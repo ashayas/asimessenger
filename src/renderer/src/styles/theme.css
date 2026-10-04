@@ -1,0 +1,73 @@
+/*
+ * Messenger 7 → 8 look.
+ * Structure from 7.5 (toolbar of big icons, "says:" transcript, display pictures at the side);
+ * finish from Live 8 (glass header, soft gradients, rounded glossy buttons).
+ * Tokens only: components never use literal colors. Switch with <html data-theme="luna"> for the 7.5 blue titlebar.
+ */
+:root {
+  --font-ui: 'Segoe UI', Tahoma, 'Lucida Grande', system-ui, sans-serif;
+  --font-title: 'Trebuchet MS', 'Segoe UI', Tahoma, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  --fs: 12px;
+
+  --ink: #1b2b48;
+  --ink-soft: #52648a;
+  --ink-faint: #8a99b5;
+  --link: #1652c7;
+
+  --win-a: #f6faff;          /* window body gradient */
+  --win-b: #dbe8f8;
+  --pane: #ffffff;
+  --pane-tint: #f1f6fd;
+  --rule: #a8bedd;
+  --rule-soft: #d6e3f4;
+  --select: #cfe1fa;
+  --select-ink: #0d2a63;
+
+  --glass-a: rgba(255, 255, 255, 0.92);   /* Live 8 header glass */
+  --glass-b: rgba(190, 214, 245, 0.88);
+  --title-a: #f4f9ff;
+  --title-b: #c6daf3;
+  --title-ink: #1b2b48;
+  --accent: #2a63d6;
+  --accent-deep: #0b3fb0;
+
+  --btn-a: #ffffff;
+  --btn-b: #d9e6f7;
+  --btn-border: #7f9bc6;
+  --btn-pri-a: #6fa2f5;
+  --btn-pri-b: #2a5fd0;
+  --btn-pri-border: #1b45a6;
+
+  --online: #38b02c;
+  --busy: #d83a2c;
+  --away: #eb9a10;
+  --offline: #9aa6b8;
+  --spark: #f2b400;
+
+  --warn-bg: #fff4d6;
+  --warn-ink: #7a4b00;
+  --warn-border: #efd58a;
+  --danger-bg: #fde5e1;
+  --danger-ink: #8f1d12;
+  --danger-border: #f2b3a9;
+  --ok-bg: #e4f6e0;
+  --ok-ink: #1e5a17;
+
+  --code-bg: #0f1b2e;
+  --code-ink: #d7e3f7;
+  --code-dim: #8196b8;
+
+  --radius: 5px;
+  --shadow-win: 0 8px 28px rgba(11, 45, 120, 0.22);
+}
+
+:root[data-theme='luna'] {
+  --title-a: #2a63d6;
+  --title-b: #0b3fb0;
+  --title-ink: #ffffff;
+  --glass-a: #eaf2fd;
+  --glass-b: #c9dbf5;
+  --win-a: #ffffff;
+  --win-b: #e6effb;
+}

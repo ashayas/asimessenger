@@ -9,6 +9,8 @@ const iconPath = join(import.meta.dirname, '../../build/icon.png')
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 330,
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 12, y: 8 },
     height: 720,
     title: APP_NAME,
     show: false,

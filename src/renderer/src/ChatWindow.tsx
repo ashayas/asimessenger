@@ -8,7 +8,11 @@ import { useSetting } from './hooks'
 import { MODE_LABEL, canUseMode, lockedReason } from '@shared/safety'
 import type { Mode } from '@shared/models'
 import { MessageView } from './MessageViews'
+import { LabelChips, LabelEditor } from './LabelEditor'
 import { play } from './sounds'
+
+/** Stable empty array: zustand selectors must not return a fresh [] each render. */
+const NO_LABELS: string[] = []
 
 function useChat(chatId: string) {
   const [chat, setChat] = useState<Chat | null>(null)
@@ -38,6 +42,16 @@ export function ChatWindow({ chatId }: { chatId: string }) {
   const [draft, setDraft] = useState('')
   const [globalDangerous] = useSetting<boolean>('allowDangerous', false)
   const [modeNote, setModeNote] = useState<string | null>(null)
+  const [editingLabels, setEditingLabels] = useState(false)
+  const chatLabelIds = useData((s) => s.chatLabels[chatId] ?? NO_LABELS)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'l') { e.preventDefault(); setEditingLabels((v) => !v) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -101,8 +115,12 @@ export function ChatWindow({ chatId }: { chatId: string }) {
       </div>
       <div className="to">
         <b>To:</b> {friend.displayName} <StatusDot presence={presence} />
-        {live?.message ? <span className="funky"> — {live.message}</span> : null}
+        {live?.message ? <span className={friend.letteringStyle === 'plain' ? '' : 'funky'}> — {live.message}</span> : null}
+        <span className="grow" />
+        <LabelChips ids={chatLabelIds} />
+        <button className="linkish" onClick={() => setEditingLabels((v) => !v)} title="Label this chat (⌘L)">🏷 Label</button>
       </div>
+      {editingLabels ? <LabelEditor target={{ kind: 'chat', id: chatId }} onClose={() => setEditingLabels(false)} /> : null}
       <div className="convo">
         <div className="transcript" data-testid="transcript">
           {blocks.length === 0 && <div className="empty">Say something to {friend.displayName}.</div>}

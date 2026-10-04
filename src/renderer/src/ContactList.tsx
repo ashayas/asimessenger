@@ -4,15 +4,17 @@ import { avatarFor } from '@shared/harness-meta'
 import { PRESENCE_LABEL, type Presence } from '@shared/status'
 import { Avatar, Banner, Btn, StatusDot, WindowFrame } from './ui/kit'
 import { useData } from './store'
+import { LabelChips, LabelEditor } from './LabelEditor'
 
 type Tab = 'friends' | 'chats' | 'labels'
 const SELECTABLE: Presence[] = ['online', 'busy', 'away', 'offline']
 
 export function ContactList() {
-  const { friends, chats, availability, profile, setProfile, workspaces, activeWorkspaceId, setActiveWorkspace, addWorkspaceFromFolder, openFriend, newChatWith, openChat } = useData()
+  const { friends, chats, availability, labels, friendLabels, chatLabels, profile, setProfile, workspaces, activeWorkspaceId, setActiveWorkspace, addWorkspaceFromFolder, openFriend, newChatWith, openChat } = useData()
   const [tab, setTab] = useState<Tab>('friends')
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
+  const [labeling, setLabeling] = useState(false)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   const { groups, live } = useMemo(() => groupFriends(friends, chats, availability, filter), [friends, chats, availability, filter])
@@ -113,6 +115,7 @@ export function ContactList() {
                         <div className="nm">
                           <StatusDot presence={l.presence} />
                           {f.displayName}
+                          <LabelChips ids={friendLabels[id] ?? []} />
                           {chats.some((c) => c.friendId === id && c.mode === 'dangerous') ? <span className="danger-badge" title="A chat with this friend is in dangerous mode">⚠</span> : null}
                           {l.unread > 0 ? <span className="badge">{l.unread}</span> : null}
                         </div>
@@ -138,11 +141,25 @@ export function ContactList() {
             ))
           ))}
 
-        {tab === 'labels' && <div className="empty">Labels you add to friends and chats will group them here.</div>}
+        {tab === 'labels' && labels.length === 0 && <div className="empty">Labels you add to friends and chats will group them here.</div>}
+        {tab === 'labels' &&
+          labels.map((l) => {
+            const fs = friends.filter((f) => (friendLabels[f.id] ?? []).includes(l.id))
+            const cs = wsChats.filter((c) => (chatLabels[c.id] ?? []).includes(l.id))
+            return (
+              <div key={l.id} className="lbl-group" data-label-group={l.name}>
+                <div className="grp"><span className="swatch" style={{ background: l.color ?? 'var(--accent)' }} /> {l.name} ({fs.length + cs.length})</div>
+                {fs.map((f) => (<div key={f.id} className="contact" data-friend={f.displayName} onDoubleClick={() => void openFriend(f.id)}><div className="who"><div className="nm">{f.displayName}</div><div className="st">friend</div></div></div>))}
+                {cs.map((c) => (<div key={c.id} className="contact" data-chat={c.title} onDoubleClick={() => void openChat(c.id)}><div className="who"><div className="nm">{c.title}</div><div className="st">{friendById.get(c.friendId)?.displayName}</div></div></div>))}
+              </div>
+            )
+          })}
         {tab === 'friends' && groups.length === 0 && <div className="empty">No friends match “{filter}”.</div>}
       </div>
 
       <div className="foot">
+        {labeling && selected ? <LabelEditor target={{ kind: 'friend', id: selected }} onClose={() => setLabeling(false)} /> : null}
+        <Btn className="wide" disabled={!selected} onClick={() => setLabeling((v) => !v)} title="Add or remove labels on the selected friend">🏷 Label selected friend</Btn>
         <Btn className="wide" disabled={!selected} onClick={() => selected && void newChatWith(selected)} title="Start a new chat with the selected friend (⌘N)">New chat with selected friend</Btn>
         <Btn className="wide" onClick={() => void window.asi.friends.openAddWindow()} title="Register a coding agent CLI (⌘⇧N)">＋ Add a friend</Btn>
       </div>

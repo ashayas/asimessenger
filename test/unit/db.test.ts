@@ -98,3 +98,20 @@ test('workspaces take the next free ⌘ slot, and null opts out', async () => {
   expect((await repo.workspaces.create({ name: 'd', path: '/d' })).slot).toBe(1)
   expect((await repo.workspaces.list()).map((w) => w.name)).toEqual(['d', 'b', 'c'])
 })
+
+test('labels: friend and chat assignments, bulk listing, rename and cascade on delete', async () => {
+  const { friend, chat } = await seed()
+  const infra = await repo.labels.create('infra', '#6b3fa0')
+  const urgent = await repo.labels.create('urgent')
+  await repo.labels.setForFriend(friend.id, [infra.id])
+  await repo.labels.setForChat(chat.id, [infra.id, urgent.id])
+  expect((await repo.labels.forFriend(friend.id)).map((l) => l.name)).toEqual(['infra'])
+  const a = await repo.labels.assignments()
+  expect(a.friends).toEqual([{ friendId: friend.id, labelId: infra.id }])
+  expect(a.chats.map((c) => c.labelId).sort()).toEqual([infra.id, urgent.id].sort())
+  await repo.labels.rename(urgent.id, 'p0')
+  expect((await repo.labels.forChat(chat.id)).map((l) => l.name)).toEqual(['infra', 'p0'])
+  await repo.labels.remove(infra.id)
+  expect((await repo.labels.assignments()).friends).toEqual([])
+  await expect(repo.labels.create('p0')).rejects.toThrow() // names are unique
+})

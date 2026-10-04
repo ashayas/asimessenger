@@ -261,3 +261,14 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .rsnip { color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rwhere { color: var(--ink-soft); font-size: 11px; white-space: nowrap; align-self: center; }
 .pfoot { display: flex; gap: 14px; padding: 5px 12px; border-top: 1px solid var(--rule-soft); color: var(--ink-soft); font-size: 11px; background: var(--pane-tint); }
+
+/* ---------- labels ---------- */
+.lchip { display: inline-block; padding: 0 6px; border-radius: 8px; color: #fff; font-size: 10px; line-height: 15px; font-weight: bold; }
+.label-editor { border-top: 1px solid var(--rule); background: var(--pane-tint); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; flex: none; }
+.le-list { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.le-item { display: inline-flex; gap: 5px; align-items: center; }
+.swatch { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.le-new { display: flex; gap: 6px; }
+.empty-inline { color: var(--ink-faint); }
+.lbl-group .grp { cursor: default; }
+.linkish { border: 0; background: transparent; color: var(--link); padding: 0 4px; } .linkish:hover { text-decoration: underline; } .to .grow { flex: 1; }

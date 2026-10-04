@@ -108,6 +108,25 @@ export function createRepo(db: Db) {
         await run('DELETE FROM chat_labels WHERE chat_id = ?', [chatId])
         for (const l of labelIds) await run('INSERT INTO chat_labels(chat_id,label_id) VALUES (?,?)', [chatId, l])
       },
+      async forFriend(friendId: string): Promise<Label[]> {
+        return (await all('SELECT l.* FROM labels l JOIN friend_labels fl ON fl.label_id = l.id WHERE fl.friend_id = ? ORDER BY l.name', [friendId]))
+          .map((r) => ({ id: String(r['id']), name: String(r['name']), color: (r['color'] as string | null) ?? null }))
+      },
+      /** Every (target, label) pair, for building the Labels view in one round trip. */
+      async assignments(): Promise<{ friends: { friendId: string; labelId: string }[]; chats: { chatId: string; labelId: string }[] }> {
+        const f = await all('SELECT friend_id, label_id FROM friend_labels')
+        const c = await all('SELECT chat_id, label_id FROM chat_labels')
+        return {
+          friends: f.map((r) => ({ friendId: String(r['friend_id']), labelId: String(r['label_id']) })),
+          chats: c.map((r) => ({ chatId: String(r['chat_id']), labelId: String(r['label_id']) }))
+        }
+      },
+      async rename(id: string, name: string): Promise<void> {
+        await run('UPDATE labels SET name = ? WHERE id = ?', [name, id])
+      },
+      async remove(id: string): Promise<void> {
+        await run('DELETE FROM labels WHERE id = ?', [id])
+      },
       async forChat(chatId: string): Promise<Label[]> {
         return (await all('SELECT l.* FROM labels l JOIN chat_labels cl ON cl.label_id = l.id WHERE cl.chat_id = ? ORDER BY l.name', [chatId]))
           .map((r) => ({ id: String(r['id']), name: String(r['name']), color: (r['color'] as string | null) ?? null }))

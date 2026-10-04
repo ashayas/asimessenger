@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Chat, Friend, Workspace } from '@shared/models'
+import type { Chat, Friend, Label, Workspace } from '@shared/models'
 import type { Presence } from '@shared/status'
 
 export interface Profile {
@@ -16,6 +16,9 @@ interface DataState {
   profile: Profile
   activeWorkspaceId: string | null
   availability: Record<string, boolean>
+  labels: Label[]
+  friendLabels: Record<string, string[]>
+  chatLabels: Record<string, string[]>
   refresh(): Promise<void>
   setProfile(patch: Partial<Profile>): Promise<void>
   setActiveWorkspace(id: string): Promise<void>
@@ -36,18 +39,26 @@ export const useData = create<DataState>((set, get) => ({
   profile: DEFAULT_PROFILE,
   activeWorkspaceId: null,
   availability: {},
+  labels: [],
+  friendLabels: {},
+  chatLabels: {},
   async refresh() {
     const api = window.asi.api
-    const [workspaces, friends, chats, profile, stored, availability] = await Promise.all([
+    const [workspaces, friends, chats, profile, stored, availability, labels, assigned] = await Promise.all([
       api.workspaces.list(),
       api.friends.list(),
       api.chats.list(),
       api.settings.get<Profile>('profile', DEFAULT_PROFILE),
       api.settings.get<string | null>('activeWorkspaceId', null),
-      window.asi.friends.availability()
+      window.asi.friends.availability(),
+      api.labels.list(),
+      api.labels.assignments()
     ])
+    const group = (rows: { labelId: string; [k: string]: string }[], key: string) => rows.reduce<Record<string, string[]>>((m, r) => { (m[r[key]!] ??= []).push(r.labelId); return m }, {})
+    const friendLabels = group(assigned.friends, 'friendId')
+    const chatLabels = group(assigned.chats, 'chatId')
     const activeWorkspaceId = workspaces.some((w) => w.id === stored) ? stored : (workspaces[0]?.id ?? null)
-    set({ workspaces, friends, chats, profile, activeWorkspaceId, availability, loaded: true })
+    set({ workspaces, friends, chats, profile, activeWorkspaceId, availability, labels, friendLabels, chatLabels, loaded: true })
   },
   async setProfile(patch) {
     const next = { ...get().profile, ...patch }

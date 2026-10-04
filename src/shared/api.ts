@@ -10,7 +10,7 @@ export const CHANGED_CHANNEL = 'asi:changed'
 export const REPO_METHODS = {
   workspaces: ['create', 'list', 'get', 'rename', 'remove'],
   friends: ['create', 'list', 'get', 'rename', 'setDangerousAllowed', 'remove'],
-  labels: ['create', 'list', 'setForFriend', 'setForChat', 'forChat'],
+  labels: ['create', 'list', 'setForFriend', 'setForChat', 'forFriend', 'forChat', 'assignments', 'rename', 'remove'],
   chats: ['create', 'get', 'list', 'rename', 'setMode', 'setSession', 'setStatus', 'markRead', 'remove'],
   messages: ['append', 'update', 'get', 'list'],
   attachments: ['get', 'add'],

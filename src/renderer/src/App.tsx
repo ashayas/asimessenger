@@ -7,6 +7,7 @@ import { Browser } from './Browser'
 import { Options } from './Options'
 import { Palette } from './Palette'
 import { Toast } from './Toast'
+import { Welcome } from './Welcome'
 import { Gallery } from './Gallery'
 import { startDataSync } from './store'
 import { useGlobalShortcuts } from './shortcuts'
@@ -32,6 +33,7 @@ export function App() {
   if (route === '/gallery') return <Gallery />
   if (route === '/add-friend') return <AddFriend />
   if (route === '/options') return <Options />
+  if (route === '/welcome') return <Welcome />
   if (route === '/browser') return <Browser />
   if (route === '/search') return <Palette />
   if (route.startsWith('/toast')) return <Toast />

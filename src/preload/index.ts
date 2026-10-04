@@ -93,4 +93,10 @@ const browser = {
   onState: (cb: (s: unknown) => void): (() => void) => { const h = (_e: unknown, s: unknown) => cb(s); ipcRenderer.on('asi:browser-state', h); return () => ipcRenderer.removeListener('asi:browser-state', h) }
 }
 
-contextBridge.exposeInMainWorld('asi', { browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })
+const onboarding = {
+  complete: (input: { name: string; workspacePath: string; presetIds: string[] }): Promise<void> => ipcRenderer.invoke('onboarding:complete', input),
+  micStatus: (): Promise<string> => ipcRenderer.invoke('permissions:mic-status'),
+  askMic: (): Promise<string> => ipcRenderer.invoke('permissions:ask-mic')
+}
+
+contextBridge.exposeInMainWorld('asi', { onboarding, browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })

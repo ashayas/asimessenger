@@ -50,6 +50,9 @@ export function createRepo(db: Db) {
       async rename(id: string, name: string): Promise<void> {
         await run('UPDATE workspaces SET name = ? WHERE id = ?', [name, id])
       },
+      async setPath(id: string, path: string): Promise<void> {
+        await run('UPDATE workspaces SET path = ? WHERE id = ?', [path, id])
+      },
       async remove(id: string): Promise<void> {
         await run('DELETE FROM workspaces WHERE id = ?', [id])
       },

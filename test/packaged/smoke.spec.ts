@@ -7,7 +7,7 @@ const APP = join(process.cwd(), 'release/mac-arm64/ASI Messenger.app/Contents/Ma
 
 test('the packaged app starts, stores data (libsql), runs a pty, and serves its UI', async () => {
   const userData = mkdtempSync(join(tmpdir(), 'asi-pkg-'))
-  const app = await electron.launch({ executablePath: APP, env: { ...process.env, ASI_USER_DATA: userData, ASI_NO_TOAST: '1' } })
+  const app = await electron.launch({ executablePath: APP, env: { ...process.env, ASI_USER_DATA: userData, ASI_NO_TOAST: '1', ASI_SKIP_ONBOARDING: '1' } })
   try {
     const win = await app.firstWindow()
     await expect(win.getByTestId('contacts')).toBeVisible({ timeout: 20_000 })

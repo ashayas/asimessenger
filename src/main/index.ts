@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell, systemPreferences } from 'electron'
 import { join } from 'node:path'
 import { APP_NAME } from '@shared/app'
 import { openDb } from './db/db'
@@ -8,7 +8,7 @@ import { closeToastsFor, createAttentionHandler, openNextUnread, refreshBadge } 
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
-import { createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow } from './windows'
+import { openOnboardingWindow, createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow } from './windows'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from './friends-service'
 import { createChatService } from './chat-service'
 import { loadAttachment } from './attachments'
@@ -16,6 +16,7 @@ import { searchAll } from './search'
 import { createTerminalService } from './terminal'
 import { createMcpBridge } from './mcp-bridge'
 import { createBrowserManager } from './browser'
+import { completeOnboarding, isOnboarded } from './onboarding'
 import { listDrawings, loadDrawing, newDrawingName, saveDrawing, savePng } from './doodle'
 import { ensureDefaults } from './defaults'
 import { installMenu } from './menu'
@@ -144,7 +145,16 @@ app.whenReady().then(async () => {
   installMenu()
   app.on('before-quit', () => db.close())
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(iconPath))
-  openContactsWindow()
+  ipcMain.handle('onboarding:complete', async (e, input) => {
+    await completeOnboarding(repo, input)
+    broadcastChanged('settings'); broadcastChanged('friends'); broadcastChanged('workspaces')
+    openContactsWindow()
+    BrowserWindow.fromWebContents(e.sender)?.close()
+  })
+  ipcMain.handle('permissions:mic-status', () => (process.platform === 'darwin' ? systemPreferences.getMediaAccessStatus('microphone') : 'granted'))
+  ipcMain.handle('permissions:ask-mic', async () => (process.platform === 'darwin' ? ((await systemPreferences.askForMediaAccess('microphone')) ? 'granted' : 'denied') : 'granted'))
+  if (!process.env['ASI_SKIP_ONBOARDING'] && !(await isOnboarded(repo))) openOnboardingWindow()
+  else openContactsWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) openContactsWindow()
   })

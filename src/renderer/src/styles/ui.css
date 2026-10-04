@@ -302,3 +302,21 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .card.link { flex-direction: row; align-items: center; gap: 8px; }
 .card.link .url { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11.5px var(--font-mono); }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+
+/* ---------- welcome / sign in ---------- */
+.welcome { height: 100%; display: flex; flex-direction: column; }
+.w-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 12px; background: linear-gradient(180deg, var(--pane), var(--pane-tint)); }
+.w-hero { display: flex; gap: 14px; align-items: center; }
+.w-hero h1 { margin: 0; font: bold 24px var(--font-title); color: var(--accent-deep); }
+.w-hero p { margin: 2px 0 0; color: var(--ink-soft); }
+.welcome h3 { margin: 0 0 4px; font: bold 12px var(--font-title); color: var(--accent-deep); }
+.welcome .row { display: flex; gap: 8px; align-items: center; }
+.welcome .hint { margin: 4px 0 0; color: var(--ink-soft); font-size: 11px; }
+.w-agents { border: 1px solid var(--rule-soft); border-radius: 4px; background: var(--pane); overflow: hidden; }
+.w-agent { display: flex; gap: 10px; align-items: center; padding: 5px 10px; border-top: 1px solid var(--rule-soft); }
+.w-agent:first-child { border-top: 0; }
+.w-agent .grow { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.w-agent .meta { color: var(--ink-soft); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-perm { display: flex; gap: 8px; align-items: center; padding: 4px 0; }
+.w-perm .grow { flex: 1; }
+.btn.signin { min-height: 32px; font-size: 13px; font-weight: bold; margin-top: auto; }

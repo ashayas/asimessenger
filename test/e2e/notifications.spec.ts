@@ -15,7 +15,8 @@ test('an agent that needs you while you are elsewhere pops a toast, badges the d
     await chat.getByLabel('Message').fill('/script permission')
 
     // make sure the chat window is not the focused one
-    await h.app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().forEach((w) => w.blur()) })
+    await h.app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('#/contacts'))?.focus() })
+    await expect.poll(() => h.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('#/chat/'))?.isFocused())).toBe(false)
     const toastP = h.app.waitForEvent('window')
     await chat.getByLabel('Message').press('Enter')
     const toast = await toastP

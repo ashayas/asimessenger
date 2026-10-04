@@ -175,3 +175,17 @@ export function createBrowserWindow(): BrowserWindow {
   loadRoute(win, '/browser')
   return win
 }
+
+let onboardingWindow: BrowserWindow | null = null
+export function openOnboardingWindow(): BrowserWindow {
+  if (onboardingWindow && !onboardingWindow.isDestroyed()) {
+    onboardingWindow.show()
+    return onboardingWindow
+  }
+  const win = new BrowserWindow(baseOptions({ width: 460, height: 700, minWidth: 420, minHeight: 560, title: 'Welcome to ASI Messenger' }))
+  onboardingWindow = win
+  win.once('ready-to-show', () => win.show())
+  win.on('closed', () => { onboardingWindow = null })
+  loadRoute(win, '/welcome')
+  return win
+}

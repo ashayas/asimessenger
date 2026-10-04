@@ -6,6 +6,11 @@ export function useGlobalShortcuts(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey) return
+      if (e.shiftKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        void window.asi.browser.open('about:blank')
+        return
+      }
       if (e.shiftKey && e.key.toLowerCase() === 'd') {
         e.preventDefault()
         const { activeWorkspaceId } = useData.getState()

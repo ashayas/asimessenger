@@ -287,3 +287,18 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 /* ---------- terminal drawer ---------- */
 .term { height: 220px; flex: none; background: #0f1b2e; padding: 4px 6px; border-top: 2px solid var(--accent-deep); }
 .term .xterm { height: 100%; }
+
+/* ---------- browser chrome ---------- */
+.browser-chrome { display: flex; flex-direction: column; overflow: hidden; }
+.btabs { display: flex; gap: 2px; padding: 4px 8px 0; height: 28px; background: linear-gradient(180deg, var(--glass-a), var(--glass-b)); border-bottom: 1px solid var(--rule); overflow-x: auto; }
+.btab { display: flex; gap: 6px; align-items: center; max-width: 200px; padding: 0 8px; border: 1px solid var(--rule); border-bottom: 0; border-radius: 4px 4px 0 0; background: var(--pane-tint); font-size: 11.5px; }
+.btab.sel { background: var(--pane); font-weight: bold; }
+.btab .bt-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btab button, .btab-new { border: 0; background: transparent; color: var(--ink-soft); }
+.baddr { display: flex; gap: 4px; align-items: center; padding: 4px 8px; background: var(--pane); border-bottom: 1px solid var(--rule); }
+.baddr button { border: 1px solid var(--btn-border); border-radius: 3px; background: linear-gradient(180deg, var(--btn-a), var(--btn-b)); min-width: 26px; height: 24px; }
+.baddr button:disabled { opacity: .4; }
+.baddr .field { flex: 1; }
+.card.link { flex-direction: row; align-items: center; gap: 8px; }
+.card.link .url { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11.5px var(--font-mono); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }

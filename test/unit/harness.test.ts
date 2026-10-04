@@ -167,3 +167,24 @@ test('attention events fire for replies, permissions and questions (not for your
   expect(seen.length).toBe(before)
   await mgr.disposeAll()
 })
+
+test('"!cmd" runs in the workspace, shows output and exit code, and never reaches the agent', async () => {
+  const msg = (await service.send(chatId, '!echo hello-shell && pwd && exit 3'))!
+  const done = await repo.messages.get(msg.id)
+  const b = done!.body as { command: string; output: string; exit: number; done: boolean; cwd: string }
+  expect(b).toMatchObject({ command: 'echo hello-shell && pwd && exit 3', exit: 3, done: true })
+  expect(b.output).toContain('hello-shell')
+  expect(b.output).toContain(b.cwd)
+  expect(manager.isLive(chatId)).toBe(false) // no agent session was started
+  expect((await repo.messages.list(chatId)).filter((m) => m.role === 'agent')).toHaveLength(0)
+})
+
+test('"/open" routes URLs to the browser and paths to the OS', async () => {
+  const opened: string[] = []
+  const svc = createChatService({ repo, manager, ingestor: createIngestor(repo, () => {}), notify: () => {}, opener: { url: (u) => opened.push(`url:${u}`), path: (p) => opened.push(`path:${p}`) } })
+  await svc.send(chatId, '/open localhost:5173')
+  await svc.send(chatId, '/open https://example.com/docs')
+  await svc.send(chatId, '/open README.md')
+  await svc.send(chatId, '/open javascript:alert(1)')
+  expect(opened).toEqual(['url:http://localhost:5173', 'url:https://example.com/docs', `path:${process.cwd()}/README.md`]) // javascript:/file: style targets are refused
+})

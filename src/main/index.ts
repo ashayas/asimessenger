@@ -8,13 +8,14 @@ import { closeToastsFor, createAttentionHandler, openNextUnread, refreshBadge } 
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
-import { openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow } from './windows'
+import { createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow } from './windows'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from './friends-service'
 import { createChatService } from './chat-service'
 import { loadAttachment } from './attachments'
 import { searchAll } from './search'
 import { createTerminalService } from './terminal'
 import { createMcpBridge } from './mcp-bridge'
+import { createBrowserManager } from './browser'
 import { listDrawings, loadDrawing, newDrawingName, saveDrawing, savePng } from './doodle'
 import { ensureDefaults } from './defaults'
 import { installMenu } from './menu'
@@ -44,12 +45,24 @@ app.whenReady().then(async () => {
     badgeTimer = setTimeout(() => void refreshBadge(repo), 80)
   })
   void refreshBadge(repo)
+  const browser = createBrowserManager(createBrowserWindow)
+  ipcMain.handle('browser:open', (_e, url: string) => { browser.open(url) })
+  ipcMain.handle('browser:state', () => browser.state())
+  ipcMain.handle('browser:new-tab', () => browser.newTab())
+  ipcMain.handle('browser:close-tab', (_e, id: number) => browser.closeTab(id))
+  ipcMain.handle('browser:select', (_e, id: number) => browser.select(id))
+  ipcMain.handle('browser:navigate', (_e, input: string) => browser.navigate(input))
+  ipcMain.handle('browser:back', () => browser.back())
+  ipcMain.handle('browser:forward', () => browser.forward())
+  ipcMain.handle('browser:reload', () => browser.reload())
+  ipcMain.handle('browser:open-external', (_e, url: string) => browser.openExternal(url))
+  ipcMain.handle('browser:urls', () => browser.urls())
   const chatRef: { current: ReturnType<typeof createChatService> | null } = { current: null }
   const bridge = createMcpBridge({
     chatExists: async (id) => !!(await repo.chats.get(id)),
     askUser: (id, q, choices) => chatRef.current!.askUser(id, q, choices),
     sendAttachment: async (id, a) => { await ingestor.ingest(id, { t: 'attachment', id: `mcp-${Date.now()}`, kind: a.kind, name: a.name, path: a.path, body: a.content }) },
-    openUrl: async (id, url) => { await ingestor.ingest(id, { t: 'open_url', url }) },
+    openUrl: async (id, url) => { await ingestor.ingest(id, { t: 'open_url', url }); browser.open(url) },
     openDrawing: async (id, name) => { const c = await repo.chats.get(id); if (c) openDoodleWindow(c.workspaceId, { chatId: id, name }) },
     setStatus: async (id, text) => { await repo.chats.setStatus(id, 'busy', text); broadcastChanged('chats') }
   })
@@ -62,7 +75,7 @@ app.whenReady().then(async () => {
   })
   registerHarnesses(manager)
   app.on('will-quit', () => void manager.disposeAll())
-  const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged })
+  const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged, opener: { url: (u) => browser.open(u), path: (p) => void shell.openPath(p) } })
   chatRef.current = chat
   ipcMain.handle('chat:send', (_e, chatId: string, text: string, quote?: { name: string; text: string }) => chat.send(chatId, text, quote))
   ipcMain.handle('safety:set-global-dangerous', (_e, on: boolean) => chat.setGlobalDangerous(on))

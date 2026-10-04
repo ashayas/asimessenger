@@ -79,4 +79,18 @@ const pty = {
   onData: (cb: (chatId: string, data: string) => void): (() => void) => { const h = (_e: unknown, c: string, d: string) => cb(c, d); ipcRenderer.on('asi:pty-data', h); return () => ipcRenderer.removeListener('asi:pty-data', h) }
 }
 
-contextBridge.exposeInMainWorld('asi', { pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })
+const browser = {
+  open: (url: string): Promise<void> => ipcRenderer.invoke('browser:open', url),
+  state: (): Promise<unknown> => ipcRenderer.invoke('browser:state'),
+  newTab: (): Promise<void> => ipcRenderer.invoke('browser:new-tab'),
+  closeTab: (id: number): Promise<void> => ipcRenderer.invoke('browser:close-tab', id),
+  select: (id: number): Promise<void> => ipcRenderer.invoke('browser:select', id),
+  navigate: (input: string): Promise<void> => ipcRenderer.invoke('browser:navigate', input),
+  back: (): Promise<void> => ipcRenderer.invoke('browser:back'),
+  forward: (): Promise<void> => ipcRenderer.invoke('browser:forward'),
+  reload: (): Promise<void> => ipcRenderer.invoke('browser:reload'),
+  openExternal: (url: string): Promise<void> => ipcRenderer.invoke('browser:open-external', url),
+  onState: (cb: (s: unknown) => void): (() => void) => { const h = (_e: unknown, s: unknown) => cb(s); ipcRenderer.on('asi:browser-state', h); return () => ipcRenderer.removeListener('asi:browser-state', h) }
+}
+
+contextBridge.exposeInMainWorld('asi', { browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })

@@ -168,3 +168,10 @@ export function openDoodleWindow(workspaceId: string, opts: { chatId?: string; n
   loadRoute(win, `/doodle/${workspaceId}${q ? `?${q}` : ''}`)
   return win
 }
+
+export function createBrowserWindow(): BrowserWindow {
+  const win = new BrowserWindow(baseOptions({ width: 1100, height: 760, minWidth: 600, minHeight: 400, title: 'Browser' }))
+  win.once('ready-to-show', () => win.show())
+  loadRoute(win, '/browser')
+  return win
+}

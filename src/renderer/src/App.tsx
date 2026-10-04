@@ -3,6 +3,7 @@ import { AddFriend } from './AddFriend'
 import { AttachmentViewer } from './AttachmentViewer'
 import { ChatWindow } from './ChatWindow'
 import { ContactList } from './ContactList'
+import { Browser } from './Browser'
 import { Options } from './Options'
 import { Palette } from './Palette'
 import { Toast } from './Toast'
@@ -31,6 +32,7 @@ export function App() {
   if (route === '/gallery') return <Gallery />
   if (route === '/add-friend') return <AddFriend />
   if (route === '/options') return <Options />
+  if (route === '/browser') return <Browser />
   if (route === '/search') return <Palette />
   if (route.startsWith('/toast')) return <Toast />
   const doodle = /^\/doodle\/([^?]+)/.exec(route)

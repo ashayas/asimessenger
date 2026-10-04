@@ -1,4 +1,9 @@
+import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { isAbsolute, resolve as resolvePath } from 'node:path'
+import { loginEnv } from '../harness/env'
+import { isAllowedNavigation, normalizeUrl } from '@shared/browser'
 import type { Repo } from './db/repo'
 import type { Message } from '@shared/models'
 import type { PermDecision, UserTurn } from '@shared/events'
@@ -17,8 +22,18 @@ const autoTitle = (text: string) => {
 
 const NUDGE_COOLDOWN_MS = 3000
 
-export function createChatService(deps: { repo: Repo; manager: HarnessManager; ingestor: Ingestor; notify: (topic: string) => void }) {
+const SHELL_OUTPUT_MAX = 100_000
+const SHELL_TIMEOUT_MS = 120_000
+
+export interface Opener {
+  url(u: string): void
+  path(p: string): void
+}
+
+export function createChatService(deps: { repo: Repo; manager: HarnessManager; ingestor: Ingestor; notify: (topic: string) => void; opener?: Opener }) {
   const { repo, manager, ingestor, notify } = deps
+  const opener: Opener = deps.opener ?? { url: () => {}, path: () => {} }
+  const shells = new Map<string, ChildProcess>()
   const lastNudge = new Map<string, number>()
   /** Questions an agent asked through ask_user, waiting for you. */
   const asks = new Map<string, { chatId: string; resolve(answer: string): void }>()
@@ -32,6 +47,9 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       if (!clean) return null
       const chat = await repo.chats.get(chatId)
       if (!chat) throw new Error(`unknown chat ${chatId}`)
+      // "!cmd" runs a shell command here; "/open <url|path>" opens it. Neither goes to the agent.
+      if (clean.startsWith('!') && clean.length > 1 && !opts.silentUser) return this.runShell(chatId, clean.slice(1).trim())
+      if (/^\/open\s+\S/.test(clean) && !opts.silentUser) return this.openTarget(chatId, clean.replace(/^\/open\s+/, '').trim())
       const friend = await repo.friends.get(chat.friendId)
       if (!friend) throw new Error(`unknown friend ${chat.friendId}`)
       const ws = await repo.workspaces.get(chat.workspaceId)
@@ -47,6 +65,53 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
         notify('messages'); notify('chats')
       }
       return shown
+    },
+
+    /** "!cmd": run a command in the chat's workspace and show it as a block. The agent does not see it. */
+    async runShell(chatId: string, cmd: string): Promise<Message | null> {
+      const chat = await repo.chats.get(chatId)
+      if (!chat) throw new Error(`unknown chat ${chatId}`)
+      const ws = await repo.workspaces.get(chat.workspaceId)
+      const cwd = ws?.path ?? process.cwd()
+      const id = `sh-${randomUUID()}`
+      const base = { t: 'tool', id, kind: 'exec', title: 'Shell', command: cmd, cwd } as const
+      const msg = await repo.messages.append({ chatId, role: 'user', kind: 'tool', body: { ...base, done: false }, text: cmd })
+      notify('messages')
+      const env = await loginEnv()
+      const started = Date.now()
+      let out = ''
+      const child = spawn(process.env['SHELL'] || '/bin/zsh', ['-c', cmd], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] })
+      shells.set(chatId, child)
+      const take = (d: Buffer) => { if (out.length < SHELL_OUTPUT_MAX) out += d.toString('utf8') }
+      child.stdout.on('data', take)
+      child.stderr.on('data', take)
+      const timer = setTimeout(() => child.kill('SIGTERM'), SHELL_TIMEOUT_MS)
+      const code = await new Promise<number>((r) => { child.on('error', () => r(127)); child.on('close', (c, sig) => r(c ?? (sig ? 130 : 1))) })
+      clearTimeout(timer)
+      shells.delete(chatId)
+      await repo.messages.update(msg.id, { body: { ...base, output: out.slice(0, SHELL_OUTPUT_MAX), exit: code, durationMs: Date.now() - started, done: true } })
+      notify('messages')
+      return msg
+    },
+
+    /** "/open <target>": web URLs open in the in-app browser, anything else is a path inside the workspace. */
+    async openTarget(chatId: string, target: string): Promise<Message | null> {
+      const chat = await repo.chats.get(chatId)
+      if (!chat) throw new Error(`unknown chat ${chatId}`)
+      const ws = await repo.workspaces.get(chat.workspaceId)
+      const say = async (text: string) => { const m = await repo.messages.append({ chatId, role: 'system', kind: 'system', body: { text }, text }); notify('messages'); return m }
+      const asUrl = normalizeUrl(target)
+      const existsHere = existsSync(isAbsolute(target) ? target : resolvePath(ws?.path ?? process.cwd(), target)) // README.md is a file, not the .md domain
+      if (!existsHere && (/^(https?:\/\/|localhost|127\.0\.0\.1|\[::1\])/i.test(target) || (!target.includes('/') && /^[\w-]+(\.[\w-]+)+(:\d+)?$/.test(target)))) {
+        if (!isAllowedNavigation(asUrl)) return say(`Cannot open ${target}`)
+        opener.url(asUrl)
+        return say(`Opened ${asUrl} in the browser.`)
+      }
+      if (/^[a-z][a-z0-9+.-]*:/i.test(target) && !/^https?:/i.test(target)) return say(`Cannot open ${target}: only web addresses and file paths`)
+      const root = ws?.path ?? process.cwd()
+      const full = isAbsolute(target) ? target : resolvePath(root, target)
+      opener.path(full)
+      return say(`Opened ${full}.`)
     },
 
     /** Start (or fetch) the live agent session for a chat without sending anything. */
@@ -118,6 +183,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
     /** Plain stop. */
     async interrupt(chatId: string): Promise<void> {
       cancelAsks(chatId, 'The human interrupted before answering.')
+      shells.get(chatId)?.kill('SIGINT')
       await manager.interrupt(chatId)
     },
 

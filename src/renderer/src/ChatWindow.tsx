@@ -112,7 +112,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
         <ToolButton icon="👥" label="Invite" disabled />
         <ToolButton icon="📎" label="Send Files" onClick={() => void window.asi.attachments.pickFiles().then(async (paths) => { if (paths.length) await window.asi.attachments.sendFiles(chatId, paths) })} />
         <ToolButton icon="✏️" label="Doodle" onClick={() => void window.asi.doodle.open(chat.workspaceId, { chatId })} />
-        <ToolButton icon="🌐" label="Browser" disabled />
+        <ToolButton icon="🌐" label="Browser" onClick={() => void window.asi.browser.open('about:blank')} />
         <ToolButton icon="🎙" label="Voice Clip" disabled />
         <ToolButton icon="⌨" label="Terminal" disabled={!terminalPossible} onClick={() => (friend.harness === 'pty' ? setDrawer((v) => !v) : void window.asi.pty.openExternal(chatId))} />
         <ToolButton icon="📳" label="Nudge" onClick={() => void window.asi.chat.nudge(chatId).then((sent) => { if (sent) play('nudge') })} />
@@ -173,7 +173,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
         <textarea
           className="field"
           aria-label="Message"
-          placeholder={`Reply to ${friend.displayName}…`}
+          placeholder={`Reply to ${friend.displayName}… (! runs a shell command, /open opens a URL or file)`}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {

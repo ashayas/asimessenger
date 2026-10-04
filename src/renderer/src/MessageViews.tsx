@@ -3,6 +3,7 @@ import type { Message } from '@shared/models'
 import type { AgentEvent } from '@shared/events'
 import { Btn } from './ui/kit'
 import { badgeFor } from '@shared/attachments'
+import { findLocalUrls } from '@shared/browser'
 
 type Tool = Extract<AgentEvent, { t: 'tool' }>
 type Perm = Extract<AgentEvent, { t: 'permission' }> & { decision: string | null; reason?: string | null }
@@ -19,6 +20,7 @@ export function MessageView({ m, chatId }: { m: Message; chatId: string }) {
         <div className="msg" data-kind="text">
           {quote ? <blockquote className="quote" data-testid="quote"><div className="qname">{quote.name}</div>{quote.text}</blockquote> : null}
           {m.text}
+          {m.role === 'agent' ? <LocalLinks text={m.text ?? ''} /> : null}
         </div>
       )
     }
@@ -37,6 +39,15 @@ export function MessageView({ m, chatId }: { m: Message; chatId: string }) {
       return <QuestionCard chatId={chatId} q={m.body as Quest} />
     case 'attachment':
       return <AttachmentCard a={m.body as Attach} messageId={m.id} />
+    case 'open_url': {
+      const url = String((m.body as { url?: string } | null)?.url ?? m.text ?? '')
+      return (
+        <div className="card link" data-kind="open_url">
+          <span aria-hidden="true">🌐</span><span className="url" title={url}>{url}</span>
+          <Btn onClick={() => void window.asi.browser.open(url)}>Open</Btn>
+        </div>
+      )
+    }
     case 'nudge':
       return <div className="msg nudge" data-kind="nudge">📳 {m.text}</div>
     case 'error':
@@ -129,6 +140,17 @@ function AttachmentCard({ a, messageId }: { a: Attach; messageId: string }) {
         <div className="grow"><b>{a.name}</b><div className="says">{a.kind} · sent as attachment</div></div>
         <Btn onClick={() => void window.asi.attachments.open(messageId)}>Open</Btn>
       </div>
+    </div>
+  )
+}
+
+/** Dev-server links the agent mentioned become one-click "open in the browser" chips. */
+function LocalLinks({ text }: { text: string }) {
+  const urls = findLocalUrls(text)
+  if (urls.length === 0) return null
+  return (
+    <div className="chips" data-testid="local-links">
+      {urls.map((u) => <Btn key={u} onClick={() => void window.asi.browser.open(u)} title="Open in the ASI Messenger browser">🌐 Open {u}</Btn>)}
     </div>
   )
 }

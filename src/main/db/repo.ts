@@ -188,6 +188,10 @@ export function createRepo(db: Db) {
     },
 
     attachments: {
+      async get(id: string): Promise<{ id: string; messageId: string; kind: string; name: string } | null> {
+        const r = (await all('SELECT id, message_id, kind, name FROM attachments WHERE id = ?', [id]))[0]
+        return r ? { id: String(r['id']), messageId: String(r['message_id']), kind: String(r['kind']), name: String(r['name']) } : null
+      },
       async add(a: { messageId: string; kind: string; name: string; path?: string | null; body?: string | null }): Promise<string> {
         const id = randomUUID()
         await run('INSERT INTO attachments(id,message_id,kind,name,path,body) VALUES (?,?,?,?,?,?)', [id, a.messageId, a.kind, a.name, a.path ?? null, a.body ?? null])

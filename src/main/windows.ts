@@ -128,3 +128,24 @@ export function openAttachmentWindow(messageId: string, title: string): BrowserW
   loadRoute(win, `/attachment/${messageId}`)
   return win
 }
+
+let searchWindow: BrowserWindow | null = null
+export function openSearchWindow(): BrowserWindow {
+  if (searchWindow && !searchWindow.isDestroyed()) {
+    searchWindow.show()
+    searchWindow.focus()
+    searchWindow.webContents.send('asi:search-focus')
+    return searchWindow
+  }
+  const win = new BrowserWindow(baseOptions({ width: 600, height: 440, minWidth: 420, minHeight: 300, title: 'Search everything', alwaysOnTop: true, center: true }))
+  searchWindow = win
+  win.once('ready-to-show', () => win.show())
+  if (!process.env['ASI_NO_AUTOCLOSE']) win.on('blur', () => { if (!win.isDestroyed()) win.close() })
+  win.on('closed', () => { searchWindow = null })
+  loadRoute(win, '/search')
+  return win
+}
+
+export function closeSearchWindow(): void {
+  if (searchWindow && !searchWindow.isDestroyed()) searchWindow.close()
+}

@@ -6,6 +6,11 @@ export function useGlobalShortcuts(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey) return
+      if (!e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        void window.asi.search.openPalette()
+        return
+      }
       if (e.shiftKey && e.key.toLowerCase() === 'u') {
         e.preventDefault()
         void window.asi.chat.openNextUnread()

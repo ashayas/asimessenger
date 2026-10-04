@@ -53,4 +53,11 @@ const attachments = {
   sendFiles: (chatId: string, paths: string[], note?: string): Promise<void> => ipcRenderer.invoke('chat:send-files', chatId, paths, note)
 }
 
-contextBridge.exposeInMainWorld('asi', { attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })
+const search = {
+  all: (q: string): Promise<unknown> => ipcRenderer.invoke('search:all', q),
+  jump: (t: unknown): Promise<void> => ipcRenderer.invoke('search:jump', t),
+  openPalette: (): Promise<void> => ipcRenderer.invoke('window:open-search'),
+  onFocus: (cb: () => void): (() => void) => { const h = () => cb(); ipcRenderer.on('asi:search-focus', h); return () => ipcRenderer.removeListener('asi:search-focus', h) }
+}
+
+contextBridge.exposeInMainWorld('asi', { search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })

@@ -8,10 +8,11 @@ import { closeToastsFor, createAttentionHandler, openNextUnread, refreshBadge } 
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
-import { openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow } from './windows'
+import { closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow } from './windows'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from './friends-service'
 import { createChatService } from './chat-service'
 import { loadAttachment } from './attachments'
+import { searchAll } from './search'
 import { ensureDefaults } from './defaults'
 import { installMenu } from './menu'
 
@@ -60,6 +61,22 @@ app.whenReady().then(async () => {
     return r.canceled ? [] : r.filePaths
   })
   ipcMain.handle('chat:send-files', (_e, chatId: string, paths: string[], note?: string) => chat.sendFiles(chatId, paths, note))
+  ipcMain.handle('window:open-search', () => { openSearchWindow() })
+  ipcMain.handle('search:all', (_e, q: string) => searchAll(repo, q))
+  ipcMain.handle('search:jump', async (_e, t: import('@shared/search').SearchTarget) => {
+    closeSearchWindow()
+    if ('workspaceId' in t && t.workspaceId) { await repo.settings.set('activeWorkspaceId', t.workspaceId); broadcastChanged('settings') }
+    if (t.type === 'chat') openChatWindow(t.chatId)
+    else if (t.type === 'attachment') { const a = await loadAttachment(repo, t.messageId); openAttachmentWindow(t.messageId, a.name) }
+    else if (t.type === 'friend') {
+      const ws = (await repo.workspaces.list())[0]
+      const active = await repo.settings.get<string | null>('activeWorkspaceId', ws?.id ?? null)
+      const existing = (await repo.chats.list({ friendId: t.friendId })).find((c) => c.workspaceId === active)
+      const chatId = existing?.id ?? (active ? (await repo.chats.create({ workspaceId: active, friendId: t.friendId })).id : null)
+      if (chatId) openChatWindow(chatId)
+    }
+    openContactsWindow()
+  })
   ipcMain.handle('chat:nudge', async (e, chatId: string) => {
     const sent = await chat.nudge(chatId)
     if (sent) shakeWindow(BrowserWindow.fromWebContents(e.sender))

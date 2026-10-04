@@ -4,6 +4,7 @@ import { AttachmentViewer } from './AttachmentViewer'
 import { ChatWindow } from './ChatWindow'
 import { ContactList } from './ContactList'
 import { Options } from './Options'
+import { Palette } from './Palette'
 import { Toast } from './Toast'
 import { Gallery } from './Gallery'
 import { startDataSync } from './store'
@@ -27,6 +28,7 @@ export function App() {
   if (route === '/gallery') return <Gallery />
   if (route === '/add-friend') return <AddFriend />
   if (route === '/options') return <Options />
+  if (route === '/search') return <Palette />
   if (route.startsWith('/toast')) return <Toast />
   const att = /^\/attachment\/(.+)$/.exec(route)
   if (att) return <AttachmentViewer messageId={att[1]!} />

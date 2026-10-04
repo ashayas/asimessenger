@@ -9,14 +9,15 @@ type Tab = 'friends' | 'chats' | 'labels'
 const SELECTABLE: Presence[] = ['online', 'busy', 'away', 'offline']
 
 export function ContactList() {
-  const { friends, chats, profile, setProfile } = useData()
+  const { friends, chats, profile, setProfile, workspaces, activeWorkspaceId, setActiveWorkspace, addWorkspaceFromFolder } = useData()
   const [tab, setTab] = useState<Tab>('friends')
   const [filter, setFilter] = useState('')
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   const { groups, live } = useMemo(() => groupFriends(friends, chats, {}, filter), [friends, chats, filter])
   const friendById = useMemo(() => new Map(friends.map((f) => [f.id, f])), [friends])
-  const unreadTotal = chats.reduce((n, c) => n + c.unreadCount, 0)
+  const wsChats = useMemo(() => chats.filter((c) => c.workspaceId === activeWorkspaceId), [chats, activeWorkspaceId])
+  const unreadTotal = wsChats.reduce((n, c) => n + c.unreadCount, 0)
 
   return (
     <WindowFrame title="ASI Messenger">
@@ -47,6 +48,23 @@ export function ContactList() {
           />
         }
       />
+
+      <div className="ws" role="tablist" aria-label="Workspaces">
+        {workspaces.map((w) => (
+          <button
+            key={w.id}
+            role="tab"
+            aria-selected={w.id === activeWorkspaceId}
+            className={w.id === activeWorkspaceId ? 'sel' : ''}
+            title={w.path}
+            data-workspace={w.name}
+            onClick={() => void setActiveWorkspace(w.id)}
+          >
+            {w.slot ? <span className="slot">⌘{w.slot}</span> : null} {w.name}
+          </button>
+        ))}
+        <button className="add" aria-label="Add workspace" title="Add a workspace folder" onClick={() => void addWorkspaceFromFolder()}>＋</button>
+      </div>
 
       <div className="searchbar">
         <input
@@ -98,10 +116,10 @@ export function ContactList() {
           ))}
 
         {tab === 'chats' &&
-          (chats.length === 0 ? (
-            <div className="empty">No chats yet. Double-click a friend to start one.</div>
+          (wsChats.length === 0 ? (
+            <div className="empty">No chats in this workspace yet. Double-click a friend to start one.</div>
           ) : (
-            chats.map((c) => (
+            wsChats.map((c) => (
               <div key={c.id} className="contact" data-chat={c.title}>
                 <div className="who">
                   <div className="nm">{c.title}{c.unreadCount > 0 ? <span className="badge">{c.unreadCount}</span> : null}</div>

@@ -88,3 +88,13 @@ test('labels and settings round-trip; file db persists across reopen', async () 
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('workspaces take the next free ⌘ slot, and null opts out', async () => {
+  const a = await repo.workspaces.create({ name: 'a', path: '/a' })
+  const b = await repo.workspaces.create({ name: 'b', path: '/b' })
+  const c = await repo.workspaces.create({ name: 'c', path: '/c', slot: null })
+  expect([a.slot, b.slot, c.slot]).toEqual([1, 2, null])
+  await repo.workspaces.remove(a.id)
+  expect((await repo.workspaces.create({ name: 'd', path: '/d' })).slot).toBe(1)
+  expect((await repo.workspaces.list()).map((w) => w.name)).toEqual(['d', 'b', 'c'])
+})

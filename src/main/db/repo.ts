@@ -36,10 +36,22 @@ export function createRepo(db: Db) {
 
   return {
     workspaces: {
+      /** slot: omit to take the next free ⌘1-9 slot; pass null for no shortcut. */
       async create(w: { name: string; path: string; slot?: number | null; color?: string | null }): Promise<Workspace> {
         const id = randomUUID()
-        await run('INSERT INTO workspaces(id,name,path,slot,color) VALUES (?,?,?,?,?)', [id, w.name, w.path, w.slot ?? null, w.color ?? null])
-        return { id, name: w.name, path: w.path, slot: w.slot ?? null, color: w.color ?? null }
+        let slot = w.slot
+        if (slot === undefined) {
+          const used = new Set((await all('SELECT slot FROM workspaces WHERE slot IS NOT NULL')).map((r) => Number(r['slot'])))
+          slot = [1, 2, 3, 4, 5, 6, 7, 8, 9].find((n) => !used.has(n)) ?? null
+        }
+        await run('INSERT INTO workspaces(id,name,path,slot,color) VALUES (?,?,?,?,?)', [id, w.name, w.path, slot, w.color ?? null])
+        return { id, name: w.name, path: w.path, slot, color: w.color ?? null }
+      },
+      async rename(id: string, name: string): Promise<void> {
+        await run('UPDATE workspaces SET name = ? WHERE id = ?', [name, id])
+      },
+      async remove(id: string): Promise<void> {
+        await run('DELETE FROM workspaces WHERE id = ?', [id])
       },
       async list(): Promise<Workspace[]> {
         return (await all('SELECT * FROM workspaces ORDER BY COALESCE(slot, 999), name')).map(toWorkspace)

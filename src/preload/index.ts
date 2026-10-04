@@ -15,4 +15,6 @@ function onChanged(cb: (topic: string) => void): () => void {
   return () => ipcRenderer.removeListener(CHANGED_CHANNEL, handler)
 }
 
-contextBridge.exposeInMainWorld('asi', { platform: process.platform, api, onChanged })
+const pickFolder = (): Promise<string | null> => ipcRenderer.invoke('dialog:pick-folder')
+
+contextBridge.exposeInMainWorld('asi', { platform: process.platform, api, onChanged, pickFolder })

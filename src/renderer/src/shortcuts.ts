@@ -1,0 +1,21 @@
+import { useEffect } from 'react'
+import { useData } from './store'
+
+/** Global key handling for the renderer window. ⌘1-9 jumps to the workspace in that slot. */
+export function useGlobalShortcuts(): void {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
+      if (/^[1-9]$/.test(e.key)) {
+        const { workspaces, setActiveWorkspace } = useData.getState()
+        const ws = workspaces.find((w) => w.slot === Number(e.key))
+        if (ws) {
+          e.preventDefault()
+          void setActiveWorkspace(ws.id)
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+}

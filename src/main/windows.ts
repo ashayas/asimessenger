@@ -91,7 +91,7 @@ export function openOptionsWindow(): BrowserWindow {
     optionsWindow.focus()
     return optionsWindow
   }
-  const win = new BrowserWindow(baseOptions({ width: 560, height: 520, minWidth: 460, minHeight: 360, title: 'Options' }))
+  const win = new BrowserWindow(baseOptions({ width: 620, height: 720, minWidth: 480, minHeight: 400, title: 'Options' }))
   optionsWindow = win
   win.once('ready-to-show', () => win.show())
   win.on('closed', () => { optionsWindow = null })

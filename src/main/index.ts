@@ -18,6 +18,12 @@ import { createMcpBridge } from './mcp-bridge'
 import { createBrowserManager } from './browser'
 import { completeOnboarding, isOnboarded } from './onboarding'
 import { appleEngine, createVoiceService, fakeEngine, type VoiceEngine } from './voice'
+import { cohereEngine } from './cohere-engine'
+import { createModelManager } from './model-manager'
+import { createVoiceRuntime } from './voice-runtime'
+import { createVoiceSetup } from './voice-setup'
+import { VOICE_MODELS, type VoiceModel } from '@shared/voice-models'
+import { readFileSync } from 'node:fs'
 import { listDrawings, loadDrawing, newDrawingName, saveDrawing, savePng } from './doodle'
 import { ensureDefaults } from './defaults'
 import { installMenu } from './menu'
@@ -151,8 +157,26 @@ app.whenReady().then(async () => {
   app.on('before-quit', () => db.close())
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(iconPath))
   const helper = app.isPackaged ? join(process.resourcesPath, 'bin', 'asi-speech') : join(app.getAppPath(), 'resources/bin/asi-speech')
-  const engines: VoiceEngine[] = process.env['ASI_VOICE_FAKE'] ? [fakeEngine(process.env['ASI_VOICE_FAKE'])] : [appleEngine(helper)]
+  const voiceRoot = join(app.getPath('userData'), 'voice')
+  const pyDir = app.isPackaged ? join(process.resourcesPath, 'py') : join(app.getAppPath(), 'native')
+  const catalog: VoiceModel[] = process.env['ASI_VOICE_MODELS_JSON'] ? (JSON.parse(readFileSync(process.env['ASI_VOICE_MODELS_JSON'], 'utf8')) as VoiceModel[]) : VOICE_MODELS
+  const runtime = createVoiceRuntime({ root: voiceRoot, requirementsPath: join(pyDir, 'voice-requirements.txt') })
+  const modelMgr = createModelManager({ root: voiceRoot, runtimeNeeded: () => !process.env['ASI_VOICE_SKIP_RUNTIME'] })
+  const setup = createVoiceSetup({ models: modelMgr, runtime, root: voiceRoot, catalog, skipRuntime: !!process.env['ASI_VOICE_SKIP_RUNTIME'] })
+  const cohere = cohereEngine({ python: runtime.pythonPath, script: join(pyDir, 'cohere_transcribe.py'), modelDir: () => setup.modelDir('cohere-transcribe-mlx-4bit'), runtimeInstalled: setup.runtimeReady })
+  app.on('will-quit', () => cohere.stop())
+  const engines: VoiceEngine[] = process.env['ASI_VOICE_FAKE'] ? [fakeEngine(process.env['ASI_VOICE_FAKE'])] : [cohere, appleEngine(helper)]
   const voice = createVoiceService(engines, () => repo.settings.get<string | null>('voiceEngine', null))
+  ipcMain.handle('voice:overview', async () => ({ ...(await setup.overview()), ...(await voice.status()) }))
+  ipcMain.handle('voice:install', async (e, modelId: string) => {
+    const send = (p: unknown) => { if (!e.sender.isDestroyed()) e.sender.send('asi:voice-progress', p) }
+    await setup.install(modelId, send)
+    if (!(await repo.settings.get<string | null>('voiceEngine', null))) await repo.settings.set('voiceEngine', 'cohere-mlx') // the recommended engine becomes the default once installed
+    broadcastChanged('settings')
+  })
+  ipcMain.handle('voice:cancel', (_e, modelId: string) => setup.cancel(modelId))
+  ipcMain.handle('voice:remove', async (_e, modelId: string) => { cohere.stop(); await setup.remove(modelId); if ((await repo.settings.get<string | null>('voiceEngine', null)) === 'cohere-mlx') await repo.settings.set('voiceEngine', null); broadcastChanged('settings') })
+  ipcMain.handle('voice:select', async (_e, id: string | null) => { await repo.settings.set('voiceEngine', id); broadcastChanged('settings') })
   ipcMain.handle('voice:transcribe', (_e, wav: Uint8Array) => voice.transcribe(wav))
   ipcMain.handle('voice:test-mode', () => !!process.env['ASI_FAKE_RECORDER'])
   ipcMain.handle('voice:status', () => voice.status())

@@ -112,6 +112,14 @@
       {
         "from": "resources/bin",
         "to": "bin"
+      },
+      {
+        "from": "native",
+        "to": "py",
+        "filter": [
+          "*.py",
+          "*.txt"
+        ]
       }
     ]
   }

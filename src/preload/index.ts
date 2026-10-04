@@ -101,6 +101,12 @@ const onboarding = {
 
 const voice = {
   transcribe: (wav: Uint8Array): Promise<{ text: string; engine: string; seconds: number }> => ipcRenderer.invoke('voice:transcribe', wav),
+  overview: (): Promise<unknown> => ipcRenderer.invoke('voice:overview'),
+  install: (modelId: string): Promise<void> => ipcRenderer.invoke('voice:install', modelId),
+  cancel: (modelId: string): Promise<void> => ipcRenderer.invoke('voice:cancel', modelId),
+  remove: (modelId: string): Promise<void> => ipcRenderer.invoke('voice:remove', modelId),
+  select: (id: string | null): Promise<void> => ipcRenderer.invoke('voice:select', id),
+  onProgress: (cb: (p: unknown) => void): (() => void) => { const h = (_e: unknown, p: unknown) => cb(p); ipcRenderer.on('asi:voice-progress', h); return () => ipcRenderer.removeListener('asi:voice-progress', h) },
   testMode: (): Promise<boolean> => ipcRenderer.invoke('voice:test-mode'),
   status: (): Promise<{ engines: { id: string; name: string; available: boolean }[]; selected: string | null }> => ipcRenderer.invoke('voice:status')
 }

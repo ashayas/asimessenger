@@ -325,3 +325,11 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .voice-note { display: flex; gap: 8px; padding: 4px 10px; background: var(--pane-tint); border-top: 1px solid var(--rule); color: var(--ink-soft); flex: none; }
 .voice-note.rec { background: var(--danger-bg); color: var(--danger-ink); }
 .voice-note .grow { flex: 1; } .voice-note .priv { font-size: 11px; }
+
+/* ---------- voice settings ---------- */
+.opts section + section { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--rule-soft); }
+.engine { display: flex; gap: 10px; align-items: center; padding: 8px 10px; margin-top: 6px; border: 1px solid var(--rule-soft); border-radius: 4px; background: var(--pane); }
+.engine .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.engine .meta { color: var(--ink-soft); font-size: 11px; }
+.bar { height: 6px; border-radius: 3px; background: var(--rule-soft); overflow: hidden; margin-top: 4px; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--online), #7fd36f); transition: width .2s; }

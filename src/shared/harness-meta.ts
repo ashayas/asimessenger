@@ -14,6 +14,7 @@ const KNOWN: Record<string, AvatarStyle> = {
   pi: { label: 'π', gradient: ['#7b8794', '#a9b3be'] },
   asi: { label: '✦', gradient: ['#1a43b8', '#4f9ee8'] },
   echo: { label: 'E', gradient: ['#2f9e6b', '#7fd1a8'] },
+  fake: { label: 'F', gradient: ['#8a5fd0', '#c3a6f0'] },
   http: { label: 'H', gradient: ['#39594d', '#6f9b84'] },
   me: { label: 'A', gradient: ['#e05297', '#f39ac2'] }
 }

@@ -154,3 +154,28 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .composer { display: flex; gap: 8px; padding: 8px; border-top: 1px solid var(--rule); background: linear-gradient(180deg, var(--glass-a), var(--glass-b)); flex: none; }
 .composer .field { min-height: 48px; resize: none; font: inherit; }
 .composer .btn { align-self: stretch; padding: 0 18px; }
+
+/* ---------- message kinds ---------- */
+.transcript .msg.err { color: var(--danger-ink); }
+.transcript .msg.faint, .transcript .msg.thinking { color: var(--ink-faint); }
+.transcript .msg.thinking summary { cursor: default; }
+.blk { margin-left: 12px; border: 1px solid #23324d; border-radius: 4px; overflow: hidden; font: 11px var(--font-mono); background: var(--code-bg); color: var(--code-ink); }
+.blk .h { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 4px 8px; background: #1a2a45; border: 0; color: var(--code-ink); font: inherit; text-align: left; }
+.blk .h .cmd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.blk .h .x { color: var(--code-dim); white-space: nowrap; } .blk .h .x.bad { color: #ff8a7a; }
+.blk .o { margin: 0; padding: 4px 8px; color: var(--code-dim); white-space: pre-wrap; }
+.blk .add { color: #7bd88f; } .blk .del { color: #ff8a7a; }
+.blk[data-running] .h .x { color: #f2c14e; }
+.card { margin-left: 12px; border: 1px solid var(--rule); border-radius: 4px; background: var(--pane-tint); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.card .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.card.perm { border-color: var(--warn-border); background: var(--warn-bg); color: var(--warn-ink); }
+.card.perm[data-decision='deny'] { border-color: var(--danger-border); background: var(--danger-bg); color: var(--danger-ink); }
+.card.q { border-color: #b9a3e0; background: #f3eefc; }
+.card .mono { font: 11px var(--font-mono); overflow-wrap: anywhere; }
+.card .decided { font-style: italic; }
+.card .file { display: flex; gap: 10px; align-items: center; }
+.card .file .grow { flex: 1; min-width: 0; }
+.card .file .ic { width: 30px; height: 36px; border: 1px solid var(--rule); border-radius: 2px 8px 2px 2px; background: var(--pane); display: grid; place-items: center; font: bold 9px var(--font-mono); color: var(--link); }
+.risk { font-size: 10.5px; padding: 0 6px; border-radius: 8px; background: var(--ok-bg); color: var(--ok-ink); border: 1px solid #b4ddaa; }
+.risk.med { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-border); }
+.risk.high { background: var(--danger-bg); color: var(--danger-ink); border-color: var(--danger-border); }

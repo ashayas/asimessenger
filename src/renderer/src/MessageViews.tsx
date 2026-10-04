@@ -1,0 +1,114 @@
+import { useState } from 'react'
+import type { Message } from '@shared/models'
+import type { AgentEvent } from '@shared/events'
+import { Btn } from './ui/kit'
+
+type Tool = Extract<AgentEvent, { t: 'tool' }>
+type Perm = Extract<AgentEvent, { t: 'permission' }> & { decision: string | null; reason?: string | null }
+type Quest = Extract<AgentEvent, { t: 'question' }> & { answer: string | null }
+type Attach = Extract<AgentEvent, { t: 'attachment' }>
+
+const DECISION_LABEL: Record<string, string> = { 'allow-once': 'Allowed once', 'allow-chat': 'Allowed for this chat', deny: 'Denied' }
+
+export function MessageView({ m, chatId }: { m: Message; chatId: string }) {
+  switch (m.kind) {
+    case 'text':
+      return <div className="msg" data-kind="text">{m.text}</div>
+    case 'thinking':
+      return (
+        <details className="msg thinking" data-kind="thinking">
+          <summary>Thinking…</summary>
+          {m.text}
+        </details>
+      )
+    case 'tool':
+      return <ToolBlock tool={m.body as Tool} />
+    case 'permission':
+      return <PermissionCard chatId={chatId} p={m.body as Perm} />
+    case 'question':
+      return <QuestionCard chatId={chatId} q={m.body as Quest} />
+    case 'attachment':
+      return <AttachmentCard a={m.body as Attach} />
+    case 'error':
+      return <div className="msg err" data-kind="error">⚠ {m.text}</div>
+    default:
+      return <div className="msg faint" data-kind={m.kind}>{m.text}</div>
+  }
+}
+
+function ToolBlock({ tool }: { tool: Tool }) {
+  const [open, setOpen] = useState(false)
+  const running = tool.done === false
+  return (
+    <div className="blk" data-kind="tool" data-running={running || undefined}>
+      <button className="h" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <span className="cmd">{tool.command ? `$ ${tool.command}` : tool.title}</span>
+        <span className={tool.exit ? 'x bad' : 'x'}>
+          {running ? 'running…' : tool.exit != null ? `exit ${tool.exit}` : 'done'}
+          {tool.durationMs != null ? ` · ${(tool.durationMs / 1000).toFixed(1)}s` : ''} {open ? '▾' : '▸'}
+        </span>
+      </button>
+      {tool.files?.map((f) => (
+        <div className="o" key={f.path}>{f.path} <span className="add">+{f.added}</span> <span className="del">−{f.removed}</span></div>
+      ))}
+      {open && tool.output ? <pre className="o">{tool.output}</pre> : null}
+    </div>
+  )
+}
+
+function PermissionCard({ chatId, p }: { chatId: string; p: Perm }) {
+  return (
+    <div className="card perm" data-kind="permission" data-decision={p.decision ?? 'pending'}>
+      <div className="row">
+        <b>Wants to run: {p.tool}</b>
+        {p.risk ? <span className={`risk ${p.risk}`}>{p.risk} risk</span> : null}
+      </div>
+      <div className="mono">{p.summary}</div>
+      {p.decision ? (
+        <div className="decided">{DECISION_LABEL[p.decision] ?? p.decision}{p.reason ? ` — ${p.reason}` : ''}</div>
+      ) : (
+        <div className="row">
+          {p.options.map((o) => (
+            <Btn key={o.id} kind={o.id === 'allow-once' ? 'primary' : o.id === 'deny' ? 'danger' : undefined} onClick={() => void window.asi.chat.respond(chatId, p.reqId, o.id)}>
+              {o.label}
+            </Btn>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function QuestionCard({ chatId, q }: { chatId: string; q: Quest }) {
+  const [text, setText] = useState('')
+  const answer = (a: string) => void window.asi.chat.respond(chatId, q.reqId, a)
+  return (
+    <div className="card q" data-kind="question" data-answered={q.answer != null || undefined}>
+      <div><b>Asks:</b> {q.prompt}</div>
+      {q.answer != null ? (
+        <div className="decided">You answered: {q.answer}</div>
+      ) : (
+        <>
+          <div className="row">{q.choices?.map((c) => <Btn key={c} onClick={() => answer(c)}>{c}</Btn>)}</div>
+          <div className="row">
+            <input className="field" aria-label="Type an answer" placeholder="Type an answer…" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && text.trim()) answer(text.trim()) }} />
+            <Btn disabled={!text.trim()} onClick={() => answer(text.trim())}>Answer</Btn>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function AttachmentCard({ a }: { a: Attach }) {
+  const ext = a.kind === 'markdown' ? 'MD' : a.kind === 'diff' ? 'Δ' : a.kind === 'image' ? 'IMG' : a.kind === 'plan' ? 'PLAN' : 'CODE'
+  return (
+    <div className="card" data-kind="attachment">
+      <div className="file">
+        <div className="ic">{ext}</div>
+        <div className="grow"><b>{a.name}</b><div className="says">{a.kind} · sent as attachment</div></div>
+        <Btn disabled title="Viewer arrives with attachments">Open</Btn>
+      </div>
+    </div>
+  )
+}

@@ -1,6 +1,9 @@
 import type { Chat, Friend } from './models'
 import type { Presence } from './status'
 
+/** Harnesses that need no installed CLI. */
+export const isBuiltin = (h: string): boolean => h === 'asi' || h === 'echo' || h === 'fake'
+
 export type GroupId = 'asi' | 'needs-you' | 'working' | 'online' | 'offline'
 
 export interface ContactGroup {
@@ -50,7 +53,7 @@ export function groupFriends(
 
   for (const f of friends) {
     if (q && !f.displayName.toLowerCase().includes(q)) continue
-    const l = liveFor(f, chats, f.harness === 'asi' ? true : (availability[f.id] ?? f.harness === 'echo'))
+    const l = liveFor(f, chats, availability[f.id] ?? isBuiltin(f.harness))
     live[f.id] = l
     if (f.harness === 'asi') buckets.asi.push(f)
     else if (l.presence === 'away') buckets['needs-you'].push(f)

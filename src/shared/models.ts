@@ -1,6 +1,6 @@
 import type { Presence } from './status'
 
-export type HarnessKind = 'claude' | 'codex' | 'acp' | 'pty' | 'http' | 'asi' | 'echo'
+export type HarnessKind = 'claude' | 'codex' | 'acp' | 'pty' | 'http' | 'asi' | 'echo' | 'fake'
 export type Mode = 'ask' | 'auto-edit' | 'plan' | 'dangerous'
 
 export interface Workspace {

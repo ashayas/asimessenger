@@ -169,6 +169,13 @@ export function createRepo(db: Db) {
         )
         return (await toMessageById(id))!
       },
+      async update(id: string, patch: { body?: unknown; text?: string | null }): Promise<void> {
+        if (patch.body !== undefined) await run('UPDATE messages SET body_json = ? WHERE id = ?', [JSON.stringify(patch.body), id])
+        if (patch.text !== undefined) await run('UPDATE messages SET text = ? WHERE id = ?', [patch.text, id])
+      },
+      async get(id: string): Promise<Message | null> {
+        return toMessageById(id)
+      },
       async list(chatId: string, opts: { limit?: number } = {}): Promise<Message[]> {
         const rows = await all('SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at, rowid', [chatId])
         const msgs = rows.map(toMessage)

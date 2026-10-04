@@ -3,7 +3,11 @@ import { join } from 'node:path'
 import { APP_NAME } from '@shared/app'
 import { openDb } from './db/db'
 import { createRepo } from './db/repo'
-import { registerRepoIpc } from './ipc'
+import { broadcastChanged, registerRepoIpc } from './ipc'
+import { HarnessManager } from '../harness/manager'
+import { EchoAgent } from '../harness/echo-agent'
+import { FakeAgent } from '../harness/fake-agent'
+import { createIngestor } from './ingest'
 import { openChatWindow, openContactsWindow } from './windows'
 import { createChatService } from './chat-service'
 import { ensureDefaults } from './defaults'
@@ -25,8 +29,18 @@ app.whenReady().then(async () => {
     const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
     return r.canceled ? null : (r.filePaths[0] ?? null)
   })
-  const chat = createChatService(repo)
-  ipcMain.handle('chat:send', (_e, chatId: string, text: string) => chat.send(chatId, text))
+  const ingestor = createIngestor(repo, broadcastChanged)
+  const manager = new HarnessManager({
+    onEvent: (chatId, e) => void ingestor.ingest(chatId, e),
+    onResumeId: (chatId, id) => void repo.chats.setSession(chatId, id)
+  })
+  manager.register('echo', async () => new EchoAgent())
+  manager.register('fake', async () => new FakeAgent())
+  app.on('will-quit', () => void manager.disposeAll())
+  const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged })
+  ipcMain.handle('chat:send', (_e, chatId: string, text: string, quote?: { name: string; text: string }) => chat.send(chatId, text, quote))
+  ipcMain.handle('chat:interrupt', (_e, chatId: string) => chat.interrupt(chatId))
+  ipcMain.handle('chat:respond', (_e, chatId: string, reqId: string, answer: string, reason?: string) => chat.respond(chatId, reqId, answer, reason))
   ipcMain.handle('window:open-chat', (_e, chatId: string) => { openChatWindow(chatId) })
   installMenu()
   app.on('before-quit', () => db.close())

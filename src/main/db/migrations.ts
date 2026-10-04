@@ -108,5 +108,13 @@ export const MIGRATIONS: string[] = [
   END;
   `,
   /* 3: live status text shown as the "personal message" */
-  `ALTER TABLE chats ADD COLUMN status_text TEXT;`
+  `ALTER TABLE chats ADD COLUMN status_text TEXT;`,
+  /* 4: keep the search index current when a streamed message's text changes */
+  `
+  CREATE TRIGGER messages_au AFTER UPDATE OF text ON messages BEGIN
+    DELETE FROM search_fts WHERE kind = 'message' AND ref_id = old.id;
+    INSERT INTO search_fts(kind, ref_id, workspace_id, title, body)
+    SELECT 'message', new.id, c.workspace_id, c.title, new.text FROM chats c WHERE c.id = new.chat_id AND new.text IS NOT NULL AND new.text <> '';
+  END;
+  `
 ]

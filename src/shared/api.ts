@@ -12,7 +12,7 @@ export const REPO_METHODS = {
   friends: ['create', 'list', 'get', 'rename', 'setDangerousAllowed', 'remove'],
   labels: ['create', 'list', 'setForFriend', 'setForChat', 'forChat'],
   chats: ['create', 'get', 'list', 'rename', 'setSession', 'setStatus', 'markRead', 'remove'],
-  messages: ['append', 'list'],
+  messages: ['append', 'update', 'get', 'list'],
   attachments: ['add'],
   settings: ['get', 'set'],
   search: ['query']

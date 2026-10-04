@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Chat, Friend, Message } from '@shared/models'
 import { avatarFor } from '@shared/harness-meta'
-import { liveFor } from '@shared/grouping'
+import { isBuiltin, liveFor } from '@shared/grouping'
 import { Avatar, StatusDot, ToolButton, WindowFrame } from './ui/kit'
 import { useData } from './store'
+import { MessageView } from './MessageViews'
 
 function useChat(chatId: string) {
   const [chat, setChat] = useState<Chat | null>(null)
@@ -46,7 +47,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
     endRef.current?.scrollIntoView({ block: 'end' })
   }, [messages.length])
 
-  const live = useMemo(() => (friend ? liveFor(friend, allChats.filter((c) => c.id === chatId), friend.harness === 'echo' || friend.harness === 'asi') : null), [friend, allChats, chatId])
+  const live = useMemo(() => (friend ? liveFor(friend, allChats.filter((c) => c.id === chatId), isBuiltin(friend.harness)) : null), [friend, allChats, chatId])
 
   if (!chat || !friend) return <WindowFrame title="ASI Messenger"><div className="empty">Loading…</div></WindowFrame>
 
@@ -77,8 +78,8 @@ export function ChatWindow({ chatId }: { chatId: string }) {
         <ToolButton icon="🌐" label="Browser" disabled />
         <ToolButton icon="🎙" label="Voice Clip" disabled />
         <ToolButton icon="⌨" label="Terminal" disabled />
-        <ToolButton icon="📳" label="Nudge" disabled />
-        <ToolButton icon="⏹" label="Stop" stop disabled />
+        <ToolButton icon="📳" label="Nudge" onClick={() => void window.asi.chat.interrupt(chatId)} />
+        <ToolButton icon="⏹" label="Stop" stop onClick={() => void window.asi.chat.interrupt(chatId)} />
       </div>
       <div className="to">
         <b>To:</b> {friend.displayName} <StatusDot presence={presence} />
@@ -91,7 +92,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
             <div key={i} className="block" data-role={b.role}>
               <div className="says"><b>{b.role === 'user' ? profile.name : b.role === 'agent' ? friend.displayName : 'ASI'}</b> says:</div>
               {b.items.map((m) => (
-                <div key={m.id} className="msg" data-kind={m.kind}>{m.text}</div>
+                <MessageView key={m.id} m={m} chatId={chatId} />
               ))}
             </div>
           ))}

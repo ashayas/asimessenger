@@ -23,7 +23,8 @@
     "dist": "pnpm build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --publish never",
     "test:packaged": "playwright test -c playwright.packaged.config.ts",
     "dist:dir": "pnpm build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir --publish never",
-    "release:signed": "bash scripts/release-signed.sh"
+    "release:signed": "bash scripts/release-signed.sh",
+    "shots": "pnpm assets && electron-vite build && playwright test -c playwright.shots.config.ts"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.1",
@@ -122,5 +123,13 @@
         ]
       }
     ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ashayas/asimessenger.git"
+  },
+  "homepage": "https://github.com/ashayas/asimessenger",
+  "bugs": {
+    "url": "https://github.com/ashayas/asimessenger/issues"
   }
 }

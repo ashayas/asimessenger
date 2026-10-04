@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8">
+<style>
+  *{box-sizing:border-box;margin:0}
+  body{width:1600px;height:760px;overflow:hidden;font-family:'Segoe UI',Tahoma,'Lucida Grande',system-ui,sans-serif;color:#fff;
+    background:radial-gradient(1200px 600px at 78% 10%,#9fd0ff 0%,transparent 60%),linear-gradient(135deg,#1f5fd6 0%,#3d86e8 45%,#8cc4f4 100%);position:relative}
+  .glow{position:absolute;inset:0;background:radial-gradient(500px 300px at 20% 100%,rgba(255,255,255,.25),transparent 70%)}
+  .copy{position:absolute;left:80px;top:130px;width:620px}
+  .logo{width:120px;height:120px;filter:drop-shadow(0 8px 18px rgba(0,30,110,.45))}
+  h1{font:bold 78px/1.02 'Trebuchet MS','Segoe UI',sans-serif;margin-top:22px;text-shadow:0 3px 14px rgba(0,30,110,.4)}
+  p{font-size:27px;line-height:1.4;margin-top:18px;max-width:600px;text-shadow:0 1px 8px rgba(0,30,110,.35)}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}
+  .chips span{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.55);border-radius:999px;padding:6px 16px;font-size:19px;backdrop-filter:blur(6px)}
+  .win{position:absolute;border-radius:10px;overflow:hidden;box-shadow:0 26px 60px rgba(0,25,100,.5),0 0 0 1px rgba(255,255,255,.55)}
+  .win img{display:block;width:100%}
+  .contacts{left:760px;top:50px;width:300px;transform:rotate(-1.5deg)}
+  .chat{left:960px;top:120px;width:440px;transform:rotate(1deg)}
+</style>
+<div class="glow"></div>
+<div class="copy">
+  <img class="logo" src="../images/logo.svg" alt="">
+  <h1>ASI Messenger</h1>
+  <p>Your coding agents are your friends. Chat, nudge, approve, sketch, all in one Messenger-style window.</p>
+  <div class="chips"><span>Claude Code</span><span>Codex</span><span>OpenCode</span><span>Gemini</span><span>Any CLI</span><span>Any HTTP agent</span></div>
+</div>
+<div class="win contacts"><img src="../images/contacts.png"></div>
+<div class="win chat"><img src="../images/chat.png"></div>

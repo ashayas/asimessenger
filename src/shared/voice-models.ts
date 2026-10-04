@@ -22,7 +22,7 @@ export const VOICE_MODELS: VoiceModel[] = [
     archive: 'cohere-transcribe-mlx-4bit.tar',
     bytes: 1510070272,
     sha256: '518aca1cb666bea44957a3ebfbef447328c1292b3dc3f3d7292fd279365f9bb3',
-    urls: ['https://github.com/ashayas/asi-messenger/releases/download/models-v1/cohere-transcribe-mlx-4bit.tar'],
+    urls: ['https://github.com/ashayas/asimessenger/releases/download/models-v1/cohere-transcribe-mlx-4bit.tar'],
     recommended: true
   }
 ]

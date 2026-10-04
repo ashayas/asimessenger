@@ -56,8 +56,8 @@ export function acpFactory(preset: AcpPreset): HarnessFactory {
     } catch (err) {
       peer.kill()
       const msg = err instanceof RpcFailure ? err.rpc.message : err instanceof Error ? err.message : String(err)
-      if (/auth|consent|login|sign/i.test(msg)) throw new Error(`${command} needs you to sign in. Run \`${command}\` once in a terminal, then try again. (${msg.split('\n')[0]})`)
-      throw new Error(msg)
+      if (/auth|consent|login|sign/i.test(msg)) throw new Error(`${command} needs you to sign in. Run \`${command}\` once in a terminal, then try again. (${msg.split('\n')[0]})`, { cause: err })
+      throw new Error(msg, { cause: err })
     }
   }
 }

@@ -5,8 +5,7 @@ import { openDb } from './db/db'
 import { createRepo } from './db/repo'
 import { broadcastChanged, registerRepoIpc } from './ipc'
 import { HarnessManager } from '../harness/manager'
-import { EchoAgent } from '../harness/echo-agent'
-import { FakeAgent } from '../harness/fake-agent'
+import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
 import { openChatWindow, openContactsWindow } from './windows'
 import { createChatService } from './chat-service'
@@ -34,8 +33,7 @@ app.whenReady().then(async () => {
     onEvent: (chatId, e) => void ingestor.ingest(chatId, e),
     onResumeId: (chatId, id) => void repo.chats.setSession(chatId, id)
   })
-  manager.register('echo', async () => new EchoAgent())
-  manager.register('fake', async () => new FakeAgent())
+  registerHarnesses(manager)
   app.on('will-quit', () => void manager.disposeAll())
   const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged })
   ipcMain.handle('chat:send', (_e, chatId: string, text: string, quote?: { name: string; text: string }) => chat.send(chatId, text, quote))

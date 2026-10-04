@@ -7,7 +7,6 @@ export function useSetting<T>(key: string, fallback: T): [T, boolean] {
   const load = useCallback(async () => {
     setValue(await window.asi.api.settings.get<T>(key, fallback))
     setReady(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
   useEffect(() => {
     void load()

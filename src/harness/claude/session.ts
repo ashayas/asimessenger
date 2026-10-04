@@ -36,6 +36,7 @@ export interface ClaudeOptions {
   extraArgs?: string[]
   /** Args placed before claude's own (tests run a node script through this). */
   prefixArgs?: string[]
+  mcp?: { url: string; token: string }
 }
 
 /** Claude Code over `claude -p --input-format stream-json --output-format stream-json --permission-prompt-tool stdio`. */
@@ -62,6 +63,7 @@ export class ClaudeSession implements AgentSession {
       '--permission-prompt-tool', 'stdio', '--permission-mode', MODE_FLAG[o.mode],
       ...(o.resumeId ? ['--resume', o.resumeId] : ['--session-id', this.resumeId]),
       ...(o.dangerousAllowed ? ['--allow-dangerously-skip-permissions'] : []),
+      ...(o.mcp ? ['--mcp-config', JSON.stringify({ mcpServers: { asi: { type: 'http', url: o.mcp.url, headers: { Authorization: `Bearer ${o.mcp.token}` } } } })] : []),
       ...(o.extraArgs ?? [])
     ]
     const env = { ...o.env }
@@ -219,6 +221,11 @@ export class ClaudeSession implements AgentSession {
     const name = String(req['tool_name'])
     const input = (req['input'] ?? {}) as Obj
     const toolUseId = String(req['tool_use_id'] ?? '')
+    // our own tools never need a permission prompt: ask_user is itself the prompt
+    if (name.startsWith('mcp__asi__')) {
+      this.write({ type: 'control_response', response: { subtype: 'success', request_id: reqId, response: { behavior: 'allow', updatedInput: input } } })
+      return
+    }
     if (name === 'AskUserQuestion') {
       const q = ((input['questions'] as Obj[]) ?? [])[0] ?? {}
       const prompt = String(q['question'] ?? 'The agent has a question')

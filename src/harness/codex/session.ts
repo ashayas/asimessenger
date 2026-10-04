@@ -25,6 +25,7 @@ export interface CodexOptions {
   resumeId?: string | null
   extraArgs?: string[]
   prefixArgs?: string[]
+  mcp?: { url: string; token: string }
 }
 
 const countDiff = (diff: string): { added: number; removed: number } => {
@@ -56,7 +57,11 @@ export class CodexSession implements AgentSession {
   get resumeId(): string { return this.threadId }
 
   static async create(o: CodexOptions): Promise<CodexSession> {
-    const child = spawn(o.command, [...(o.prefixArgs ?? []), 'app-server', ...(o.extraArgs ?? [])], { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'] })
+    const mcpArgs = o.mcp
+      ? ['-c', `mcp_servers.asi.url=${JSON.stringify(o.mcp.url)}`, '-c', 'mcp_servers.asi.bearer_token_env_var="ASI_MCP_TOKEN"', '-c', 'mcp_servers.asi.tool_timeout_sec=3600', '-c', 'mcp_servers.asi.default_tools_approval_mode="approve"']
+      : []
+    const env = o.mcp ? { ...o.env, ASI_MCP_TOKEN: o.mcp.token } : o.env
+    const child = spawn(o.command, [...(o.prefixArgs ?? []), 'app-server', ...mcpArgs, ...(o.extraArgs ?? [])], { cwd: o.cwd, env, stdio: ['pipe', 'pipe', 'pipe'] })
     const peer = new RpcPeer(child, { jsonrpcField: false })
     const s = new CodexSession(peer, o)
     try {

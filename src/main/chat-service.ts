@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { Repo } from './db/repo'
 import type { Message } from '@shared/models'
 import type { PermDecision, UserTurn } from '@shared/events'
@@ -19,6 +20,11 @@ const NUDGE_COOLDOWN_MS = 3000
 export function createChatService(deps: { repo: Repo; manager: HarnessManager; ingestor: Ingestor; notify: (topic: string) => void }) {
   const { repo, manager, ingestor, notify } = deps
   const lastNudge = new Map<string, number>()
+  /** Questions an agent asked through ask_user, waiting for you. */
+  const asks = new Map<string, { chatId: string; resolve(answer: string): void }>()
+  const cancelAsks = (chatId: string, why: string) => {
+    for (const [id, a] of asks) if (a.chatId === chatId) { asks.delete(id); a.resolve(why) }
+  }
 
   return {
     async send(chatId: string, text: string, quote?: UserTurn['quote'], opts: { silentUser?: boolean } = {}): Promise<Message | null> {
@@ -111,7 +117,16 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
 
     /** Plain stop. */
     async interrupt(chatId: string): Promise<void> {
+      cancelAsks(chatId, 'The human interrupted before answering.')
       await manager.interrupt(chatId)
+    },
+
+    /** ask_user from the MCP bridge: shows a question card and resolves with the answer. */
+    async askUser(chatId: string, prompt: string, choices?: string[]): Promise<string> {
+      const reqId = `ask-${randomUUID()}`
+      const answered = new Promise<string>((resolve) => asks.set(reqId, { chatId, resolve }))
+      await ingestor.ingest(chatId, { t: 'question', reqId, prompt, choices })
+      return answered
     },
 
     /** The classic: interrupt whatever the agent is doing, with a transcript line. Rate limited per chat. */
@@ -121,6 +136,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       const running = manager.isLive(chatId) && (await repo.chats.get(chatId))?.status !== 'online'
       await repo.messages.append({ chatId, role: 'system', kind: 'nudge', body: { interrupted: running }, text: running ? 'You sent a nudge and stopped the agent.' : 'You sent a nudge.' })
       notify('messages')
+      cancelAsks(chatId, 'The human sent a nudge instead of answering.')
       if (running) await manager.interrupt(chatId)
       return true
     },
@@ -128,6 +144,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
     /** Answer a permission request or question card. */
     async respond(chatId: string, reqId: string, answer: PermDecision | string, reason?: string): Promise<void> {
       await ingestor.idle(chatId)
+      const ask = asks.get(reqId)
       const msgs = await repo.messages.list(chatId)
       const card = msgs.find((m) => (m.kind === 'permission' || m.kind === 'question') && (m.body as { reqId?: string }).reqId === reqId)
       if (card) {
@@ -136,6 +153,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       }
       await repo.chats.setStatus(chatId, 'busy', null)
       notify('messages'); notify('chats')
+      if (ask) { asks.delete(reqId); ask.resolve(String(answer)); return }
       manager.respond(chatId, reqId, answer, reason)
     }
   }

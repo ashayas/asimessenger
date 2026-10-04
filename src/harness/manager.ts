@@ -1,12 +1,14 @@
 import type { AgentEvent, AgentSession, PermDecision, UserTurn } from '@shared/events'
 import type { Chat, Friend, HarnessKind, Mode } from '@shared/models'
-import type { HarnessFactory } from './types'
+import type { HarnessFactory, McpEndpoint } from './types'
 
 export interface ManagerHooks {
   /** Called for every event from any session. */
   onEvent(chatId: string, e: AgentEvent): void
   /** Called when a fresh session reports a resumable id. */
   onResumeId?(chatId: string, id: string): void
+  /** Where agents in this chat can reach ASI's tools. */
+  mcpFor?(chatId: string): McpEndpoint | undefined
 }
 
 /** Owns one live AgentSession per chat; sessions start lazily on the first message. */
@@ -42,7 +44,7 @@ export class HarnessManager {
     const factory = this.factories.get(friend.harness)
     if (!factory) throw new Error(`no harness registered for "${friend.harness}"`)
     const p = (async () => {
-      const session = await factory({ friend, chatId: chat.id, cwd, mode, resumeId: chat.harnessSessionId })
+      const session = await factory({ friend, chatId: chat.id, cwd, mode, resumeId: chat.harnessSessionId, mcp: this.hooks.mcpFor?.(chat.id) })
       const unsub = session.subscribe((e) => this.hooks.onEvent(chat.id, e))
       this.sessions.set(chat.id, { session, unsub })
       if (session.resumeId && session.resumeId !== chat.harnessSessionId) this.hooks.onResumeId?.(chat.id, session.resumeId)

@@ -14,6 +14,7 @@ import { createChatService } from './chat-service'
 import { loadAttachment } from './attachments'
 import { searchAll } from './search'
 import { createTerminalService } from './terminal'
+import { createMcpBridge } from './mcp-bridge'
 import { listDrawings, loadDrawing, newDrawingName, saveDrawing, savePng } from './doodle'
 import { ensureDefaults } from './defaults'
 import { installMenu } from './menu'
@@ -43,13 +44,26 @@ app.whenReady().then(async () => {
     badgeTimer = setTimeout(() => void refreshBadge(repo), 80)
   })
   void refreshBadge(repo)
+  const chatRef: { current: ReturnType<typeof createChatService> | null } = { current: null }
+  const bridge = createMcpBridge({
+    chatExists: async (id) => !!(await repo.chats.get(id)),
+    askUser: (id, q, choices) => chatRef.current!.askUser(id, q, choices),
+    sendAttachment: async (id, a) => { await ingestor.ingest(id, { t: 'attachment', id: `mcp-${Date.now()}`, kind: a.kind, name: a.name, path: a.path, body: a.content }) },
+    openUrl: async (id, url) => { await ingestor.ingest(id, { t: 'open_url', url }) },
+    openDrawing: async (id, name) => { const c = await repo.chats.get(id); if (c) openDoodleWindow(c.workspaceId, { chatId: id, name }) },
+    setStatus: async (id, text) => { await repo.chats.setStatus(id, 'busy', text); broadcastChanged('chats') }
+  })
+  await bridge.start()
+  app.on('will-quit', () => void bridge.stop())
   const manager = new HarnessManager({
+    mcpFor: (chatId) => bridge.endpointFor(chatId),
     onEvent: (chatId, e) => void ingestor.ingest(chatId, e),
     onResumeId: (chatId, id) => void repo.chats.setSession(chatId, id)
   })
   registerHarnesses(manager)
   app.on('will-quit', () => void manager.disposeAll())
   const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged })
+  chatRef.current = chat
   ipcMain.handle('chat:send', (_e, chatId: string, text: string, quote?: { name: string; text: string }) => chat.send(chatId, text, quote))
   ipcMain.handle('safety:set-global-dangerous', (_e, on: boolean) => chat.setGlobalDangerous(on))
   ipcMain.handle('safety:set-friend-dangerous', (_e, id: string, on: boolean) => chat.setFriendDangerous(id, on))

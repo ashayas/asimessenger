@@ -8,5 +8,5 @@ export const codexFactory: HarnessFactory = async (ctx) => {
   const exe = which(command, env)
   if (!exe) throw new Error(`"${command}" was not found on your PATH`)
   if (ctx.mode === 'dangerous' && !ctx.friend.dangerousAllowed) throw new Error('dangerous mode is not enabled for this friend')
-  return CodexSession.create({ command: exe, env, cwd: ctx.cwd, mode: ctx.mode, resumeId: ctx.resumeId, extraArgs: ctx.friend.args })
+  return CodexSession.create({ command: exe, env, cwd: ctx.cwd, mode: ctx.mode, resumeId: ctx.resumeId, extraArgs: ctx.friend.args, mcp: ctx.mcp })
 }

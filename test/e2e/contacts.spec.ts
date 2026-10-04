@@ -10,7 +10,7 @@ test('contact list groups friends by what they are doing', async () => {
       const asi = await api.friends.create({ harness: 'asi', displayName: 'ASI' })
       const claude = await api.friends.create({ harness: 'claude', displayName: 'Claude Code' })
       const codex = await api.friends.create({ harness: 'codex', displayName: 'Codex' })
-      await api.friends.create({ harness: 'acp', avatar: 'pi', displayName: 'Pi' })
+      await api.friends.create({ harness: 'acp', avatar: 'pi', displayName: 'Pi', command: 'pi-acp', transport: 'generic' })
       const c1 = await api.chats.create({ workspaceId: ws.id, friendId: claude.id, title: 'auth' })
       await api.chats.setStatus(c1.id, 'busy', 'running tests')
       const c2 = await api.chats.create({ workspaceId: ws.id, friendId: codex.id, title: 'build' })

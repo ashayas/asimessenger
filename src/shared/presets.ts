@@ -20,7 +20,7 @@ export const PRESETS: FriendPreset[] = [
   { id: 'opencode', name: 'OpenCode', harness: 'acp', transport: 'opencode', command: 'opencode', args: ['acp'], versionArgs: ['--version'], installHint: 'curl -fsSL https://opencode.ai/install | bash', blurb: 'ACP' },
   { id: 'gemini', name: 'Gemini CLI', harness: 'acp', transport: 'gemini', command: 'gemini', args: ['--experimental-acp'], versionArgs: ['--version'], installHint: 'npm i -g @google/gemini-cli', blurb: 'ACP · sign in once in a terminal' },
   { id: 'hermes', name: 'Hermes', harness: 'acp', transport: 'hermes', command: 'hermes', args: ['acp'], versionArgs: ['--version'], installHint: 'see the Hermes Agent docs', blurb: 'ACP' },
-  { id: 'pi', name: 'Pi', harness: 'acp', transport: 'generic', command: 'pi-acp', args: [], versionArgs: ['--version'], installHint: 'install an ACP adapter for Pi, then set its command here', blurb: 'ACP adapter' }
+  { id: 'pi', name: 'Pi', harness: 'pi', transport: null, command: 'pi', args: [], versionArgs: ['--version'], installHint: 'npm i -g @earendil-works/pi-coding-agent, then run pi and /login once', blurb: 'native RPC' }
 ]
 
 export interface DetectedPreset {

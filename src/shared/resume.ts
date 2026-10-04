@@ -9,6 +9,7 @@ export function resumeCommand(friend: Pick<Friend, 'harness' | 'transport' | 'co
   let cmd: string | null = null
   if (friend.harness === 'claude') cmd = `${bin ?? 'claude'}${id ? ` --resume ${q(id)}` : ''}`
   else if (friend.harness === 'codex') cmd = `${bin ?? 'codex'}${id ? ` resume ${q(id)}` : ''}`
+  else if (friend.harness === 'pi') cmd = `${bin ?? 'pi'}${id ? ` --session ${q(id)}` : ''}`
   else if (friend.harness === 'acp' && friend.transport === 'opencode') cmd = `${bin ?? 'opencode'}${id ? ` --session ${q(id)}` : ''}`
   else if (friend.harness === 'pty' && bin) cmd = bin
   return cmd ? `cd ${q(cwd)} && ${cmd}` : null

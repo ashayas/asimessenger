@@ -23,6 +23,7 @@ import { discoverSessions } from '../asi/discovery'
 import { adoptSession } from './adopt'
 import { createSecrets } from './secrets'
 import { httpFactory } from '../harness/http/factory'
+import { configurePi } from '../harness/pi/factory'
 import { homedir } from 'node:os'
 import { completeOnboarding, isOnboarded } from './onboarding'
 import { appleEngine, createVoiceService, fakeEngine, type VoiceEngine } from './voice'
@@ -194,6 +195,7 @@ app.whenReady().then(async () => {
   const voiceRoot = join(app.getPath('userData'), 'voice')
   const pyDir = app.isPackaged ? join(process.resourcesPath, 'py') : join(app.getAppPath(), 'native')
   const catalog: VoiceModel[] = process.env['ASI_VOICE_MODELS_JSON'] ? (JSON.parse(readFileSync(process.env['ASI_VOICE_MODELS_JSON'], 'utf8')) as VoiceModel[]) : VOICE_MODELS
+  configurePi({ extensionPath: join(pyDir, 'pi', 'asi-extension.js') })
   const runtime = createVoiceRuntime({ root: voiceRoot, requirementsPath: join(pyDir, 'voice-requirements.txt') })
   const modelMgr = createModelManager({ root: voiceRoot, runtimeNeeded: () => !process.env['ASI_VOICE_SKIP_RUNTIME'] })
   const setup = createVoiceSetup({ models: modelMgr, runtime, root: voiceRoot, catalog, skipRuntime: !!process.env['ASI_VOICE_SKIP_RUNTIME'] })

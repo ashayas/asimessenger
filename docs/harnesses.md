@@ -8,13 +8,25 @@ knows those events, so a new harness never needs UI work.
 |---|---|---|
 | `claude` | `claude -p` stream-json + `--permission-prompt-tool stdio` | Claude Code |
 | `codex` | `codex app-server` JSON-RPC | Codex |
-| `acp` | Agent Client Protocol over stdio | OpenCode, Gemini CLI, Hermes, Pi adapters, anything ACP |
+| `pi` | `pi --mode rpc` (JSONL) + a bundled gate extension | Pi |
+| `acp` | Agent Client Protocol over stdio | OpenCode, Gemini CLI, Hermes, anything ACP |
 | `pty` | a real pseudo-terminal | any CLI with no protocol |
 | `http` | manifest-driven HTTP (SSE / NDJSON / JSON) | hosted agents, e.g. Cohere North in a fork |
 | `asi`, `echo`, `fake` | in-process | ASI, a smoke-test friend, tests |
 
 All structured harnesses also get **ASI's MCP tools** (`ask_user`, `send_attachment`, `open_url`, `open_drawing`,
 `set_status`) injected, so questions and attachments behave the same everywhere.
+
+## Pi
+
+Pi speaks its own JSONL RPC, so ASI Messenger talks to it directly (no ACP adapter). Pi has no permission prompts or MCP,
+so the app loads `native/pi/asi-extension.js` with `pi -e`. The extension:
+
+- **gates tools by the chat's mode.** Ask prompts for `bash`, `edit` and `write`. Auto-edit allows edits and still prompts for bash. Plan blocks edits. Dangerous allows everything (and needs both opt-ins). The mode lives in a small file the app rewrites, so switching mode mid-chat takes effect on the next tool call. An unreadable file means Ask.
+- **proxies ASI's tools** (`ask_user`, `send_attachment`, ...) to the local MCP bridge.
+
+Sessions are Pi session files under `~/.pi/agent/sessions/asi-messenger/`, so `pi --session <file>` continues any chat in a terminal.
+Pick a model with the friend's arguments, e.g. `--provider openrouter --model anthropic/claude-haiku-4.5`; log in once with `pi` and `/login`, or set a provider key.
 
 ## Add a service over HTTP (no code)
 

@@ -11,3 +11,4 @@ playwright-report
 *.p12
 *.p8
 *.mobileprovision
+build/.render.html

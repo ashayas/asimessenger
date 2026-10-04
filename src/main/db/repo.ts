@@ -21,7 +21,7 @@ const toFriend = (r: Row): Friend => ({
 const toChat = (r: Row): Chat => ({
   id: String(r['id']), workspaceId: String(r['workspace_id']), friendId: String(r['friend_id']),
   title: String(r['title']), harnessSessionId: (r['harness_session_id'] as string | null) ?? null,
-  status: r['status'] as Presence, unreadCount: Number(r['unread_count']),
+  status: r['status'] as Presence, statusText: (r['status_text'] as string | null) ?? null, unreadCount: Number(r['unread_count']),
   createdAt: Number(r['created_at']), lastActivityAt: Number(r['last_activity_at'])
 })
 const toMessage = (r: Row): Message => ({
@@ -130,8 +130,8 @@ export function createRepo(db: Db) {
       async setSession(id: string, sessionId: string | null): Promise<void> {
         await run('UPDATE chats SET harness_session_id = ? WHERE id = ?', [sessionId, id])
       },
-      async setStatus(id: string, status: Presence): Promise<void> {
-        await run('UPDATE chats SET status = ?, last_activity_at = ? WHERE id = ?', [status, now(), id])
+      async setStatus(id: string, status: Presence, statusText: string | null = null): Promise<void> {
+        await run('UPDATE chats SET status = ?, status_text = ?, last_activity_at = ? WHERE id = ?', [status, statusText, now(), id])
       },
       async markRead(id: string): Promise<void> {
         await run('UPDATE chats SET unread_count = 0 WHERE id = ?', [id])

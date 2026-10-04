@@ -4,6 +4,7 @@ import type { Repo } from '../main/db/repo'
 export type AsiApi = Repo
 
 export const REPO_CHANNEL_PREFIX = 'repo:'
+export const CHANGED_CHANNEL = 'asi:changed'
 
 /** Explicit list (contextBridge cannot clone Proxies). test/unit/api.test.ts keeps it in sync with the repo. */
 export const REPO_METHODS = {

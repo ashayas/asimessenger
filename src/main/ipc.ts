@@ -1,6 +1,13 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import type { Repo } from './db/repo'
-import { REPO_CHANNEL_PREFIX } from '@shared/api'
+import { CHANGED_CHANNEL, REPO_CHANNEL_PREFIX } from '@shared/api'
+
+const READ_ONLY = new Set(['list', 'get', 'query', 'forChat'])
+
+/** Tells every window that data in `topic` changed so stores can refetch. */
+export function broadcastChanged(topic: string): void {
+  for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(CHANGED_CHANNEL, topic)
+}
 
 /** Registers one IPC handler per repo method: "repo:<group>.<method>". */
 export function registerRepoIpc(repo: Repo): string[] {
@@ -9,9 +16,12 @@ export function registerRepoIpc(repo: Repo): string[] {
     for (const [name, fn] of Object.entries(methods as Record<string, unknown>)) {
       if (typeof fn !== 'function') continue
       const channel = `${REPO_CHANNEL_PREFIX}${group}.${name}`
-      ipcMain.handle(channel, (_e, ...args: unknown[]) =>
-        (fn as (...a: unknown[]) => unknown).apply(methods, args)
-      )
+      const readOnly = READ_ONLY.has(name)
+      ipcMain.handle(channel, async (_e, ...args: unknown[]) => {
+        const result = await (fn as (...a: unknown[]) => unknown).apply(methods, args)
+        if (!readOnly) broadcastChanged(group)
+        return result
+      })
       channels.push(channel)
     }
   }

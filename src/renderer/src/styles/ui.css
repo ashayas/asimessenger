@@ -114,3 +114,24 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .gallery { padding: 16px; display: flex; flex-direction: column; gap: 18px; overflow: auto; height: 100%; user-select: text; }
 .gallery h2 { margin: 0 0 6px; font: bold 13px var(--font-title); color: var(--accent-deep); }
 .gallery .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+
+/* ---------- contact list ---------- */
+.presence-select { font: inherit; border: 0; background: transparent; color: var(--ink-soft); cursor: default; padding: 0; }
+.pm-input { width: 100%; border: 1px solid transparent; background: transparent; font: inherit; font-style: italic; color: var(--ink-soft); padding: 0 2px; border-radius: 3px; user-select: text; }
+.pm-input:hover, .pm-input:focus { border-color: var(--rule); background: var(--pane); }
+.searchbar { padding: 8px 10px 4px; }
+.tabs2 { display: flex; gap: 14px; padding: 2px 12px 0; border-bottom: 1px solid var(--rule-soft); }
+.tabs2 button { border: 0; background: transparent; padding: 3px 0; border-bottom: 2px solid transparent; display: flex; gap: 5px; align-items: center; }
+.tabs2 button.sel { border-bottom-color: var(--accent); font-weight: bold; }
+.contacts { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0 8px; background: var(--pane); }
+.grp { display: flex; gap: 4px; width: 100%; text-align: left; border: 0; background: transparent; padding: 5px 10px 2px; font-weight: bold; color: var(--accent-deep); }
+.grp .caret { color: var(--ink-soft); width: 10px; }
+.contact { display: flex; gap: 8px; align-items: center; padding: 4px 10px 4px 20px; }
+.contact:hover { background: var(--pane-tint); }
+.contact.sel { background: var(--select); color: var(--select-ink); }
+.contact .who { flex: 1; min-width: 0; }
+.contact .nm { display: flex; gap: 6px; align-items: center; font-weight: bold; }
+.contact .st { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 16px; }
+.empty { padding: 16px; color: var(--ink-faint); text-align: center; }
+.foot { padding: 8px 10px; border-top: 1px solid var(--rule-soft); background: linear-gradient(180deg, var(--glass-a), var(--glass-b)); }
+.btn.wide { width: 100%; }

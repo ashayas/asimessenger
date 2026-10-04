@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { REPO_CHANNEL_PREFIX, REPO_METHODS } from '../shared/api'
+import { CHANGED_CHANNEL, REPO_CHANNEL_PREFIX, REPO_METHODS } from '../shared/api'
 
 const api: Record<string, Record<string, (...args: unknown[]) => Promise<unknown>>> = {}
 for (const [group, methods] of Object.entries(REPO_METHODS)) {
@@ -9,4 +9,10 @@ for (const [group, methods] of Object.entries(REPO_METHODS)) {
   }
 }
 
-contextBridge.exposeInMainWorld('asi', { platform: process.platform, api })
+function onChanged(cb: (topic: string) => void): () => void {
+  const handler = (_e: unknown, topic: string) => cb(topic)
+  ipcRenderer.on(CHANGED_CHANNEL, handler)
+  return () => ipcRenderer.removeListener(CHANGED_CHANNEL, handler)
+}
+
+contextBridge.exposeInMainWorld('asi', { platform: process.platform, api, onChanged })

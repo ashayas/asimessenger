@@ -106,5 +106,7 @@ export const MIGRATIONS: string[] = [
   CREATE TRIGGER drawings_ad AFTER DELETE ON drawings BEGIN
     DELETE FROM search_fts WHERE kind = 'drawing' AND ref_id = old.id;
   END;
-  `
+  `,
+  /* 3: live status text shown as the "personal message" */
+  `ALTER TABLE chats ADD COLUMN status_text TEXT;`
 ]

@@ -4,6 +4,7 @@ import { APP_NAME } from '@shared/app'
 import { openDb } from './db/db'
 import { createRepo } from './db/repo'
 import { registerRepoIpc } from './ipc'
+import { ensureDefaults } from './defaults'
 
 app.setName(APP_NAME)
 if (process.env['ASI_USER_DATA']) app.setPath('userData', process.env['ASI_USER_DATA'])
@@ -32,7 +33,9 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(async () => {
   const db = await openDb(join(app.getPath('userData'), 'asi.db'))
-  registerRepoIpc(createRepo(db))
+  const repo = createRepo(db)
+  if (!process.env['ASI_NO_SEED']) await ensureDefaults(repo)
+  registerRepoIpc(repo)
   app.on('before-quit', () => db.close())
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(iconPath))
   createWindow()

@@ -3,6 +3,6 @@ import type { AsiApi } from '@shared/api'
 
 declare global {
   interface Window {
-    asi: { platform: string; api: AsiApi }
+    asi: { platform: string; api: AsiApi; onChanged(cb: (topic: string) => void): () => void }
   }
 }

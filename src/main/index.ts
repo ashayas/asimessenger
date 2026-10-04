@@ -1,8 +1,12 @@
 import { app, BrowserWindow, nativeImage } from 'electron'
 import { join } from 'node:path'
 import { APP_NAME } from '@shared/app'
+import { openDb } from './db/db'
+import { createRepo } from './db/repo'
+import { registerRepoIpc } from './ipc'
 
 app.setName(APP_NAME)
+if (process.env['ASI_USER_DATA']) app.setPath('userData', process.env['ASI_USER_DATA'])
 
 const iconPath = join(import.meta.dirname, '../../build/icon.png')
 
@@ -26,7 +30,10 @@ function createWindow(): BrowserWindow {
   return win
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  const db = await openDb(join(app.getPath('userData'), 'asi.db'))
+  registerRepoIpc(createRepo(db))
+  app.on('before-quit', () => db.close())
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(iconPath))
   createWindow()
   app.on('activate', () => {

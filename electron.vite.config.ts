@@ -8,7 +8,7 @@ export default defineConfig({
   main: {
     resolve: { alias },
     build: {
-      rollupOptions: { input: { index: resolve('src/main/index.ts') }, external: ['electron'] }
+      rollupOptions: { input: { index: resolve('src/main/index.ts') }, external: ['electron', '@libsql/client', /^@libsql\//, 'libsql'] }
     }
   },
   preload: {

@@ -17,6 +17,7 @@
     "icons": "electron scripts/make-icons.cjs"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zustand": "^5.0.15"

@@ -20,6 +20,7 @@ const pickFolder = (): Promise<string | null> => ipcRenderer.invoke('dialog:pick
 const chat = {
   send: (chatId: string, text: string, quote?: { name: string; text: string }): Promise<unknown> => ipcRenderer.invoke('chat:send', chatId, text, quote),
   setMode: (chatId: string, mode: string): Promise<void> => ipcRenderer.invoke('chat:set-mode', chatId, mode),
+  nudge: (chatId: string): Promise<boolean> => ipcRenderer.invoke('chat:nudge', chatId),
   interrupt: (chatId: string): Promise<void> => ipcRenderer.invoke('chat:interrupt', chatId),
   respond: (chatId: string, reqId: string, answer: string, reason?: string): Promise<void> => ipcRenderer.invoke('chat:respond', chatId, reqId, answer, reason),
   openWindow: (chatId: string): Promise<void> => ipcRenderer.invoke('window:open-chat', chatId)

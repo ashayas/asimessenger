@@ -37,7 +37,7 @@ test('every event kind renders and the permission/question round trips work', as
     await say('/script long')
     await expect(chat.locator('[data-running]')).toBeVisible()
     await chat.getByRole('button', { name: 'Stop' }).click()
-    await expect.poll(() => h.win.evaluate(async (id) => (await window.asi.api.chats.get(id))!.statusText, chatId)).toBe('stopped')
+    await expect.poll(() => h.win.evaluate(async (id) => (await window.asi.api.chats.get(id))!.statusText, chatId)).toContain('stopped')
     await chat.screenshot({ path: 'test-results/events.png' })
   } finally {
     await h.cleanup()

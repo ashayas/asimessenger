@@ -2,6 +2,7 @@ import type { Repo } from './db/repo'
 import type { AgentEvent } from '@shared/events'
 import type { Presence } from '@shared/status'
 import { heuristicRisk } from '@shared/safety'
+import { statusLine, type Lettering } from '@shared/status-text'
 
 const PHASE_PRESENCE: Record<string, Presence> = { idle: 'online', done: 'online', thinking: 'busy', tool: 'busy', waiting: 'away', error: 'busy' }
 
@@ -10,6 +11,7 @@ interface ChatState {
   byEventId: Map<string, string>
   textBuf: Map<string, string>
   flushTimer: ReturnType<typeof setTimeout> | null
+  lettering: Lettering | null
 }
 
 /**
@@ -21,7 +23,7 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void) {
   const queues = new Map<string, Promise<void>>()
   const state = (chatId: string): ChatState => {
     let s = states.get(chatId)
-    if (!s) states.set(chatId, (s = { byEventId: new Map(), textBuf: new Map(), flushTimer: null }))
+    if (!s) states.set(chatId, (s = { byEventId: new Map(), textBuf: new Map(), flushTimer: null, lettering: null }))
     return s
   }
 
@@ -34,6 +36,16 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void) {
     }
     s.textBuf.clear()
     notify('messages')
+  }
+
+  async function lettering(chatId: string): Promise<Lettering> {
+    const s = state(chatId)
+    if (!s.lettering) {
+      const chat = await repo.chats.get(chatId)
+      const friend = chat ? await repo.friends.get(chat.friendId) : null
+      s.lettering = friend?.letteringStyle === 'plain' ? 'plain' : 'funky'
+    }
+    return s.lettering
   }
 
   async function handle(chatId: string, e: AgentEvent): Promise<void> {
@@ -69,14 +81,14 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void) {
         await flush(chatId)
         const risk = e.risk ?? heuristicRisk(e.tool, e.summary)
         await repo.messages.append({ chatId, role: 'agent', kind: 'permission', body: { ...e, risk, decision: null }, text: `${e.tool}: ${e.summary}` })
-        await repo.chats.setStatus(chatId, 'away', `waiting on u: ${e.summary}`)
+        await repo.chats.setStatus(chatId, 'away', statusLine({ phase: 'waiting', detail: e.summary }, await lettering(chatId)))
         notify('chats'); notify('messages')
         return
       }
       case 'question': {
         await flush(chatId)
         await repo.messages.append({ chatId, role: 'agent', kind: 'question', body: { ...e, answer: null }, text: e.prompt })
-        await repo.chats.setStatus(chatId, 'away', 'has a question 4 u')
+        await repo.chats.setStatus(chatId, 'away', statusLine({ phase: 'waiting', detail: 'question' }, await lettering(chatId)))
         notify('chats'); notify('messages')
         return
       }
@@ -93,7 +105,7 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void) {
         return
       }
       case 'status': {
-        await repo.chats.setStatus(chatId, PHASE_PRESENCE[e.phase] ?? 'online', e.detail ?? null)
+        await repo.chats.setStatus(chatId, PHASE_PRESENCE[e.phase] ?? 'online', statusLine({ phase: e.phase, detail: e.detail, kind: e.kind }, await lettering(chatId)))
         notify('chats')
         return
       }
@@ -102,7 +114,8 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void) {
       case 'turn_end': {
         await flush(chatId)
         s.byEventId.clear()
-        const text = e.reason === 'interrupted' ? 'stopped' : e.reason === 'error' ? `x_x ${e.error ?? 'error'}` : null
+        const style = await lettering(chatId)
+        const text = e.reason === 'interrupted' ? statusLine({ phase: 'stopped' }, style) : e.reason === 'error' ? statusLine({ phase: 'error', detail: e.error ?? 'error' }, style) : statusLine({ phase: 'done' }, style)
         if (e.reason === 'error') await repo.messages.append({ chatId, role: 'system', kind: 'error', body: { error: e.error ?? 'error' }, text: e.error ?? 'error' })
         await repo.chats.setStatus(chatId, 'online', text)
         notify('chats'); notify('messages')

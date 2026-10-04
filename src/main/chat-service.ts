@@ -12,8 +12,11 @@ const autoTitle = (text: string) => {
   return one.length > TITLE_MAX ? one.slice(0, TITLE_MAX - 1) + '…' : one
 }
 
+const NUDGE_COOLDOWN_MS = 3000
+
 export function createChatService(deps: { repo: Repo; manager: HarnessManager; ingestor: Ingestor; notify: (topic: string) => void }) {
   const { repo, manager, ingestor, notify } = deps
+  const lastNudge = new Map<string, number>()
 
   return {
     async send(chatId: string, text: string, quote?: UserTurn['quote']): Promise<Message | null> {
@@ -72,9 +75,20 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       notify('chats')
     },
 
-    /** Nudge. */
+    /** Plain stop. */
     async interrupt(chatId: string): Promise<void> {
       await manager.interrupt(chatId)
+    },
+
+    /** The classic: interrupt whatever the agent is doing, with a transcript line. Rate limited per chat. */
+    async nudge(chatId: string, now = Date.now()): Promise<boolean> {
+      if (now - (lastNudge.get(chatId) ?? 0) < NUDGE_COOLDOWN_MS) return false
+      lastNudge.set(chatId, now)
+      const running = manager.isLive(chatId) && (await repo.chats.get(chatId))?.status !== 'online'
+      await repo.messages.append({ chatId, role: 'system', kind: 'nudge', body: { interrupted: running }, text: running ? 'You sent a nudge and stopped the agent.' : 'You sent a nudge.' })
+      notify('messages')
+      if (running) await manager.interrupt(chatId)
+      return true
     },
 
     /** Answer a permission request or question card. */

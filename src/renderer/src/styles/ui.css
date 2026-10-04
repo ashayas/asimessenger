@@ -216,3 +216,4 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .mode-note .grow { flex: 1; }
 .deny-reason { display: flex; gap: 6px; align-items: center; flex: 1 1 100%; }
 .danger-badge { color: var(--busy); }
+.transcript .msg.nudge { color: var(--ink-soft); font-style: italic; }

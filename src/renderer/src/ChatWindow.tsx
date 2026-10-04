@@ -8,6 +8,7 @@ import { useSetting } from './hooks'
 import { MODE_LABEL, canUseMode, lockedReason } from '@shared/safety'
 import type { Mode } from '@shared/models'
 import { MessageView } from './MessageViews'
+import { play } from './sounds'
 
 function useChat(chatId: string) {
   const [chat, setChat] = useState<Chat | null>(null)
@@ -90,7 +91,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
         <ToolButton icon="🌐" label="Browser" disabled />
         <ToolButton icon="🎙" label="Voice Clip" disabled />
         <ToolButton icon="⌨" label="Terminal" disabled />
-        <ToolButton icon="📳" label="Nudge" onClick={() => void window.asi.chat.interrupt(chatId)} />
+        <ToolButton icon="📳" label="Nudge" onClick={() => void window.asi.chat.nudge(chatId).then((sent) => { if (sent) play('nudge') })} />
         <ToolButton icon="⏹" label="Stop" stop onClick={() => void window.asi.chat.interrupt(chatId)} />
       </div>
       <div className="to">

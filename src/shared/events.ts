@@ -19,7 +19,7 @@ export interface PermOption {
 
 /** One normalized stream for every harness. Renderers only know this type. */
 export type AgentEvent =
-  | { t: 'status'; phase: Phase; detail?: string }
+  | { t: 'status'; phase: Phase; detail?: string; kind?: ToolKind }
   | { t: 'text'; id: string; delta: string }
   | { t: 'thinking'; id: string; delta: string }
   | {

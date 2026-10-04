@@ -57,7 +57,7 @@ test('permission card round trip: waiting -> allow -> agent continues', async ()
   await service.send(chatId, '/script permission')
   await waitFor(async () => (await repo.chats.get(chatId))!.status === 'away')
   const card = (await repo.messages.list(chatId)).find((m) => m.kind === 'permission')!
-  expect((await repo.chats.get(chatId))!.statusText).toContain('rm -rf dist')
+  expect((await repo.chats.get(chatId))!.statusText).toBe('(⊙_⊙) waiting on u: rm -rf dist && pnpm build')
   await service.respond(chatId, (card.body as { reqId: string }).reqId, 'deny', 'too risky')
   await waitFor(async () => (await repo.messages.list(chatId)).some((m) => m.text === 'Permission handled.'))
   expect(agent.answers).toEqual([{ reqId: (card.body as { reqId: string }).reqId, answer: 'deny', reason: 'too risky' }])
@@ -77,7 +77,7 @@ test('interrupt stops a long turn and the chat returns online', async () => {
   await service.send(chatId, '/script long')
   await waitFor(async () => (await kinds()).includes('tool'))
   await service.interrupt(chatId)
-  await waitFor(async () => (await repo.chats.get(chatId))!.statusText === 'stopped')
+  await waitFor(async () => (await repo.chats.get(chatId))!.statusText?.includes('stopped') === true)
   expect((await repo.chats.get(chatId))!.status).toBe('online')
 })
 
@@ -132,4 +132,16 @@ test('new chats inherit the friend default mode; the mode is what the session st
   const f = await repo.friends.create({ harness: 'fake', displayName: 'Planner', defaultMode: 'plan' })
   const c = await repo.chats.create({ workspaceId: ws.id, friendId: f.id })
   expect(c.mode).toBe('plan')
+})
+
+test('nudge interrupts a running turn, leaves a transcript line, and is rate limited', async () => {
+  await service.send(chatId, '/script long')
+  await waitFor(async () => (await kinds()).includes('tool'))
+  expect(await service.nudge(chatId, 10_000)).toBe(true)
+  await waitFor(async () => (await repo.chats.get(chatId))!.statusText?.includes('stopped') === true)
+  const line = (await repo.messages.list(chatId)).find((m) => m.kind === 'nudge')!
+  expect(line.text).toBe('You sent a nudge and stopped the agent.')
+  expect(await service.nudge(chatId, 11_000)).toBe(false) // within 3s
+  expect(await service.nudge(chatId, 14_000)).toBe(true)
+  expect((await repo.messages.list(chatId)).filter((m) => m.kind === 'nudge')).toHaveLength(2)
 })

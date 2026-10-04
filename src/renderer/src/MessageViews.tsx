@@ -29,6 +29,8 @@ export function MessageView({ m, chatId }: { m: Message; chatId: string }) {
       return <QuestionCard chatId={chatId} q={m.body as Quest} />
     case 'attachment':
       return <AttachmentCard a={m.body as Attach} />
+    case 'nudge':
+      return <div className="msg nudge" data-kind="nudge">📳 {m.text}</div>
     case 'error':
       return <div className="msg err" data-kind="error">⚠ {m.text}</div>
     default:

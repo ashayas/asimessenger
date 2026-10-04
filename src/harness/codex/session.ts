@@ -224,7 +224,7 @@ export class CodexSession implements AgentSession {
           durationMs: item['durationMs'] != null ? Number(item['durationMs']) : undefined, done
         }
         this.tools.set(id, ev)
-        if (!done) this.hub.emit({ t: 'status', phase: 'tool', detail: ev.command })
+        if (!done) this.hub.emit({ t: 'status', phase: 'tool', detail: ev.command, kind: 'exec' })
         this.hub.emit(ev)
         return
       }
@@ -233,7 +233,7 @@ export class CodexSession implements AgentSession {
         const status = String(item['status'])
         const ev: Tool = { t: 'tool', id, kind: 'edit', title: 'Edit files', files, done, ...(done ? { exit: status === 'completed' ? 0 : 1 } : {}) }
         this.tools.set(id, ev)
-        if (!done) this.hub.emit({ t: 'status', phase: 'tool', detail: files.map((f) => f.path).join(', ') })
+        if (!done) this.hub.emit({ t: 'status', phase: 'tool', detail: files.map((f) => f.path).join(', '), kind: 'edit' })
         this.hub.emit(ev)
         return
       }

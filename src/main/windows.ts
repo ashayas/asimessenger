@@ -86,3 +86,17 @@ export function openOptionsWindow(): BrowserWindow {
   loadRoute(win, '/options')
   return win
 }
+
+/** The nudge shake: a quick decaying jitter of the window position. */
+export function shakeWindow(win: BrowserWindow | null): void {
+  if (!win || win.isDestroyed() || win.isFullScreen()) return
+  const [x0, y0] = win.getPosition() as [number, number]
+  const offsets = [14, -14, 11, -11, 8, -8, 5, -5, 2, -2, 0]
+  let i = 0
+  const timer = setInterval(() => {
+    if (win.isDestroyed() || i >= offsets.length) return void clearInterval(timer)
+    const o = offsets[i++]!
+    win.setPosition(x0 + o, y0 + (i % 2 === 0 ? 3 : -3))
+    if (i >= offsets.length) win.setPosition(x0, y0)
+  }, 28)
+}

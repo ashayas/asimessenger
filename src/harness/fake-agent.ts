@@ -13,7 +13,7 @@ const SCRIPTS: Record<string, (args: { prompt: string; id: string }) => Step[]> 
     { t: 'turn_end', reason: 'done' }
   ],
   tools: ({ id }) => [
-    { t: 'status', phase: 'tool', detail: 'pnpm vitest run' },
+    { t: 'status', phase: 'tool', detail: 'pnpm vitest run', kind: 'exec' },
     { t: 'tool', id: `${id}-t1`, kind: 'exec', title: 'Run tests', command: 'pnpm vitest run src/auth/session.test.ts', cwd: '~/code/honeycomb', done: false },
     { wait: 20 },
     { t: 'tool', id: `${id}-t1`, kind: 'exec', title: 'Run tests', command: 'pnpm vitest run src/auth/session.test.ts', cwd: '~/code/honeycomb', output: '✗ refreshes once under concurrent calls\n  1 failed | 23 passed', exit: 1, durationMs: 2400, done: true },
@@ -41,7 +41,7 @@ const SCRIPTS: Record<string, (args: { prompt: string; id: string }) => Step[]> 
     { t: 'turn_end', reason: 'done' }
   ],
   long: ({ id }) => [
-    { t: 'status', phase: 'tool', detail: 'sleep 30' },
+    { t: 'status', phase: 'tool', detail: 'sleep 30', kind: 'exec' },
     { t: 'tool', id: `${id}-t1`, kind: 'exec', title: 'Long task', command: 'sleep 30', done: false },
     { wait: 30_000 },
     { t: 'text', id, delta: 'finished (should have been interrupted)' },

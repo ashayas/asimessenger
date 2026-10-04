@@ -173,7 +173,7 @@ export class AcpSession implements AgentSession {
       done
     }
     this.tools.set(id, ev)
-    if (!done) this.hub.emit({ t: 'status', phase: 'tool', detail: ev.command ?? ev.title })
+    if (!done) this.hub.emit({ t: 'status', phase: 'tool', detail: ev.command ?? ev.files?.[0]?.path ?? ev.title, kind: ev.kind })
     this.hub.emit(ev)
   }
 }

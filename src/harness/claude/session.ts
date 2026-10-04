@@ -195,7 +195,7 @@ export class ClaudeSession implements AgentSession {
       command: d.command || prev?.command, files: d.files ?? prev?.files, output: prev?.output, exit: prev?.exit, done, ...extra
     }
     this.tools.set(id, ev)
-    if (!done) this.hub.emit({ t: 'status', phase: 'tool', detail: ev.command ?? ev.files?.[0]?.path ?? name })
+    if (!done) this.hub.emit({ t: 'status', phase: 'tool', detail: ev.command ?? ev.files?.[0]?.path ?? name, kind: ev.kind })
     this.hub.emit(ev)
   }
 

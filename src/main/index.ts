@@ -4,6 +4,8 @@ import { APP_NAME } from '@shared/app'
 import { openDb } from './db/db'
 import { createRepo } from './db/repo'
 import { registerRepoIpc } from './ipc'
+import { openChatWindow, openContactsWindow } from './windows'
+import { createChatService } from './chat-service'
 import { ensureDefaults } from './defaults'
 import { installMenu } from './menu'
 
@@ -11,26 +13,6 @@ app.setName(APP_NAME)
 if (process.env['ASI_USER_DATA']) app.setPath('userData', process.env['ASI_USER_DATA'])
 
 const iconPath = join(import.meta.dirname, '../../build/icon.png')
-
-function createWindow(): BrowserWindow {
-  const win = new BrowserWindow({
-    width: 330,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 12, y: 8 },
-    height: 720,
-    title: APP_NAME,
-    show: false,
-    webPreferences: {
-      preload: join(import.meta.dirname, '../preload/index.cjs'),
-      contextIsolation: true,
-      sandbox: true
-    }
-  })
-  win.once('ready-to-show', () => win.show())
-  if (process.env['ELECTRON_RENDERER_URL']) win.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  else win.loadFile(join(import.meta.dirname, '../renderer/index.html'))
-  return win
-}
 
 app.whenReady().then(async () => {
   const db = await openDb(join(app.getPath('userData'), 'asi.db'))
@@ -43,12 +25,15 @@ app.whenReady().then(async () => {
     const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
     return r.canceled ? null : (r.filePaths[0] ?? null)
   })
+  const chat = createChatService(repo)
+  ipcMain.handle('chat:send', (_e, chatId: string, text: string) => chat.send(chatId, text))
+  ipcMain.handle('window:open-chat', (_e, chatId: string) => { openChatWindow(chatId) })
   installMenu()
   app.on('before-quit', () => db.close())
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(iconPath))
-  createWindow()
+  openContactsWindow()
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) openContactsWindow()
   })
 })
 

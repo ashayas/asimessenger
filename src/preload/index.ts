@@ -17,4 +17,9 @@ function onChanged(cb: (topic: string) => void): () => void {
 
 const pickFolder = (): Promise<string | null> => ipcRenderer.invoke('dialog:pick-folder')
 
-contextBridge.exposeInMainWorld('asi', { platform: process.platform, api, onChanged, pickFolder })
+const chat = {
+  send: (chatId: string, text: string): Promise<unknown> => ipcRenderer.invoke('chat:send', chatId, text),
+  openWindow: (chatId: string): Promise<void> => ipcRenderer.invoke('window:open-chat', chatId)
+}
+
+contextBridge.exposeInMainWorld('asi', { platform: process.platform, api, onChanged, pickFolder, chat })

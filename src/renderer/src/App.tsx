@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ChatWindow } from './ChatWindow'
 import { ContactList } from './ContactList'
 import { Gallery } from './Gallery'
 import { startDataSync } from './store'
@@ -20,6 +21,8 @@ export function App() {
   useEffect(() => startDataSync(), [])
   useGlobalShortcuts()
   if (route === '/gallery') return <Gallery />
+  const chat = /^\/chat\/(.+)$/.exec(route)
+  if (chat) return <ChatWindow chatId={chat[1]!} />
   if (route === '/' || route === '/contacts') return <ContactList />
   return <h1>ASI Messenger</h1>
 }

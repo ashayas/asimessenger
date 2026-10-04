@@ -19,6 +19,10 @@ interface DataState {
   setProfile(patch: Partial<Profile>): Promise<void>
   setActiveWorkspace(id: string): Promise<void>
   addWorkspaceFromFolder(): Promise<void>
+  /** Open the most recent chat with this friend in the active workspace (creating one if none), in its own window. */
+  openFriend(friendId: string): Promise<void>
+  newChatWith(friendId: string): Promise<void>
+  openChat(chatId: string): Promise<void>
 }
 
 const DEFAULT_PROFILE: Profile = { name: 'You', personalMessage: '', presence: 'online' }
@@ -57,6 +61,22 @@ export const useData = create<DataState>((set, get) => ({
     const name = path.split('/').filter(Boolean).pop() ?? path
     const ws = await window.asi.api.workspaces.create({ name, path })
     await get().setActiveWorkspace(ws.id)
+  }
+  ,
+  async openFriend(friendId) {
+    const { chats, activeWorkspaceId } = get()
+    const existing = chats.find((c) => c.friendId === friendId && c.workspaceId === activeWorkspaceId)
+    if (existing) return get().openChat(existing.id)
+    return get().newChatWith(friendId)
+  },
+  async newChatWith(friendId) {
+    const { activeWorkspaceId } = get()
+    if (!activeWorkspaceId) return
+    const chat = await window.asi.api.chats.create({ workspaceId: activeWorkspaceId, friendId })
+    await get().openChat(chat.id)
+  },
+  async openChat(chatId) {
+    await window.asi.chat.openWindow(chatId)
   }
 }))
 

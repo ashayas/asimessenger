@@ -9,9 +9,10 @@ type Tab = 'friends' | 'chats' | 'labels'
 const SELECTABLE: Presence[] = ['online', 'busy', 'away', 'offline']
 
 export function ContactList() {
-  const { friends, chats, profile, setProfile, workspaces, activeWorkspaceId, setActiveWorkspace, addWorkspaceFromFolder } = useData()
+  const { friends, chats, profile, setProfile, workspaces, activeWorkspaceId, setActiveWorkspace, addWorkspaceFromFolder, openFriend, newChatWith, openChat } = useData()
   const [tab, setTab] = useState<Tab>('friends')
   const [filter, setFilter] = useState('')
+  const [selected, setSelected] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   const { groups, live } = useMemo(() => groupFriends(friends, chats, {}, filter), [friends, chats, filter])
@@ -99,7 +100,14 @@ export function ContactList() {
                   const l = live[id]!
                   const a = avatarFor(f)
                   return (
-                    <div key={id} className="contact" data-friend={f.displayName} data-presence={l.presence}>
+                    <div
+                      key={id}
+                      className={`contact${selected === id ? ' sel' : ''}`}
+                      data-friend={f.displayName}
+                      data-presence={l.presence}
+                      onClick={() => setSelected(id)}
+                      onDoubleClick={() => void openFriend(id)}
+                    >
                       <Avatar label={a.label} gradient={a.gradient} presence={l.presence} size="sm" working={l.presence === 'busy'} waiting={l.presence === 'away'} />
                       <div className="who">
                         <div className="nm">
@@ -120,7 +128,7 @@ export function ContactList() {
             <div className="empty">No chats in this workspace yet. Double-click a friend to start one.</div>
           ) : (
             wsChats.map((c) => (
-              <div key={c.id} className="contact" data-chat={c.title}>
+              <div key={c.id} className="contact" data-chat={c.title} onDoubleClick={() => void openChat(c.id)}>
                 <div className="who">
                   <div className="nm">{c.title}{c.unreadCount > 0 ? <span className="badge">{c.unreadCount}</span> : null}</div>
                   <div className="st">{friendById.get(c.friendId)?.displayName}</div>
@@ -134,6 +142,7 @@ export function ContactList() {
       </div>
 
       <div className="foot">
+        <Btn className="wide" disabled={!selected} onClick={() => selected && void newChatWith(selected)} title="Start a new chat with the selected friend (⌘N)">New chat with selected friend</Btn>
         <Btn className="wide" disabled title="Registering a CLI arrives with the friends registry">＋ Add a friend</Btn>
       </div>
     </WindowFrame>

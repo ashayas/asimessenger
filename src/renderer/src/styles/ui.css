@@ -133,7 +133,7 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .contact .nm { display: flex; gap: 6px; align-items: center; font-weight: bold; }
 .contact .st { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 16px; }
 .empty { padding: 16px; color: var(--ink-faint); text-align: center; }
-.foot { padding: 8px 10px; border-top: 1px solid var(--rule-soft); background: linear-gradient(180deg, var(--glass-a), var(--glass-b)); }
+.foot { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--rule-soft); background: linear-gradient(180deg, var(--glass-a), var(--glass-b)); }
 .btn.wide { width: 100%; }
 
 /* ---------- workspace tabs ---------- */
@@ -142,3 +142,15 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .ws button.sel { background: var(--pane); color: var(--ink); font-weight: bold; position: relative; top: 1px; }
 .ws .slot { font: 10px var(--font-mono); color: var(--ink-faint); }
 .ws .add { padding: 2px 7px; }
+
+/* ---------- conversation window ---------- */
+.to { padding: 4px 10px; border-bottom: 1px solid var(--rule-soft); background: var(--pane-tint); display: flex; gap: 6px; align-items: center; flex: none; }
+.convo { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 104px; background: var(--pane); }
+.transcript { overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; user-select: text; }
+.transcript .says { color: var(--ink-soft); }
+.transcript .says b { color: var(--ink); }
+.transcript .msg { padding-left: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.convo .side { display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 12px 0; border-left: 1px solid var(--rule-soft); background: linear-gradient(180deg, var(--pane-tint), var(--pane)); }
+.composer { display: flex; gap: 8px; padding: 8px; border-top: 1px solid var(--rule); background: linear-gradient(180deg, var(--glass-a), var(--glass-b)); flex: none; }
+.composer .field { min-height: 48px; resize: none; font: inherit; }
+.composer .btn { align-self: stretch; padding: 0 18px; }

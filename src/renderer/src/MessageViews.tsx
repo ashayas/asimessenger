@@ -39,6 +39,8 @@ export function MessageView({ m, chatId }: { m: Message; chatId: string }) {
       return <QuestionCard chatId={chatId} q={m.body as Quest} />
     case 'attachment':
       return <AttachmentCard a={m.body as Attach} messageId={m.id} />
+    case 'links':
+      return <LinksCard items={(m.body as { items: LinkItem[] }).items} />
     case 'open_url': {
       const url = String((m.body as { url?: string } | null)?.url ?? m.text ?? '')
       return (
@@ -151,6 +153,24 @@ function LocalLinks({ text }: { text: string }) {
   return (
     <div className="chips" data-testid="local-links">
       {urls.map((u) => <Btn key={u} onClick={() => void window.asi.browser.open(u)} title="Open in the ASI Messenger browser">🌐 Open {u}</Btn>)}
+    </div>
+  )
+}
+
+type LinkItem = { label: string; detail?: string; target: import('@shared/search').SearchTarget }
+
+/** ASI's answers: each row jumps to the chat/attachment/drawing, or brings an outside session in. */
+function LinksCard({ items }: { items: LinkItem[] }) {
+  const [err, setErr] = useState<string | null>(null)
+  return (
+    <div className="card links" data-kind="links">
+      {items.map((it, i) => (
+        <div className="link-row" key={i} data-target={it.target.type}>
+          <div className="grow"><b>{it.label}</b>{it.detail ? <div className="says">{it.detail}</div> : null}</div>
+          <Btn onClick={() => { setErr(null); window.asi.search.jump(it.target).catch((e: unknown) => setErr(String(e).replace(/^Error invoking remote method '[^']+': Error: /, ''))) }}>{it.target.type === 'adopt' ? 'Bring in' : 'Open'}</Btn>
+        </div>
+      ))}
+      {err ? <div className="note bad" role="alert">{err}</div> : null}
     </div>
   )
 }

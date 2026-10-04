@@ -1,5 +1,5 @@
 import type { Repo } from './db/repo'
-import type { AgentEvent } from '@shared/events'
+import type { AgentEvent, Risk } from '@shared/events'
 import type { Presence } from '@shared/status'
 import { heuristicRisk } from '@shared/safety'
 import { statusLine, type Lettering } from '@shared/status-text'
@@ -26,7 +26,7 @@ export interface Attention {
   reqId?: string
 }
 
-export function createIngestor(repo: Repo, notify: (topic: string) => void, onAttention: (a: Attention) => void = () => {}) {
+export function createIngestor(repo: Repo, notify: (topic: string) => void, onAttention: (a: Attention) => void = () => {}, assessRisk?: (tool: string, summary: string) => Promise<Risk>) {
   const states = new Map<string, ChatState>()
   const queues = new Map<string, Promise<void>>()
   const state = (chatId: string): ChatState => {
@@ -87,7 +87,7 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
       }
       case 'permission': {
         await flush(chatId)
-        const risk = e.risk ?? heuristicRisk(e.tool, e.summary)
+        const risk = e.risk ?? (await (assessRisk?.(e.tool, e.summary) ?? Promise.resolve(heuristicRisk(e.tool, e.summary))).catch(() => heuristicRisk(e.tool, e.summary)))
         await repo.messages.append({ chatId, role: 'agent', kind: 'permission', body: { ...e, risk, decision: null }, text: `${e.tool}: ${e.summary}` })
         await repo.chats.setStatus(chatId, 'away', statusLine({ phase: 'waiting', detail: e.summary }, await lettering(chatId)))
         notify('chats'); notify('messages')
@@ -106,6 +106,12 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
         await flush(chatId)
         const m = await repo.messages.append({ chatId, role: 'agent', kind: 'attachment', body: e, text: e.name })
         await repo.attachments.add({ messageId: m.id, kind: e.kind, name: e.name, path: e.path ?? null, body: e.body ?? null })
+        notify('messages')
+        return
+      }
+      case 'links': {
+        await flush(chatId)
+        await repo.messages.append({ chatId, role: 'agent', kind: 'links', body: e, text: e.items.map((i) => i.label).join(', ') })
         notify('messages')
         return
       }

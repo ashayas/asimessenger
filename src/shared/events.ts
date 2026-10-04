@@ -1,4 +1,5 @@
 import type { Mode } from './models'
+import type { SearchTarget } from './search'
 
 export type Phase = 'idle' | 'thinking' | 'tool' | 'waiting' | 'error' | 'done'
 export type ToolKind = 'exec' | 'edit' | 'read' | 'search' | 'web' | 'mcp'
@@ -39,6 +40,7 @@ export type AgentEvent =
   | { t: 'question'; reqId: string; prompt: string; choices?: string[] }
   | { t: 'attachment'; id: string; kind: AttachmentKind; name: string; path?: string; body?: string }
   | { t: 'open_url'; url: string }
+  | { t: 'links'; items: { label: string; detail?: string; target: SearchTarget }[] }
   | { t: 'usage'; inputTokens: number; outputTokens: number; costUsd?: number }
   | { t: 'turn_end'; reason: 'done' | 'interrupted' | 'error'; error?: string }
 

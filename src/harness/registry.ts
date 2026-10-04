@@ -6,11 +6,13 @@ import { ptyFactory } from './pty/factory'
 import { EchoAgent } from './echo-agent'
 import { FakeAgent } from './fake-agent'
 import type { HarnessManager } from './manager'
+import type { HarnessFactory } from './types'
 
 const ACP_PRESETS = { opencode: OPENCODE, gemini: GEMINI, hermes: HERMES, generic: GENERIC_ACP } as const
 
 /** Wires every built-in harness kind into the manager. ACP friends pick a preset by `transport`. */
-export function registerHarnesses(manager: HarnessManager): void {
+export function registerHarnesses(manager: HarnessManager, extra: { asi?: HarnessFactory } = {}): void {
+  if (extra.asi) manager.register('asi', extra.asi)
   manager.register('echo', async () => new EchoAgent())
   manager.register('claude', claudeFactory)
   manager.register('codex', codexFactory)

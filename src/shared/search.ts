@@ -3,6 +3,8 @@ export type SearchTarget =
   | { type: 'attachment'; messageId: string; chatId: string; workspaceId: string | null }
   | { type: 'friend'; friendId: string }
   | { type: 'drawing'; workspaceId: string; name: string }
+  /** An agent session found running outside Messenger: bring it into a chat. */
+  | { type: 'adopt'; harness: 'claude' | 'codex'; sessionId: string; cwd: string; title: string }
 
 export interface PaletteResult {
   kind: 'chat' | 'friend' | 'attachment' | 'drawing' | 'message'

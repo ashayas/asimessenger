@@ -333,3 +333,12 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .engine .meta { color: var(--ink-soft); font-size: 11px; }
 .bar { height: 6px; border-radius: 3px; background: var(--rule-soft); overflow: hidden; margin-top: 4px; }
 .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--online), #7fd36f); transition: width .2s; }
+
+/* ---------- ASI results ---------- */
+.card.links { gap: 4px; }
+.link-row { display: flex; gap: 10px; align-items: center; padding: 3px 0; border-top: 1px solid var(--rule-soft); }
+.link-row:first-child { border-top: 0; }
+.link-row .grow { flex: 1; min-width: 0; }
+.link-row .says { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brain { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--rule); background: var(--pane-tint); }
+.brain .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }

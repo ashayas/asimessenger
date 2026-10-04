@@ -3,6 +3,7 @@ import type { DetectedPreset } from '@shared/presets'
 import { avatarFor } from '@shared/harness-meta'
 import { Avatar, Btn, WindowFrame } from './ui/kit'
 import { useData } from './store'
+import { BrainSetup } from './BrainSetup'
 
 export function AddFriend() {
   const friends = useData((s) => s.friends)
@@ -64,6 +65,7 @@ export function AddFriend() {
           )
         })}
       </div>
+      <BrainSetup />
       <div className="byo">
         <b>Bring your own harness</b>
         <input className="field" aria-label="Friend name" placeholder="Name, e.g. My Agent" value={name} onChange={(e) => setName(e.target.value)} />

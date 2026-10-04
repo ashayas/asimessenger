@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell, systemPreferences } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, safeStorage, shell, systemPreferences } from 'electron'
 import { join } from 'node:path'
 import { APP_NAME } from '@shared/app'
 import { openDb } from './db/db'
@@ -16,6 +16,13 @@ import { searchAll } from './search'
 import { createTerminalService } from './terminal'
 import { createMcpBridge } from './mcp-bridge'
 import { createBrowserManager } from './browser'
+import { AsiAgent } from '../asi/agent'
+import { createBrain } from '../asi/brain'
+import { assessRisk } from '../asi/decider'
+import { discoverSessions } from '../asi/discovery'
+import { adoptSession } from './adopt'
+import { createSecrets } from './secrets'
+import { homedir } from 'node:os'
 import { completeOnboarding, isOnboarded } from './onboarding'
 import { appleEngine, createVoiceService, fakeEngine, type VoiceEngine } from './voice'
 import { cohereEngine } from './cohere-engine'
@@ -48,8 +55,17 @@ app.whenReady().then(async () => {
     const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
     return r.canceled ? null : (r.filePaths[0] ?? null)
   })
+  const secrets = createSecrets(repo, {
+    available: () => safeStorage.isEncryptionAvailable(),
+    encrypt: (s) => safeStorage.encryptString(s).toString('base64'),
+    decrypt: (c) => safeStorage.decryptString(Buffer.from(c, 'base64'))
+  })
+  const brain = createBrain(repo, secrets, undefined, process.env['ASI_CLEF_BASE'])
+  ipcMain.handle('asi:brain-status', () => brain.status())
+  ipcMain.handle('asi:brain-connect', async (_e, input) => { const r = await brain.connect(input); broadcastChanged('settings'); return r })
+  ipcMain.handle('asi:brain-disconnect', async () => { await brain.disconnect(); broadcastChanged('settings') })
   const attention = createAttentionHandler(repo)
-  const ingestor = createIngestor(repo, broadcastChanged, (a) => void attention(a))
+  const ingestor = createIngestor(repo, broadcastChanged, (a) => void attention(a), async (tool, summary) => (await assessRisk(await brain.decider(), tool, summary)).risk)
   let badgeTimer: ReturnType<typeof setTimeout> | null = null
   onChanged((topic) => {
     if (topic !== 'chats' && topic !== 'messages') return
@@ -85,7 +101,7 @@ app.whenReady().then(async () => {
     onEvent: (chatId, e) => void ingestor.ingest(chatId, e),
     onResumeId: (chatId, id) => void repo.chats.setSession(chatId, id)
   })
-  registerHarnesses(manager)
+  registerHarnesses(manager, { asi: async () => new AsiAgent({ repo, decider: () => brain.decider(), discover: () => discoverSessions({ home: process.env['ASI_DISCOVERY_HOME'] ?? homedir() }), search: (q) => searchAll(repo, q) }) })
   app.on('will-quit', () => void manager.disposeAll())
   const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged, opener: { url: (u) => browser.open(u), path: (p) => void shell.openPath(p) } })
   chatRef.current = chat
@@ -110,6 +126,7 @@ app.whenReady().then(async () => {
     if (t.type === 'chat') openChatWindow(t.chatId)
     else if (t.type === 'attachment') { const a = await loadAttachment(repo, t.messageId); openAttachmentWindow(t.messageId, a.name) }
     else if (t.type === 'drawing') openDoodleWindow(t.workspaceId, { name: t.name })
+    else if (t.type === 'adopt') { openChatWindow(await adoptSession(repo, t)); broadcastChanged('chats'); broadcastChanged('workspaces') }
     else if (t.type === 'friend') {
       const ws = (await repo.workspaces.list())[0]
       const active = await repo.settings.get<string | null>('activeWorkspaceId', ws?.id ?? null)

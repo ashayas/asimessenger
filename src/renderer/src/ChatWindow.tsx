@@ -192,6 +192,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
           <Btn onClick={() => void window.asi.safety.openOptions()}>Open Options</Btn>
         </div>
       ) : null}
+      {friend.harness === 'asi' || friend.harness === 'echo' ? null : (
       <div className="modes" role="radiogroup" aria-label="Permission mode">
         {(['ask', 'auto-edit', 'plan', 'dangerous'] as Mode[]).map((m) => {
           const locked = !canUseMode(m, safety)
@@ -210,6 +211,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
           )
         })}
       </div>
+      )}
       <div className="composer">
         <textarea
           ref={composerRef}

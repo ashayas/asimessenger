@@ -342,3 +342,5 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .link-row .says { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brain { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--rule); background: var(--pane-tint); }
 .brain .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.opts .row { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
+.opts input[type='range'] { flex: 1; }

@@ -4,6 +4,7 @@ import { Avatar, Btn, WindowFrame } from './ui/kit'
 import { useData } from './store'
 import { useSetting } from './hooks'
 import { VoiceSettings } from './VoiceSettings'
+import { GeneralSettings } from './GeneralSettings'
 
 export function Options() {
   const friends = useData((s) => s.friends).filter((f) => f.harness !== 'asi' && f.harness !== 'echo' && f.harness !== 'fake')
@@ -55,6 +56,7 @@ export function Options() {
           </div>
           {!global && friends.length > 0 ? <div className="hint">Per-friend switches unlock once the global switch is on.</div> : null}
         </section>
+        <GeneralSettings />
         <VoiceSettings />
       </div>
     </WindowFrame>

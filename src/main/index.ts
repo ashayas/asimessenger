@@ -109,6 +109,15 @@ app.whenReady().then(async () => {
   ipcMain.handle('chat:send', (_e, chatId: string, text: string, quote?: { name: string; text: string }) => chat.send(chatId, text, quote))
   ipcMain.handle('safety:set-global-dangerous', (_e, on: boolean) => chat.setGlobalDangerous(on))
   ipcMain.handle('safety:set-friend-dangerous', (_e, id: string, on: boolean) => chat.setFriendDangerous(id, on))
+  ipcMain.handle('data:export', async () => {
+    const data = await repo.data.exportAll()
+    const target = process.env['ASI_TEST_EXPORT_PATH'] ?? (await dialog.showSaveDialog({ defaultPath: join(app.getPath('documents'), `asi-messenger-export-${new Date().toISOString().slice(0, 10)}.json`) })).filePath
+    if (!target) return null
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(target, JSON.stringify(data, null, 2))
+    return target
+  })
+  ipcMain.handle('data:delete-all-chats', async () => { await manager.disposeAll(); const n = await repo.data.deleteAllChats(); broadcastChanged('chats'); broadcastChanged('messages'); return n })
   ipcMain.handle('window:open-options', () => { openOptionsWindow() })
   ipcMain.handle('chat:set-mode', (_e, chatId: string, mode: string) => chat.setMode(chatId, mode as never))
   ipcMain.handle('attachments:load', (_e, messageId: string) => loadAttachment(repo, messageId))

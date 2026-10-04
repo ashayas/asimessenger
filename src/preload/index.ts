@@ -117,4 +117,9 @@ const brain = {
   disconnect: (): Promise<void> => ipcRenderer.invoke('asi:brain-disconnect')
 }
 
-contextBridge.exposeInMainWorld('asi', { brain, voice, onboarding, browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })
+const data = {
+  exportAll: (): Promise<string | null> => ipcRenderer.invoke('data:export'),
+  deleteAllChats: (): Promise<number> => ipcRenderer.invoke('data:delete-all-chats')
+}
+
+contextBridge.exposeInMainWorld('asi', { data, brain, voice, onboarding, browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })

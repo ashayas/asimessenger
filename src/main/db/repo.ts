@@ -86,6 +86,9 @@ export function createRepo(db: Db) {
       async rename(id: string, displayName: string): Promise<void> {
         await run('UPDATE friends SET display_name = ? WHERE id = ?', [displayName, id])
       },
+      async setLettering(id: string, style: 'funky' | 'plain'): Promise<void> {
+        await run('UPDATE friends SET lettering_style = ? WHERE id = ?', [style, id])
+      },
       async setDangerousAllowed(id: string, allowed: boolean): Promise<void> {
         await run('UPDATE friends SET dangerous_allowed = ? WHERE id = ?', [allowed ? 1 : 0, id])
       },
@@ -239,6 +242,26 @@ export function createRepo(db: Db) {
       },
       async list(workspaceId: string): Promise<{ id: string; path: string; title: string; updatedAt: number }[]> {
         return (await all('SELECT * FROM drawings WHERE workspace_id = ? ORDER BY updated_at DESC', [workspaceId])).map((r) => ({ id: String(r['id']), path: String(r['path']), title: String(r['title']), updatedAt: Number(r['updated_at']) }))
+      }
+    },
+
+    data: {
+      /** Everything you typed and everything agents answered, as plain JSON you own. */
+      async exportAll(): Promise<{ exportedAt: string; workspaces: unknown[]; friends: unknown[]; chats: unknown[] }> {
+        const friends = (await all('SELECT id, harness, display_name, command FROM friends')).map((f) => ({ id: f['id'], harness: f['harness'], name: f['display_name'], command: f['command'] }))
+        const workspaces = (await all('SELECT id, name, path FROM workspaces')).map((w) => ({ id: w['id'], name: w['name'], path: w['path'] }))
+        const chats = []
+        for (const c of await all('SELECT * FROM chats ORDER BY created_at')) {
+          const msgs = await all('SELECT role, kind, text, body_json, created_at FROM messages WHERE chat_id = ? ORDER BY created_at, rowid', [String(c['id'])])
+          chats.push({ id: c['id'], title: c['title'], workspaceId: c['workspace_id'], friendId: c['friend_id'], createdAt: c['created_at'], messages: msgs.map((m) => ({ role: m['role'], kind: m['kind'], text: m['text'], at: m['created_at'], body: JSON.parse(String(m['body_json'])) })) })
+        }
+        return { exportedAt: new Date().toISOString(), workspaces, friends, chats }
+      },
+      /** Deletes all chats (and their messages, attachments, permission records). Friends, workspaces and settings stay. */
+      async deleteAllChats(): Promise<number> {
+        const n = Number((await all('SELECT COUNT(*) AS c FROM chats'))[0]?.['c'] ?? 0)
+        await run('DELETE FROM chats')
+        return n
       }
     },
 

@@ -124,3 +124,19 @@ test('drawings are indexed once per path and searchable by title', async () => {
   expect((await repo.drawings.list(ws.id)).map((d) => d.title)).toEqual(['auth-flow.excalidraw'])
   expect((await repo.search.query('auth-flow'))[0]).toMatchObject({ kind: 'drawing', refId: a })
 })
+
+test('export contains chats with messages; delete-all keeps friends and workspaces; lettering is settable', async () => {
+  const { ws, friend, chat } = await seed()
+  await repo.messages.append({ chatId: chat.id, role: 'user', kind: 'text', body: { text: 'hi' }, text: 'hi' })
+  await repo.messages.append({ chatId: chat.id, role: 'agent', kind: 'text', body: { text: 'hello' }, text: 'hello' })
+  const dump = await repo.data.exportAll()
+  expect(dump.chats).toEqual([expect.objectContaining({ title: 'auth-refactor', messages: [expect.objectContaining({ role: 'user', text: 'hi' }), expect.objectContaining({ role: 'agent', text: 'hello' })] })])
+  expect(JSON.stringify(dump)).not.toContain('secret') // no credentials in an export
+  await repo.friends.setLettering(friend.id, 'plain')
+  expect((await repo.friends.get(friend.id))!.letteringStyle).toBe('plain')
+  expect(await repo.data.deleteAllChats()).toBe(1)
+  expect(await repo.chats.list()).toEqual([])
+  expect(await repo.search.query('hello')).toEqual([]) // the search index followed
+  expect((await repo.workspaces.get(ws.id))!.name).toBe('honeycomb')
+  expect(await repo.friends.list()).toHaveLength(1)
+})

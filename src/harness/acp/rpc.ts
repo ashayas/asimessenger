@@ -26,7 +26,7 @@ export class RpcPeer {
   /** Last chunk of stderr, kept for error messages. */
   stderrTail = ''
 
-  constructor(private child: ChildProcessWithoutNullStreams) {
+  constructor(private child: ChildProcessWithoutNullStreams, private opts: { jsonrpcField?: boolean } = {}) {
     child.stdout.setEncoding('utf8')
     child.stdout.on('data', (d: string) => this.onData(d))
     child.stderr.setEncoding('utf8')
@@ -44,12 +44,12 @@ export class RpcPeer {
     const id = this.nextId++
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject })
-      this.write({ jsonrpc: '2.0', id, method, params })
+      this.write({ id, method, params })
     })
   }
 
   notify(method: string, params?: unknown): void {
-    if (!this.closed) this.write({ jsonrpc: '2.0', method, params })
+    if (!this.closed) this.write({ method, params })
   }
 
   kill(): void {
@@ -59,7 +59,8 @@ export class RpcPeer {
   }
 
   private write(msg: Json): void {
-    this.child.stdin.write(JSON.stringify(msg) + '\n')
+    const out = this.opts.jsonrpcField === false ? msg : { jsonrpc: '2.0', ...msg }
+    this.child.stdin.write(JSON.stringify(out) + '\n')
   }
 
   private onData(chunk: string): void {
@@ -81,9 +82,9 @@ export class RpcPeer {
     if (method && id !== undefined) {
       try {
         const result = (await this.requestHandler?.(method, msg['params'])) ?? null
-        this.write({ jsonrpc: '2.0', id, result })
+        this.write({ id, result })
       } catch (err) {
-        this.write({ jsonrpc: '2.0', id, error: { code: -32603, message: err instanceof Error ? err.message : String(err) } })
+        this.write({ id, error: { code: -32603, message: err instanceof Error ? err.message : String(err) } })
       }
     } else if (method) {
       this.notificationHandler?.(method, msg['params'])

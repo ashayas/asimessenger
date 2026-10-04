@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Message } from '@shared/models'
 import type { AgentEvent } from '@shared/events'
 import { Btn } from './ui/kit'
+import { badgeFor } from '@shared/attachments'
 
 type Tool = Extract<AgentEvent, { t: 'tool' }>
 type Perm = Extract<AgentEvent, { t: 'permission' }> & { decision: string | null; reason?: string | null }
@@ -12,8 +13,15 @@ const DECISION_LABEL: Record<string, string> = { 'allow-once': 'Allowed once', '
 
 export function MessageView({ m, chatId }: { m: Message; chatId: string }) {
   switch (m.kind) {
-    case 'text':
-      return <div className="msg" data-kind="text">{m.text}</div>
+    case 'text': {
+      const quote = (m.body as { quote?: { name: string; text: string } } | null)?.quote
+      return (
+        <div className="msg" data-kind="text">
+          {quote ? <blockquote className="quote" data-testid="quote"><div className="qname">{quote.name}</div>{quote.text}</blockquote> : null}
+          {m.text}
+        </div>
+      )
+    }
     case 'thinking':
       return (
         <details className="msg thinking" data-kind="thinking">
@@ -28,7 +36,7 @@ export function MessageView({ m, chatId }: { m: Message; chatId: string }) {
     case 'question':
       return <QuestionCard chatId={chatId} q={m.body as Quest} />
     case 'attachment':
-      return <AttachmentCard a={m.body as Attach} />
+      return <AttachmentCard a={m.body as Attach} messageId={m.id} />
     case 'nudge':
       return <div className="msg nudge" data-kind="nudge">📳 {m.text}</div>
     case 'error':
@@ -113,14 +121,13 @@ function QuestionCard({ chatId, q }: { chatId: string; q: Quest }) {
   )
 }
 
-function AttachmentCard({ a }: { a: Attach }) {
-  const ext = a.kind === 'markdown' ? 'MD' : a.kind === 'diff' ? 'Δ' : a.kind === 'image' ? 'IMG' : a.kind === 'plan' ? 'PLAN' : 'CODE'
+function AttachmentCard({ a, messageId }: { a: Attach; messageId: string }) {
   return (
     <div className="card" data-kind="attachment">
       <div className="file">
-        <div className="ic">{ext}</div>
+        <div className="ic">{badgeFor(a.kind)}</div>
         <div className="grow"><b>{a.name}</b><div className="says">{a.kind} · sent as attachment</div></div>
-        <Btn disabled title="Viewer arrives with attachments">Open</Btn>
+        <Btn onClick={() => void window.asi.attachments.open(messageId)}>Open</Btn>
       </div>
     </div>
   )

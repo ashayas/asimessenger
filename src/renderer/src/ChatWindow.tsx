@@ -91,7 +91,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
     <WindowFrame title={`${chat.mode === 'dangerous' ? '⚠ DANGEROUS · ' : ''}${chat.title} · ${friend.displayName} · Conversation`} danger={chat.mode === 'dangerous'}>
       <div className="toolbar">
         <ToolButton icon="👥" label="Invite" disabled />
-        <ToolButton icon="📎" label="Send Files" disabled />
+        <ToolButton icon="📎" label="Send Files" onClick={() => void window.asi.attachments.pickFiles().then(async (paths) => { if (paths.length) await window.asi.attachments.sendFiles(chatId, paths) })} />
         <ToolButton icon="✏️" label="Doodle" disabled />
         <ToolButton icon="🌐" label="Browser" disabled />
         <ToolButton icon="🎙" label="Voice Clip" disabled />

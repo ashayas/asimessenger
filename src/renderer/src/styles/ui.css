@@ -226,3 +226,26 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .toast-text { min-width: 0; flex: 1; }
 .toast-text .snip { color: var(--ink-soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .toast-actions { display: flex; gap: 6px; padding: 0 10px 8px; justify-content: flex-end; }
+
+/* ---------- attachment viewer ---------- */
+.viewer { flex: 1; min-height: 0; overflow: auto; background: var(--pane); user-select: text; }
+.md { padding: 14px 20px; max-width: 80ch; line-height: 1.6; }
+.md h1, .md h2, .md h3 { font-family: var(--font-title); color: var(--accent-deep); margin: 1em 0 .4em; }
+.md pre { background: var(--code-bg); color: var(--code-ink); padding: 10px 12px; border-radius: 4px; overflow-x: auto; font: 11.5px var(--font-mono); }
+.md code { font: 11.5px var(--font-mono); background: var(--pane-tint); padding: 0 3px; border-radius: 3px; }
+.md pre code { background: transparent; padding: 0; }
+.md blockquote { margin: .6em 0; padding-left: 10px; border-left: 3px solid var(--rule); color: var(--ink-soft); }
+.md table { border-collapse: collapse; } .md th, .md td { border: 1px solid var(--rule-soft); padding: 3px 8px; }
+.codeview { font: 11.5px/1.5 var(--font-mono); padding: 6px 0; }
+.ln { display: flex; white-space: pre-wrap; }
+.ln .no { user-select: none; width: 44px; flex: none; text-align: right; padding-right: 10px; color: var(--ink-faint); }
+.ln .src { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ln.add { background: #e4f6e0; } .ln.del { background: #fde5e1; } .ln.hunk { background: var(--pane-tint); color: var(--ink-soft); }
+.replybar { padding: 6px 10px 8px; border-top: 1px solid var(--rule); background: linear-gradient(180deg, var(--glass-a), var(--glass-b)); flex: none; }
+.quoting { font-size: 11px; color: var(--ink-soft); margin-bottom: 4px; }
+.quoting .sent { color: var(--ok-ink); font-weight: bold; }
+.composer-lite { display: flex; gap: 8px; }
+.composer-lite .field { min-height: 44px; resize: none; font: inherit; }
+.composer-lite .btn { align-self: stretch; }
+.transcript .quote { margin: 0 0 4px; padding: 3px 8px; border-left: 3px solid var(--rule); background: var(--pane-tint); color: var(--ink-soft); white-space: pre-wrap; max-height: 120px; overflow: auto; }
+.transcript .quote .qname { font-weight: bold; font-size: 10.5px; }

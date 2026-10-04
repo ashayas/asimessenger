@@ -46,4 +46,11 @@ const safety = {
 
 const windowFocused = (): Promise<boolean> => ipcRenderer.invoke('window:is-focused')
 
-contextBridge.exposeInMainWorld('asi', { platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })
+const attachments = {
+  load: (messageId: string): Promise<unknown> => ipcRenderer.invoke('attachments:load', messageId),
+  open: (messageId: string): Promise<void> => ipcRenderer.invoke('attachments:open', messageId),
+  pickFiles: (): Promise<string[]> => ipcRenderer.invoke('dialog:pick-files'),
+  sendFiles: (chatId: string, paths: string[], note?: string): Promise<void> => ipcRenderer.invoke('chat:send-files', chatId, paths, note)
+}
+
+contextBridge.exposeInMainWorld('asi', { attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })

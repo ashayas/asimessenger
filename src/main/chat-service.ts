@@ -4,6 +4,8 @@ import type { PermDecision, UserTurn } from '@shared/events'
 import type { Mode } from '@shared/models'
 import { canUseMode, lockedReason } from '@shared/safety'
 import type { HarnessManager } from '../harness/manager'
+import { attachmentPrompt } from '@shared/attachments'
+import { readPickedFile } from './attachments'
 import type { Ingestor } from './ingest'
 
 const TITLE_MAX = 42
@@ -19,7 +21,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
   const lastNudge = new Map<string, number>()
 
   return {
-    async send(chatId: string, text: string, quote?: UserTurn['quote']): Promise<Message | null> {
+    async send(chatId: string, text: string, quote?: UserTurn['quote'], opts: { silentUser?: boolean } = {}): Promise<Message | null> {
       const clean = text.trim()
       if (!clean) return null
       const chat = await repo.chats.get(chatId)
@@ -27,8 +29,8 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       const friend = await repo.friends.get(chat.friendId)
       if (!friend) throw new Error(`unknown friend ${chat.friendId}`)
       const ws = await repo.workspaces.get(chat.workspaceId)
-      const msg = await repo.messages.append({ chatId, role: 'user', kind: 'text', body: { text: clean, quote }, text: clean })
-      if (chat.title === 'New chat') await repo.chats.rename(chatId, autoTitle(clean))
+      const shown = opts.silentUser ? null : await repo.messages.append({ chatId, role: 'user', kind: 'text', body: { text: clean, quote }, text: clean })
+      if (chat.title === 'New chat') await repo.chats.rename(chatId, autoTitle(opts.silentUser ? (await repo.messages.list(chatId)).find((m) => m.kind === 'attachment')?.text ?? clean : clean))
       notify('messages')
       try {
         await manager.send(chat, friend, ws?.path ?? process.cwd(), { text: clean, quote })
@@ -38,7 +40,20 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
         await repo.chats.setStatus(chatId, 'online', `x_x ${message}`)
         notify('messages'); notify('chats')
       }
-      return msg
+      return shown
+    },
+
+    /** Send files to the agent; they appear in the transcript as attachments you can reopen. */
+    async sendFiles(chatId: string, paths: string[], note = ''): Promise<void> {
+      const parts: string[] = []
+      for (const [i, p] of paths.entries()) {
+        const f = await readPickedFile(p)
+        const m = await repo.messages.append({ chatId, role: 'user', kind: 'attachment', body: { t: 'attachment', id: `u-${Date.now()}-${i}`, kind: f.kind, name: f.name, path: p, body: f.text }, text: f.name })
+        await repo.attachments.add({ messageId: m.id, kind: f.kind, name: f.name, path: p, body: f.text })
+        parts.push(attachmentPrompt(f.name, f.text, i === 0 ? note : ''))
+      }
+      notify('messages')
+      if (parts.length) await this.send(chatId, parts.join('\n\n'), undefined, { silentUser: true })
     },
 
     /** Change a chat's permission mode. Dangerous needs the global switch AND the friend's opt-in. */

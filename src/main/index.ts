@@ -8,9 +8,10 @@ import { closeToastsFor, createAttentionHandler, openNextUnread, refreshBadge } 
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
-import { shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow } from './windows'
+import { openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow } from './windows'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from './friends-service'
 import { createChatService } from './chat-service'
+import { loadAttachment } from './attachments'
 import { ensureDefaults } from './defaults'
 import { installMenu } from './menu'
 
@@ -51,6 +52,14 @@ app.whenReady().then(async () => {
   ipcMain.handle('safety:set-friend-dangerous', (_e, id: string, on: boolean) => chat.setFriendDangerous(id, on))
   ipcMain.handle('window:open-options', () => { openOptionsWindow() })
   ipcMain.handle('chat:set-mode', (_e, chatId: string, mode: string) => chat.setMode(chatId, mode as never))
+  ipcMain.handle('attachments:load', (_e, messageId: string) => loadAttachment(repo, messageId))
+  ipcMain.handle('attachments:open', async (_e, messageId: string) => { const a = await loadAttachment(repo, messageId); openAttachmentWindow(messageId, a.name) })
+  ipcMain.handle('dialog:pick-files', async () => {
+    if (process.env['ASI_TEST_FILES']) return JSON.parse(process.env['ASI_TEST_FILES']) as string[]
+    const r = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] })
+    return r.canceled ? [] : r.filePaths
+  })
+  ipcMain.handle('chat:send-files', (_e, chatId: string, paths: string[], note?: string) => chat.sendFiles(chatId, paths, note))
   ipcMain.handle('chat:nudge', async (e, chatId: string) => {
     const sent = await chat.nudge(chatId)
     if (sent) shakeWindow(BrowserWindow.fromWebContents(e.sender))

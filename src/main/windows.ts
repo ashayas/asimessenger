@@ -112,3 +112,19 @@ export function shakeWindow(win: BrowserWindow | null): void {
     if (i >= offsets.length) win.setPosition(x0, y0)
   }, 28)
 }
+
+const attachmentWindows = new Map<string, BrowserWindow>()
+export function openAttachmentWindow(messageId: string, title: string): BrowserWindow {
+  const existing = attachmentWindows.get(messageId)
+  if (existing && !existing.isDestroyed()) {
+    existing.show()
+    existing.focus()
+    return existing
+  }
+  const win = new BrowserWindow(baseOptions({ width: 760, height: 620, minWidth: 460, minHeight: 360, title }))
+  attachmentWindows.set(messageId, win)
+  win.once('ready-to-show', () => win.show())
+  win.on('closed', () => attachmentWindows.delete(messageId))
+  loadRoute(win, `/attachment/${messageId}`)
+  return win
+}

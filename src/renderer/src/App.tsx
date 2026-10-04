@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AddFriend } from './AddFriend'
+import { AttachmentViewer } from './AttachmentViewer'
 import { ChatWindow } from './ChatWindow'
 import { ContactList } from './ContactList'
 import { Options } from './Options'
@@ -27,6 +28,8 @@ export function App() {
   if (route === '/add-friend') return <AddFriend />
   if (route === '/options') return <Options />
   if (route.startsWith('/toast')) return <Toast />
+  const att = /^\/attachment\/(.+)$/.exec(route)
+  if (att) return <AttachmentViewer messageId={att[1]!} />
   const chat = /^\/chat\/(.+)$/.exec(route)
   if (chat) return <ChatWindow chatId={chat[1]!} />
   if (route === '/' || route === '/contacts') return <ContactList />

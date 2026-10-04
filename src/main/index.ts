@@ -22,6 +22,7 @@ import { assessRisk } from '../asi/decider'
 import { discoverSessions } from '../asi/discovery'
 import { adoptSession } from './adopt'
 import { createSecrets } from './secrets'
+import { httpFactory } from '../harness/http/factory'
 import { homedir } from 'node:os'
 import { completeOnboarding, isOnboarded } from './onboarding'
 import { appleEngine, createVoiceService, fakeEngine, type VoiceEngine } from './voice'
@@ -101,7 +102,7 @@ app.whenReady().then(async () => {
     onEvent: (chatId, e) => void ingestor.ingest(chatId, e),
     onResumeId: (chatId, id) => void repo.chats.setSession(chatId, id)
   })
-  registerHarnesses(manager, { asi: async () => new AsiAgent({ repo, decider: () => brain.decider(), discover: () => discoverSessions({ home: process.env['ASI_DISCOVERY_HOME'] ?? homedir() }), search: (q) => searchAll(repo, q) }) })
+  registerHarnesses(manager, { http: httpFactory(secrets), asi: async () => new AsiAgent({ repo, decider: () => brain.decider(), discover: () => discoverSessions({ home: process.env['ASI_DISCOVERY_HOME'] ?? homedir() }), search: (q) => searchAll(repo, q) }) })
   app.on('will-quit', () => void manager.disposeAll())
   const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged, opener: { url: (u) => browser.open(u), path: (p) => void shell.openPath(p) } })
   chatRef.current = chat
@@ -168,7 +169,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('friends:detect', () => detectPresets())
   ipcMain.handle('friends:availability', async () => availability(await repo.friends.list()))
   ipcMain.handle('friends:add-preset', async (_e, id: string) => { const f = await addPreset(repo, id); broadcastChanged('friends'); return f })
-  ipcMain.handle('friends:add-custom', async (_e, c) => { const f = await addCustom(repo, c); broadcastChanged('friends'); return f })
+  ipcMain.handle('friends:add-custom', async (_e, c) => { const f = await addCustom(repo, c, secrets); broadcastChanged('friends'); return f })
   ipcMain.handle('friends:test-acp', (_e, command: string, args: string[]) => testAcp(command, args))
   installMenu()
   app.on('before-quit', () => db.close())

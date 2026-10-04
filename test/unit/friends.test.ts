@@ -65,3 +65,17 @@ test('test connection performs the ACP handshake or explains the failure', async
   expect(await testAcp(process.execPath, [resolve('test/fixtures/mock-acp-agent.mjs')])).toEqual({ ok: true, agent: 'ACP agent' })
   expect(await testAcp('definitely-not-real', [])).toMatchObject({ ok: false, error: expect.stringContaining('not found') })
 })
+
+test('HTTP friends validate the manifest, keep the token in the keychain and the manifest in args', async () => {
+  const stored: Record<string, string> = {}
+  const secrets = { set: async (n: string, v: string) => { stored[n] = v } }
+  const manifest = JSON.stringify({ baseUrl: 'https://agents.example.com/api', send: { path: '/chat', body: { m: '{{text}}' } }, stream: 'sse', map: { text: 'delta' } })
+  await expect(addCustom(repo, { name: 'North', command: '', args: [], kind: 'http', manifest: '{oops' }, secrets)).rejects.toThrow(/valid JSON/)
+  await expect(addCustom(repo, { name: 'North', command: '', args: [], kind: 'http', manifest: manifest.replace('https://agents.example.com/api', 'http://agents.example.com') }, secrets)).rejects.toThrow(/https/)
+  const f = await addCustom(repo, { name: 'North', command: '', args: [], kind: 'http', manifest, token: ' tok-123 ' }, secrets)
+  expect(f).toMatchObject({ harness: 'http', displayName: 'North', command: null })
+  const saved = JSON.parse(f.args[0]!)
+  expect(saved.auth).toEqual({ type: 'bearer', secret: expect.stringMatching(/^http-/) })
+  expect(stored[saved.auth.secret]).toBe('tok-123')
+  expect(JSON.stringify(f)).not.toContain('tok-123') // the token is not in the database row
+})

@@ -1,7 +1,9 @@
 import { execFile, spawn } from 'node:child_process'
 import { loginEnv, which } from '../harness/env'
 import { RpcPeer } from '../harness/acp/rpc'
+import { randomUUID } from 'node:crypto'
 import type { Repo } from './db/repo'
+import { parseManifest } from '../harness/http/manifest'
 import { PRESETS, type DetectedPreset } from '@shared/presets'
 import type { Friend } from '@shared/models'
 
@@ -25,7 +27,7 @@ export async function availability(friends: Friend[]): Promise<Record<string, bo
   const env = await loginEnv()
   const out: Record<string, boolean> = {}
   for (const f of friends) {
-    if (f.harness === 'asi' || f.harness === 'echo' || f.harness === 'fake') continue
+    if (f.harness === 'asi' || f.harness === 'echo' || f.harness === 'fake' || f.harness === 'http') continue
     const command = f.command ?? PRESETS.find((p) => p.id === f.avatar)?.command ?? null
     out[f.id] = command ? which(command, env) !== null : false
   }
@@ -44,9 +46,31 @@ export async function addPreset(repo: Repo, presetId: string): Promise<Friend> {
   })
 }
 
-export async function addCustom(repo: Repo, c: { name: string; command: string; args: string[]; kind: 'acp' | 'pty' }): Promise<Friend> {
+export interface CustomFriendInput {
+  name: string
+  command: string
+  args: string[]
+  kind: 'acp' | 'pty' | 'http'
+  /** http: the manifest JSON. */
+  manifest?: string
+  /** http: bearer token, stored in the keychain (never in the database). */
+  token?: string
+}
+
+export async function addCustom(repo: Repo, c: CustomFriendInput, secrets?: { set(name: string, value: string): Promise<void> }): Promise<Friend> {
   const name = c.name.trim()
   if (!name) throw new Error('give your friend a name')
+  if (c.kind === 'http') {
+    const m = parseManifest(c.manifest ?? '')
+    const token = c.token?.trim()
+    if (token) {
+      if (!secrets) throw new Error('the system keychain is not available')
+      const secret = m.auth?.secret ?? `http-${randomUUID()}`
+      await secrets.set(secret, token)
+      m.auth = { type: 'bearer', secret }
+    }
+    return repo.friends.create({ harness: 'http', displayName: name, avatar: 'http', transport: 'http', command: null, args: [JSON.stringify(m)] })
+  }
   if (!c.command.trim()) throw new Error('enter the command to run')
   return repo.friends.create({
     harness: c.kind, displayName: name, avatar: null, transport: c.kind === 'acp' ? 'generic' : null,

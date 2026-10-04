@@ -11,7 +11,9 @@ export function AddFriend() {
   const [busy, setBusy] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [cmdline, setCmdline] = useState('')
-  const [kind, setKind] = useState<'acp' | 'pty'>('acp')
+  const [kind, setKind] = useState<'acp' | 'pty' | 'http'>('acp')
+  const [manifest, setManifest] = useState('')
+  const [token, setToken] = useState('')
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   useEffect(() => { void window.asi.friends.detect().then(setFound) }, [])
@@ -29,6 +31,7 @@ export function AddFriend() {
 
   const test = async () => {
     const { command, args } = parse()
+    if (kind === 'http') return setMsg({ ok: true, text: 'HTTP friends are checked when you add them (the manifest is validated).' })
     if (!command) return setMsg({ ok: false, text: 'Enter the command to run.' })
     if (kind === 'pty') return setMsg({ ok: true, text: 'Raw terminal friends run any command; no handshake to test.' })
     setMsg({ ok: true, text: 'Testing…' })
@@ -39,8 +42,8 @@ export function AddFriend() {
   const addCustom = async () => {
     const { command, args } = parse()
     try {
-      await window.asi.friends.addCustom({ name, command, args, kind })
-      setName(''); setCmdline(''); setMsg({ ok: true, text: 'Added.' })
+      await window.asi.friends.addCustom({ name, command, args, kind, manifest, token })
+      setName(''); setCmdline(''); setManifest(''); setToken(''); setMsg({ ok: true, text: 'Added.' })
     } catch (err) {
       setMsg({ ok: false, text: err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : String(err) })
     }
@@ -69,10 +72,18 @@ export function AddFriend() {
       <div className="byo">
         <b>Bring your own harness</b>
         <input className="field" aria-label="Friend name" placeholder="Name, e.g. My Agent" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="field mono" aria-label="Command" placeholder="my-agent acp --model local" value={cmdline} onChange={(e) => setCmdline(e.target.value)} />
+        {kind === 'http' ? (
+          <>
+            <textarea className="field mono" aria-label="Manifest" rows={6} placeholder='{ "baseUrl": "https://…", "send": { "path": "/chat", "body": { "message": "{{text}}" } }, "stream": "sse", "map": { "text": "delta" } }' value={manifest} onChange={(e) => setManifest(e.target.value)} />
+            <input className="field mono" type="password" aria-label="Bearer token" placeholder="Bearer token (stored in your keychain)" value={token} onChange={(e) => setToken(e.target.value)} />
+          </>
+        ) : (
+          <input className="field mono" aria-label="Command" placeholder="my-agent acp --model local" value={cmdline} onChange={(e) => setCmdline(e.target.value)} />
+        )}
         <div className="row">
           <label><input type="radio" name="kind" checked={kind === 'acp'} onChange={() => setKind('acp')} /> ACP</label>
           <label><input type="radio" name="kind" checked={kind === 'pty'} onChange={() => setKind('pty')} /> Raw terminal</label>
+          <label><input type="radio" name="kind" checked={kind === 'http'} onChange={() => setKind('http')} /> HTTP</label>
           <span className="grow" />
           <Btn onClick={() => void test()}>Test connection</Btn>
           <Btn kind="primary" onClick={() => void addCustom()}>Add</Btn>

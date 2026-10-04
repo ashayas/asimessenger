@@ -1,8 +1,8 @@
 import type { Chat, Friend } from './models'
 import type { Presence } from './status'
 
-/** Harnesses that need no installed CLI. */
-export const isBuiltin = (h: string): boolean => h === 'asi' || h === 'echo' || h === 'fake'
+/** Harnesses that need no installed CLI (HTTP friends are remote; they report errors when used). */
+export const isBuiltin = (h: string): boolean => h === 'asi' || h === 'echo' || h === 'fake' || h === 'http'
 
 export type GroupId = 'asi' | 'needs-you' | 'working' | 'online' | 'offline'
 

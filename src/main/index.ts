@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from 'electron'
 import { join } from 'node:path'
 import { APP_NAME } from '@shared/app'
 import { openDb } from './db/db'
@@ -8,11 +8,12 @@ import { closeToastsFor, createAttentionHandler, openNextUnread, refreshBadge } 
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
-import { closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow } from './windows'
+import { openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow } from './windows'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from './friends-service'
 import { createChatService } from './chat-service'
 import { loadAttachment } from './attachments'
 import { searchAll } from './search'
+import { listDrawings, loadDrawing, newDrawingName, saveDrawing, savePng } from './doodle'
 import { ensureDefaults } from './defaults'
 import { installMenu } from './menu'
 
@@ -68,6 +69,7 @@ app.whenReady().then(async () => {
     if ('workspaceId' in t && t.workspaceId) { await repo.settings.set('activeWorkspaceId', t.workspaceId); broadcastChanged('settings') }
     if (t.type === 'chat') openChatWindow(t.chatId)
     else if (t.type === 'attachment') { const a = await loadAttachment(repo, t.messageId); openAttachmentWindow(t.messageId, a.name) }
+    else if (t.type === 'drawing') openDoodleWindow(t.workspaceId, { name: t.name })
     else if (t.type === 'friend') {
       const ws = (await repo.workspaces.list())[0]
       const active = await repo.settings.get<string | null>('activeWorkspaceId', ws?.id ?? null)
@@ -77,6 +79,17 @@ app.whenReady().then(async () => {
     }
     openContactsWindow()
   })
+  ipcMain.handle('doodle:open', (_e, workspaceId: string, opts?: { chatId?: string; name?: string }) => { openDoodleWindow(workspaceId, opts) })
+  ipcMain.handle('doodle:list', (_e, wsId: string) => listDrawings(repo, wsId))
+  ipcMain.handle('doodle:new-name', (_e, wsId: string) => newDrawingName(repo, wsId))
+  ipcMain.handle('doodle:load', (_e, wsId: string, name: string) => loadDrawing(repo, wsId, name))
+  ipcMain.handle('doodle:save', async (_e, wsId: string, name: string, json: string) => { await saveDrawing(repo, wsId, name, json); broadcastChanged('drawings') })
+  ipcMain.handle('doodle:send', async (_e, wsId: string, chatId: string, name: string, pngBase64: string, note?: string) => {
+    const png = await savePng(repo, wsId, name, pngBase64)
+    const ws = await repo.workspaces.get(wsId)
+    await chat.sendDoodle(chatId, name, png, `${ws?.path}/.drawings/${name}.excalidraw`, note)
+  })
+  ipcMain.handle('doodle:reveal', async (_e, wsId: string) => { const ws = await repo.workspaces.get(wsId); if (ws) shell.showItemInFolder(`${ws.path}/.drawings`) })
   ipcMain.handle('chat:nudge', async (e, chatId: string) => {
     const sent = await chat.nudge(chatId)
     if (sent) shakeWindow(BrowserWindow.fromWebContents(e.sender))

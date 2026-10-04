@@ -115,3 +115,12 @@ test('labels: friend and chat assignments, bulk listing, rename and cascade on d
   expect((await repo.labels.assignments()).friends).toEqual([])
   await expect(repo.labels.create('p0')).rejects.toThrow() // names are unique
 })
+
+test('drawings are indexed once per path and searchable by title', async () => {
+  const { ws } = await seed()
+  const a = await repo.drawings.upsert({ workspaceId: ws.id, path: '/hc/.drawings/auth-flow.excalidraw', title: 'auth-flow.excalidraw' })
+  const b = await repo.drawings.upsert({ workspaceId: ws.id, path: '/hc/.drawings/auth-flow.excalidraw', title: 'auth-flow.excalidraw' })
+  expect(b).toBe(a)
+  expect((await repo.drawings.list(ws.id)).map((d) => d.title)).toEqual(['auth-flow.excalidraw'])
+  expect((await repo.search.query('auth-flow'))[0]).toMatchObject({ kind: 'drawing', refId: a })
+})

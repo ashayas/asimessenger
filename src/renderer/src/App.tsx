@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { AddFriend } from './AddFriend'
 import { AttachmentViewer } from './AttachmentViewer'
 import { ChatWindow } from './ChatWindow'
@@ -10,6 +10,9 @@ import { Gallery } from './Gallery'
 import { startDataSync } from './store'
 import { useGlobalShortcuts } from './shortcuts'
 import './styles/ui.css'
+
+// Excalidraw is big; only the doodle window pays for it.
+const Doodle = lazy(() => import('./Doodle'))
 
 function useRoute(): string {
   const [route, setRoute] = useState(() => location.hash.replace(/^#/, '') || '/')
@@ -30,6 +33,11 @@ export function App() {
   if (route === '/options') return <Options />
   if (route === '/search') return <Palette />
   if (route.startsWith('/toast')) return <Toast />
+  const doodle = /^\/doodle\/([^?]+)/.exec(route)
+  if (doodle) {
+    const q = new URLSearchParams(route.split('?')[1] ?? '')
+    return <Suspense fallback={null}><Doodle workspaceId={doodle[1]!} chatId={q.get('chat')} name={q.get('name')} /></Suspense>
+  }
   const att = /^\/attachment\/(.+)$/.exec(route)
   if (att) return <AttachmentViewer messageId={att[1]!} />
   const chat = /^\/chat\/(.+)$/.exec(route)

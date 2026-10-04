@@ -106,7 +106,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
       <div className="toolbar">
         <ToolButton icon="👥" label="Invite" disabled />
         <ToolButton icon="📎" label="Send Files" onClick={() => void window.asi.attachments.pickFiles().then(async (paths) => { if (paths.length) await window.asi.attachments.sendFiles(chatId, paths) })} />
-        <ToolButton icon="✏️" label="Doodle" disabled />
+        <ToolButton icon="✏️" label="Doodle" onClick={() => void window.asi.doodle.open(chat.workspaceId, { chatId })} />
         <ToolButton icon="🌐" label="Browser" disabled />
         <ToolButton icon="🎙" label="Voice Clip" disabled />
         <ToolButton icon="⌨" label="Terminal" disabled />

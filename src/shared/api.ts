@@ -14,6 +14,7 @@ export const REPO_METHODS = {
   chats: ['create', 'get', 'list', 'rename', 'setMode', 'setSession', 'setStatus', 'markRead', 'remove'],
   messages: ['append', 'update', 'get', 'list'],
   attachments: ['get', 'add'],
+  drawings: ['upsert', 'get', 'list'],
   settings: ['get', 'set'],
   search: ['query']
 } as const

@@ -6,6 +6,12 @@ export function useGlobalShortcuts(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey) return
+      if (e.shiftKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault()
+        const { activeWorkspaceId } = useData.getState()
+        if (activeWorkspaceId) void window.asi.doodle.open(activeWorkspaceId)
+        return
+      }
       if (!e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         void window.asi.search.openPalette()

@@ -2,7 +2,7 @@ export type SearchTarget =
   | { type: 'chat'; chatId: string; workspaceId: string | null }
   | { type: 'attachment'; messageId: string; chatId: string; workspaceId: string | null }
   | { type: 'friend'; friendId: string }
-  | { type: 'drawing'; path: string; workspaceId: string | null }
+  | { type: 'drawing'; workspaceId: string; name: string }
 
 export interface PaletteResult {
   kind: 'chat' | 'friend' | 'attachment' | 'drawing' | 'message'

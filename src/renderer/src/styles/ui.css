@@ -272,3 +272,14 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .empty-inline { color: var(--ink-faint); }
 .lbl-group .grp { cursor: default; }
 .linkish { border: 0; background: transparent; color: var(--link); padding: 0 4px; } .linkish:hover { text-decoration: underline; } .to .grow { flex: 1; }
+
+/* ---------- doodle ---------- */
+.doodle-bar { align-items: center; }
+.doodle-bar .grow { flex: 1; }
+.doodle-bar .pick { display: flex; flex-direction: column; font-size: 11px; padding: 0 6px; }
+.doodle-bar .pick select { font: inherit; max-width: 220px; }
+.doodle-bar .saved { color: var(--ink-soft); margin-right: 8px; }
+.doodle-canvas { flex: 1; min-height: 0; position: relative; background: #fff; }
+.doodle-canvas .excalidraw { height: 100%; }
+.imgview { padding: 16px; display: grid; place-items: start center; }
+.imgview img { max-width: 100%; border: 1px solid var(--rule-soft); background: #fff; }

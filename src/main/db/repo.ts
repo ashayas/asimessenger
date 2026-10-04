@@ -218,6 +218,27 @@ export function createRepo(db: Db) {
       }
     },
 
+    drawings: {
+      /** Register (or touch) a drawing file so it is searchable. */
+      async upsert(d: { workspaceId: string; path: string; title: string }): Promise<string> {
+        const existing = (await all('SELECT id FROM drawings WHERE path = ?', [d.path]))[0]
+        if (existing) {
+          await run('UPDATE drawings SET updated_at = ? WHERE id = ?', [now(), String(existing['id'])])
+          return String(existing['id'])
+        }
+        const id = randomUUID()
+        await run('INSERT INTO drawings(id,workspace_id,path,title,updated_at) VALUES (?,?,?,?,?)', [id, d.workspaceId, d.path, d.title, now()])
+        return id
+      },
+      async get(id: string): Promise<{ id: string; workspaceId: string; path: string; title: string } | null> {
+        const r = (await all('SELECT * FROM drawings WHERE id = ?', [id]))[0]
+        return r ? { id: String(r['id']), workspaceId: String(r['workspace_id']), path: String(r['path']), title: String(r['title']) } : null
+      },
+      async list(workspaceId: string): Promise<{ id: string; path: string; title: string; updatedAt: number }[]> {
+        return (await all('SELECT * FROM drawings WHERE workspace_id = ? ORDER BY updated_at DESC', [workspaceId])).map((r) => ({ id: String(r['id']), path: String(r['path']), title: String(r['title']), updatedAt: Number(r['updated_at']) }))
+      }
+    },
+
     settings: {
       async get<T>(key: string, fallback: T): Promise<T> {
         const r = (await all('SELECT value_json FROM settings WHERE key = ?', [key]))[0]

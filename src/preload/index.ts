@@ -60,4 +60,15 @@ const search = {
   onFocus: (cb: () => void): (() => void) => { const h = () => cb(); ipcRenderer.on('asi:search-focus', h); return () => ipcRenderer.removeListener('asi:search-focus', h) }
 }
 
-contextBridge.exposeInMainWorld('asi', { search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })
+const doodle = {
+  open: (workspaceId: string, opts?: { chatId?: string; name?: string }): Promise<void> => ipcRenderer.invoke('doodle:open', workspaceId, opts),
+  list: (wsId: string): Promise<{ name: string; updatedAt: number }[]> => ipcRenderer.invoke('doodle:list', wsId),
+  newName: (wsId: string): Promise<string> => ipcRenderer.invoke('doodle:new-name', wsId),
+  load: (wsId: string, name: string): Promise<string | null> => ipcRenderer.invoke('doodle:load', wsId, name),
+  save: (wsId: string, name: string, json: string): Promise<void> => ipcRenderer.invoke('doodle:save', wsId, name, json),
+  send: (wsId: string, chatId: string, name: string, pngBase64: string, note?: string): Promise<void> => ipcRenderer.invoke('doodle:send', wsId, chatId, name, pngBase64, note),
+  reveal: (wsId: string): Promise<void> => ipcRenderer.invoke('doodle:reveal', wsId),
+  onOpen: (cb: (a: { chatId: string | null; name: string | null }) => void): (() => void) => { const h = (_e: unknown, a: { chatId: string | null; name: string | null }) => cb(a); ipcRenderer.on('asi:doodle-open', h); return () => ipcRenderer.removeListener('asi:doodle-open', h) }
+}
+
+contextBridge.exposeInMainWorld('asi', { doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })

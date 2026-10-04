@@ -149,3 +149,22 @@ export function openSearchWindow(): BrowserWindow {
 export function closeSearchWindow(): void {
   if (searchWindow && !searchWindow.isDestroyed()) searchWindow.close()
 }
+
+const doodleWindows = new Map<string, BrowserWindow>()
+/** One Excalidraw window per workspace; chatId (optional) enables "Send to chat". */
+export function openDoodleWindow(workspaceId: string, opts: { chatId?: string; name?: string } = {}): BrowserWindow {
+  const existing = doodleWindows.get(workspaceId)
+  const q = new URLSearchParams({ ...(opts.chatId ? { chat: opts.chatId } : {}), ...(opts.name ? { name: opts.name } : {}) }).toString()
+  if (existing && !existing.isDestroyed()) {
+    existing.show()
+    existing.focus()
+    existing.webContents.send('asi:doodle-open', { chatId: opts.chatId ?? null, name: opts.name ?? null })
+    return existing
+  }
+  const win = new BrowserWindow(baseOptions({ width: 1000, height: 720, minWidth: 600, minHeight: 420, title: 'Doodle' }))
+  doodleWindows.set(workspaceId, win)
+  win.once('ready-to-show', () => win.show())
+  win.on('closed', () => doodleWindows.delete(workspaceId))
+  loadRoute(win, `/doodle/${workspaceId}${q ? `?${q}` : ''}`)
+  return win
+}

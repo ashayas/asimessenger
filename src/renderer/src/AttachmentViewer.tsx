@@ -41,7 +41,9 @@ export function AttachmentViewer({ messageId }: { messageId: string }) {
   return (
     <WindowFrame title={`${a.name} · from ${a.friendName}`}>
       <div className="viewer" data-testid="viewer" data-kind={a.kind}>
-        {html ? (
+        {a.kind === 'image' ? (
+          <div className="imgview"><img src={a.text} alt={a.name} /></div>
+        ) : html ? (
           <div className="md" dangerouslySetInnerHTML={{ __html: html }} />
         ) : (
           <div className="codeview">

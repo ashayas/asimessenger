@@ -12,3 +12,4 @@ playwright-report
 *.p8
 *.mobileprovision
 build/.render.html
+src/renderer/public/excalidraw-assets

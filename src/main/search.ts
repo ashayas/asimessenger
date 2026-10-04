@@ -1,3 +1,4 @@
+import { basename } from 'node:path'
 import type { Repo } from './db/repo'
 import { KIND_ORDER, type PaletteResult, type SearchTarget } from '@shared/search'
 
@@ -18,6 +19,10 @@ export async function searchAll(repo: Repo, query: string, limit = 40): Promise<
       const a = await repo.attachments.get(h.refId)
       const m = a ? await repo.messages.get(a.messageId) : null
       if (a && m) target = { type: 'attachment', messageId: a.messageId, chatId: m.chatId, workspaceId: h.workspaceId }
+    }
+    else if (h.kind === 'drawing') {
+      const d = await repo.drawings.get(h.refId)
+      if (d) target = { type: 'drawing', workspaceId: d.workspaceId, name: basename(d.path).replace(/\.excalidraw$/, '') }
     }
     if (!target) continue
     // a chat that already matched by title should not repeat for each of its messages' titles

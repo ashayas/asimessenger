@@ -56,6 +56,15 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       if (parts.length) await this.send(chatId, parts.join('\n\n'), undefined, { silentUser: true })
     },
 
+    /** Send a drawing: shows as an image attachment and tells the agent where the PNG and editable source are. */
+    async sendDoodle(chatId: string, name: string, pngPath: string, sourcePath: string, note = ''): Promise<void> {
+      const m = await repo.messages.append({ chatId, role: 'user', kind: 'attachment', body: { t: 'attachment', id: `doodle-${Date.now()}`, kind: 'image', name: `${name}.png`, path: pngPath }, text: `${name}.png` })
+      await repo.attachments.add({ messageId: m.id, kind: 'image', name: `${name}.png`, path: pngPath })
+      notify('messages')
+      const text = `${note ? note + '\n\n' : ''}I drew a diagram for you. Image: ${pngPath} (editable Excalidraw source: ${sourcePath}). Please open the image and take it into account.`
+      await this.send(chatId, text, undefined, { silentUser: true })
+    },
+
     /** Change a chat's permission mode. Dangerous needs the global switch AND the friend's opt-in. */
     async setMode(chatId: string, mode: Mode): Promise<void> {
       const chat = await repo.chats.get(chatId)

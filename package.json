@@ -12,12 +12,17 @@
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "test:e2e": "electron-vite build && playwright test",
+    "test:e2e": "pnpm assets && electron-vite build && playwright test",
     "lint": "eslint .",
     "test:live": "ASI_LIVE=1 vitest run --config vitest.live.config.ts",
-    "icons": "electron scripts/make-icons.cjs"
+    "icons": "electron scripts/make-icons.cjs",
+    "assets": "node scripts/copy-excalidraw-assets.mjs",
+    "predev": "pnpm assets",
+    "prebuild": "pnpm assets",
+    "postinstall": "node scripts/copy-excalidraw-assets.mjs"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.1",
     "@libsql/client": "^0.18.0",
     "dompurify": "^3.4.16",
     "marked": "^18.0.14",

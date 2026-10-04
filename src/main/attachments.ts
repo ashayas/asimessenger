@@ -22,6 +22,17 @@ export async function readInsideWorkspace(path: string, workspace: string): Prom
   return readFile(real, 'utf8')
 }
 
+/** Images come back as a data URL so the viewer needs no file access. */
+export async function readImageInsideWorkspace(path: string, workspace: string): Promise<string> {
+  const [real, root] = await Promise.all([realpath(path), realpath(workspace)])
+  if (real !== root && !real.startsWith(root + sep)) throw new Error('that file is outside this workspace')
+  const st = await stat(real)
+  if (st.size > 10 * 1024 * 1024) throw new Error('image is larger than 10 MB')
+  const ext = real.toLowerCase().split('.').pop()
+  const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/png'
+  return `data:${mime};base64,${(await readFile(real)).toString('base64')}`
+}
+
 export async function loadAttachment(repo: Repo, messageId: string): Promise<LoadedAttachment> {
   const msg = await repo.messages.get(messageId)
   if (!msg || msg.kind !== 'attachment') throw new Error('attachment not found')
@@ -31,7 +42,7 @@ export async function loadAttachment(repo: Repo, messageId: string): Promise<Loa
   let text = a.body ?? ''
   if (!text && a.path) {
     const ws = chat ? await repo.workspaces.get(chat.workspaceId) : null
-    text = await readInsideWorkspace(a.path, ws?.path ?? '/nonexistent')
+    text = a.kind === 'image' ? await readImageInsideWorkspace(a.path, ws?.path ?? '/nonexistent') : await readInsideWorkspace(a.path, ws?.path ?? '/nonexistent')
   }
   return { chatId: msg.chatId, name: a.name, kind: a.kind, text, path: a.path ?? null, friendName: friend?.displayName ?? 'Agent' }
 }

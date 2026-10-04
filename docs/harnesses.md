@@ -50,11 +50,11 @@ Add a friend › **HTTP**, paste a manifest, enter the token (kept in the macOS 
 }
 ```
 
-### Cohere North (template: confirm the field names against your instance's API reference)
+### Cohere North
 
-North's API is `https://{instance}/api` with a Bearer token ([reference](https://private.docs.cohere.com/reference/overview)).
-Start from the manifest above, point `baseUrl` at your instance, set `send.path` to your chat endpoint and map the
-streamed text field. A fork can ship this as a preset in `src/shared/presets.ts` plus a test against a mock server.
+North is not built in. A fork or contributor with access to North's API connects it; the full hand-off guide (what to
+collect from Cohere, manifest vs. dedicated harness, event mapping, tests, safety, definition of done) is
+[cohere-north.md](cohere-north.md).
 
 ## Add a protocol (code)
 

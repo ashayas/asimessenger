@@ -102,7 +102,7 @@ pnpm dist         # build an unsigned DMG into release/
 
 ## Add your own agent
 
-Anything that speaks [ACP](https://agentclientprotocol.com), runs in a terminal, or streams over HTTP can be a friend. HTTP agents (for example Cohere North) need only a manifest, no code. See [docs/harnesses.md](docs/harnesses.md).
+Anything that speaks [ACP](https://agentclientprotocol.com), runs in a terminal, or streams over HTTP can be a friend. Simple HTTP agents need only a manifest, no code. See [docs/harnesses.md](docs/harnesses.md). Connecting **Cohere North**? Start at [docs/cohere-north.md](docs/cohere-north.md).
 
 ## Built and tested for real
 
@@ -111,11 +111,11 @@ Anything that speaks [ACP](https://agentclientprotocol.com), runs in a terminal,
 | `pnpm test` | unit tests: data, harness adapters against mock agents, status engine, tool server, safety policy |
 | `pnpm test:e2e` | Playwright drives the Electron app end to end |
 | `pnpm test:packaged` | smoke test of the packaged `.app` |
-| `pnpm test:live` | with `ASI_LIVE=1`: contract tests against your installed **Claude Code, Codex, OpenCode and Gemini** in a throwaway git repo |
+| `pnpm test:live` | with `ASI_LIVE=1`: contract tests against your installed **Claude Code, Codex, OpenCode, Gemini and Pi** in a throwaway git repo |
 | `pnpm shots` | regenerates the images above from a scripted demo scene |
 
 ## More
 
-[Architecture](docs/architecture.md) · [Harnesses](docs/harnesses.md) · [Voice](docs/voice.md) · [Releasing](docs/releasing.md) · [Contributing](CONTRIBUTING.md)
+[Architecture](docs/architecture.md) · [Harnesses](docs/harnesses.md) · [Cohere North guide](docs/cohere-north.md) · [Voice](docs/voice.md) · [Releasing](docs/releasing.md) · [Contributing](CONTRIBUTING.md)
 
 <sub>ASI Messenger is an independent homage to the instant-messenger era. The logo, sounds and icons are original; it uses no third-party Messenger assets. Apache-2.0.</sub>

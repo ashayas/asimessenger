@@ -2,6 +2,17 @@
 
 A Messenger-style home for your coding agents. Every agent CLI you register is a friend in your contact list, every chat is a persisted thread, and **Nudge** interrupts an agent mid-turn.
 
+## What it does
+
+- **Agents are friends.** Claude Code, Codex, OpenCode, Gemini CLI, Hermes, Pi, any ACP agent, any CLI (raw terminal) and any streaming HTTP service. One chat window (or tab) per thread, persisted.
+- **Warp-style conversation.** Command blocks, permission cards with risk labels, questions, markdown/code/diff attachments you can reply to by quoting a selection.
+- **Nudge** interrupts an agent (with the shake and the sound). Presence, unread badges, toasts and the dock badge tell you who needs you.
+- **ASI**, the always-online friend: "status", "who needs me", "what's running outside Messenger", "find …"; optional Cloudflare Clef brain.
+- **Safe by default.** Ask mode everywhere; dangerous mode needs a global switch and a per-friend opt-in.
+- **Tools built in.** ⌘K search, ⌘1–9 workspaces, Excalidraw doodles saved in `<workspace>/.drawings`, an in-app browser, push-to-talk voice that never leaves your Mac.
+
+Docs: [architecture](docs/architecture.md) · [harnesses](docs/harnesses.md) · [voice](docs/voice.md) · [releasing](docs/releasing.md).
+
 Open source (Apache-2.0). Signed DMGs are published on the Releases page; you can also build from source.
 
 ```bash

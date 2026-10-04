@@ -122,4 +122,10 @@ const data = {
   deleteAllChats: (): Promise<number> => ipcRenderer.invoke('data:delete-all-chats')
 }
 
-contextBridge.exposeInMainWorld('asi', { data, brain, voice, onboarding, browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })
+const tabs = {
+  setActive: (workspaceId: string, chatId: string | null): Promise<void> => ipcRenderer.invoke('tabs:active', workspaceId, chatId),
+  popOut: (chatId: string): Promise<void> => ipcRenderer.invoke('tabs:pop-out', chatId),
+  onOpen: (cb: (a: { chatId: string }) => void): (() => void) => { const h = (_e: unknown, a: { chatId: string }) => cb(a); ipcRenderer.on('asi:tabs-open', h); return () => ipcRenderer.removeListener('asi:tabs-open', h) }
+}
+
+contextBridge.exposeInMainWorld('asi', { tabs, data, brain, voice, onboarding, browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })

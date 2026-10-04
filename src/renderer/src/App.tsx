@@ -7,6 +7,7 @@ import { Browser } from './Browser'
 import { Options } from './Options'
 import { Palette } from './Palette'
 import { Toast } from './Toast'
+import { TabsWindow } from './TabsWindow'
 import { Welcome } from './Welcome'
 import { Gallery } from './Gallery'
 import { startDataSync } from './store'
@@ -42,6 +43,8 @@ export function App() {
     const q = new URLSearchParams(route.split('?')[1] ?? '')
     return <Suspense fallback={null}><Doodle workspaceId={doodle[1]!} chatId={q.get('chat')} name={q.get('name')} /></Suspense>
   }
+  const tabsRoute = /^\/tabs\/([^?]+)/.exec(route)
+  if (tabsRoute) return <TabsWindow workspaceId={tabsRoute[1]!} firstChat={new URLSearchParams(route.split('?')[1] ?? '').get('chat')} />
   const att = /^\/attachment\/(.+)$/.exec(route)
   if (att) return <AttachmentViewer messageId={att[1]!} />
   const chat = /^\/chat\/(.+)$/.exec(route)

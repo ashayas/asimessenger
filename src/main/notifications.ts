@@ -1,7 +1,7 @@
 import { app, BrowserWindow, screen } from 'electron'
 import type { Repo } from './db/repo'
 import type { Attention } from './ingest'
-import { openChatWindow, windowFor } from './windows'
+import { isLookingAt, showChat } from './windows'
 import { loadRoute, toastOptions } from './windows'
 
 const TOAST_MS = 9000
@@ -22,7 +22,7 @@ export async function refreshBadge(repo: Repo): Promise<number> {
 export async function openNextUnread(repo: Repo): Promise<string | null> {
   const next = (await repo.chats.list()).filter((c) => c.unreadCount > 0).sort((a, b) => a.lastActivityAt - b.lastActivityAt)[0]
   if (!next) return null
-  openChatWindow(next.id)
+  showChat(next.id)
   return next.id
 }
 
@@ -31,8 +31,7 @@ export function createAttentionHandler(repo: Repo) {
   return async (a: Attention): Promise<void> => {
     const chat = await repo.chats.get(a.chatId)
     if (!chat) return
-    const w = windowFor(a.chatId)
-    if (w && !w.isDestroyed() && w.isFocused()) return // you are watching it; the transcript is enough
+    if (isLookingAt(a.chatId)) return // you are watching it; the transcript is enough
     await refreshBadge(repo)
     if (process.platform === 'darwin' && !BrowserWindow.getFocusedWindow()) app.dock?.bounce('informational')
     if (process.env['ASI_NO_TOAST']) return

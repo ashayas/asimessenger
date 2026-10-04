@@ -189,3 +189,38 @@ export function openOnboardingWindow(): BrowserWindow {
   loadRoute(win, '/welcome')
   return win
 }
+
+/** Opening a chat goes through one router so the "tabs vs windows" setting applies everywhere. */
+let router: ((chatId: string) => void) | null = null
+export function setChatRouter(fn: (chatId: string) => void): void { router = fn }
+export function showChat(chatId: string): void { if (router) router(chatId); else openChatWindow(chatId) }
+
+const tabsWindows = new Map<string, BrowserWindow>()
+const tabsActive = new Map<string, string | null>()
+
+/** One tabbed window per workspace. */
+export function openTabsWindow(workspaceId: string, chatId: string): BrowserWindow {
+  const existing = tabsWindows.get(workspaceId)
+  if (existing && !existing.isDestroyed()) {
+    existing.show()
+    existing.focus()
+    existing.webContents.send('asi:tabs-open', { chatId })
+    return existing
+  }
+  const win = new BrowserWindow(baseOptions({ width: 760, height: 620, minWidth: 520, minHeight: 400, title: 'Chats' }))
+  tabsWindows.set(workspaceId, win)
+  win.once('ready-to-show', () => win.show())
+  win.on('closed', () => { tabsWindows.delete(workspaceId); tabsActive.delete(workspaceId) })
+  loadRoute(win, `/tabs/${workspaceId}?chat=${chatId}`)
+  return win
+}
+
+export function setTabsActive(workspaceId: string, chatId: string | null): void { tabsActive.set(workspaceId, chatId) }
+
+/** True when you are looking at this chat right now: its own window, or the active tab of a focused tabs window. */
+export function isLookingAt(chatId: string): boolean {
+  const w = windowFor(chatId)
+  if (w && w.isFocused()) return true
+  for (const [ws, win] of tabsWindows) if (!win.isDestroyed() && win.isFocused() && tabsActive.get(ws) === chatId) return true
+  return false
+}

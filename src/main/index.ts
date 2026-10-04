@@ -8,7 +8,7 @@ import { closeToastsFor, createAttentionHandler, openNextUnread, refreshBadge } 
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
-import { openOnboardingWindow, createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow } from './windows'
+import { openOnboardingWindow, createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow, openTabsWindow, setChatRouter, setTabsActive, showChat } from './windows'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from './friends-service'
 import { createChatService } from './chat-service'
 import { loadAttachment } from './attachments'
@@ -133,16 +133,16 @@ app.whenReady().then(async () => {
   ipcMain.handle('search:jump', async (_e, t: import('@shared/search').SearchTarget) => {
     closeSearchWindow()
     if ('workspaceId' in t && t.workspaceId) { await repo.settings.set('activeWorkspaceId', t.workspaceId); broadcastChanged('settings') }
-    if (t.type === 'chat') openChatWindow(t.chatId)
+    if (t.type === 'chat') showChat(t.chatId)
     else if (t.type === 'attachment') { const a = await loadAttachment(repo, t.messageId); openAttachmentWindow(t.messageId, a.name) }
     else if (t.type === 'drawing') openDoodleWindow(t.workspaceId, { name: t.name })
-    else if (t.type === 'adopt') { openChatWindow(await adoptSession(repo, t)); broadcastChanged('chats'); broadcastChanged('workspaces') }
+    else if (t.type === 'adopt') { showChat(await adoptSession(repo, t)); broadcastChanged('chats'); broadcastChanged('workspaces') }
     else if (t.type === 'friend') {
       const ws = (await repo.workspaces.list())[0]
       const active = await repo.settings.get<string | null>('activeWorkspaceId', ws?.id ?? null)
       const existing = (await repo.chats.list({ friendId: t.friendId })).find((c) => c.workspaceId === active)
       const chatId = existing?.id ?? (active ? (await repo.chats.create({ workspaceId: active, friendId: t.friendId })).id : null)
-      if (chatId) openChatWindow(chatId)
+      if (chatId) showChat(chatId)
     }
     openContactsWindow()
   })
@@ -169,11 +169,18 @@ app.whenReady().then(async () => {
   })
   ipcMain.handle('window:is-focused', (e) => BrowserWindow.fromWebContents(e.sender)?.isFocused() ?? false)
   ipcMain.handle('chat:open-next-unread', () => openNextUnread(repo))
-  ipcMain.handle('toast:open-chat', (e, chatId: string) => { openChatWindow(chatId); closeToastsFor(chatId); BrowserWindow.fromWebContents(e.sender)?.close() })
+  ipcMain.handle('toast:open-chat', (e, chatId: string) => { showChat(chatId); closeToastsFor(chatId); BrowserWindow.fromWebContents(e.sender)?.close() })
   ipcMain.handle('toast:dismiss', (e) => { BrowserWindow.fromWebContents(e.sender)?.close() })
   ipcMain.handle('chat:interrupt', (_e, chatId: string) => chat.interrupt(chatId))
   ipcMain.handle('chat:respond', (_e, chatId: string, reqId: string, answer: string, reason?: string) => chat.respond(chatId, reqId, answer, reason))
-  ipcMain.handle('window:open-chat', (_e, chatId: string) => { openChatWindow(chatId) })
+  ipcMain.handle('window:open-chat', (_e, chatId: string) => { showChat(chatId) })
+  setChatRouter((chatId) => void (async () => {
+    const chat = await repo.chats.get(chatId)
+    if (chat && (await repo.settings.get<'windows' | 'tabs'>('chatWindows', 'windows')) === 'tabs') openTabsWindow(chat.workspaceId, chatId)
+    else openChatWindow(chatId)
+  })())
+  ipcMain.handle('tabs:active', (_e, workspaceId: string, chatId: string | null) => { setTabsActive(workspaceId, chatId) })
+  ipcMain.handle('tabs:pop-out', (_e, chatId: string) => { openChatWindow(chatId) })
   ipcMain.handle('window:open-add-friend', () => { openAddFriendWindow() })
   ipcMain.handle('friends:detect', () => detectPresets())
   ipcMain.handle('friends:availability', async () => availability(await repo.friends.list()))

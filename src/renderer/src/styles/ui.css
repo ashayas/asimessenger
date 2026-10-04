@@ -344,3 +344,18 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .brain .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .opts .row { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
 .opts input[type='range'] { flex: 1; }
+
+/* ---------- tabs window ---------- */
+.ttabs { display: flex; gap: 2px; padding: 4px 8px 0; background: linear-gradient(180deg, var(--glass-a), var(--glass-b)); border-bottom: 1px solid var(--rule); overflow-x: auto; flex: none; align-items: flex-end; }
+.ttab { display: flex; gap: 6px; align-items: center; max-width: 240px; padding: 3px 8px; border: 1px solid var(--rule); border-bottom: 0; border-radius: 5px 5px 0 0; background: var(--pane-tint); font-size: 11.5px; white-space: nowrap; }
+.ttab.sel { background: var(--pane); font-weight: bold; position: relative; top: 1px; }
+.ttab .tt { overflow: hidden; text-overflow: ellipsis; }
+.ttab .ttf { color: var(--ink-faint); font: 10px var(--font-mono); }
+.ttab button { border: 0; background: transparent; color: var(--ink-soft); padding: 0 2px; }
+.ttab button:hover { color: var(--busy); }
+.tnew { position: relative; }
+.tnew > button { border: 0; background: transparent; font-size: 15px; padding: 0 8px; }
+.tmenu { position: absolute; top: 100%; left: 0; z-index: 5; display: flex; flex-direction: column; min-width: 160px; background: var(--pane); border: 1px solid var(--rule); border-radius: 4px; box-shadow: var(--shadow-win); }
+.tmenu button { text-align: left; border: 0; background: transparent; padding: 5px 10px; }
+.tmenu button:hover { background: var(--select); }
+.win-body.embedded { flex: 1; min-height: 0; }

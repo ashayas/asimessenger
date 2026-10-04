@@ -38,11 +38,15 @@ function useChat(chatId: string) {
   return { chat, friend, messages }
 }
 
-export function ChatWindow({ chatId }: { chatId: string }) {
+/** Unsent text survives switching tabs (only the active tab is mounted). */
+const drafts = new Map<string, string>()
+
+export function ChatWindow({ chatId, embedded = false }: { chatId: string; embedded?: boolean }) {
   const { chat, friend, messages } = useChat(chatId)
   const profile = useData((s) => s.profile)
   const allChats = useData((s) => s.chats)
-  const [draft, setDraft] = useState('')
+  const [draft, setDraftState] = useState(() => drafts.get(chatId) ?? '')
+  const setDraft = useCallback((v: string | ((d: string) => string)) => setDraftState((d) => { const n = typeof v === 'function' ? v(d) : v; drafts.set(chatId, n); return n }), [chatId])
   const [globalDangerous] = useSetting<boolean>('allowDangerous', false)
   const [modeNote, setModeNote] = useState<string | null>(null)
   const [editingLabels, setEditingLabels] = useState(false)
@@ -112,7 +116,8 @@ export function ChatWindow({ chatId }: { chatId: string }) {
 
   const live = useMemo(() => (friend ? liveFor(friend, allChats.filter((c) => c.id === chatId), isBuiltin(friend.harness)) : null), [friend, allChats, chatId])
 
-  if (!chat || !friend) return <WindowFrame title="ASI Messenger"><div className="empty">Loading…</div></WindowFrame>
+  const Frame = embedded ? EmbeddedFrame : WindowFrame
+  if (!chat || !friend) return <Frame title="ASI Messenger"><div className="empty">Loading…</div></Frame>
 
   const style = avatarFor(friend)
   const terminalPossible = friend.harness === 'pty' || resumeCommand(friend, chat, '/') !== null
@@ -141,7 +146,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
   }
 
   return (
-    <WindowFrame title={`${chat.mode === 'dangerous' ? '⚠ DANGEROUS · ' : ''}${chat.title} · ${friend.displayName} · Conversation`} danger={chat.mode === 'dangerous'}>
+    <Frame title={`${chat.mode === 'dangerous' ? '⚠ DANGEROUS · ' : ''}${chat.title} · ${friend.displayName} · Conversation`} danger={chat.mode === 'dangerous'}>
       <div className="toolbar">
         <ToolButton icon="👥" label="Invite" disabled />
         <ToolButton icon="📎" label="Send Files" onClick={() => void window.asi.attachments.pickFiles().then(async (paths) => { if (paths.length) await window.asi.attachments.sendFiles(chatId, paths) })} />
@@ -230,6 +235,11 @@ export function ChatWindow({ chatId }: { chatId: string }) {
         />
         <button className="btn primary" onClick={send} disabled={!draft.trim()}>Send</button>
       </div>
-    </WindowFrame>
+    </Frame>
   )
+}
+
+/** The chat body without its own title bar, for use inside a tab. */
+function EmbeddedFrame(props: { title: string; danger?: boolean; children: React.ReactNode }) {
+  return <div className="win-body embedded" data-danger={props.danger || undefined}>{props.children}</div>
 }

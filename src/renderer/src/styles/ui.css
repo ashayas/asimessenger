@@ -320,3 +320,8 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .w-perm { display: flex; gap: 8px; align-items: center; padding: 4px 0; }
 .w-perm .grow { flex: 1; }
 .btn.signin { min-height: 32px; font-size: 13px; font-weight: bold; margin-top: auto; }
+
+/* ---------- voice ---------- */
+.voice-note { display: flex; gap: 8px; padding: 4px 10px; background: var(--pane-tint); border-top: 1px solid var(--rule); color: var(--ink-soft); flex: none; }
+.voice-note.rec { background: var(--danger-bg); color: var(--danger-ink); }
+.voice-note .grow { flex: 1; } .voice-note .priv { font-size: 11px; }

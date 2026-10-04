@@ -13,3 +13,4 @@ playwright-report
 *.mobileprovision
 build/.render.html
 src/renderer/public/excalidraw-assets
+resources/bin/

@@ -99,4 +99,10 @@ const onboarding = {
   askMic: (): Promise<string> => ipcRenderer.invoke('permissions:ask-mic')
 }
 
-contextBridge.exposeInMainWorld('asi', { onboarding, browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })
+const voice = {
+  transcribe: (wav: Uint8Array): Promise<{ text: string; engine: string; seconds: number }> => ipcRenderer.invoke('voice:transcribe', wav),
+  testMode: (): Promise<boolean> => ipcRenderer.invoke('voice:test-mode'),
+  status: (): Promise<{ engines: { id: string; name: string; available: boolean }[]; selected: string | null }> => ipcRenderer.invoke('voice:status')
+}
+
+contextBridge.exposeInMainWorld('asi', { voice, onboarding, browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })

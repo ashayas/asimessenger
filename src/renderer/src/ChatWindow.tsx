@@ -12,6 +12,7 @@ import { LabelChips, LabelEditor } from './LabelEditor'
 import { TerminalDrawer } from './TerminalDrawer'
 import { resumeCommand } from '@shared/resume'
 import { play } from './sounds'
+import { startRecording, type Recording } from './voice'
 
 /** Stable empty array: zustand selectors must not return a fresh [] each render. */
 const NO_LABELS: string[] = []
@@ -57,6 +58,10 @@ export function ChatWindow({ chatId }: { chatId: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   const endRef = useRef<HTMLDivElement>(null)
+  const composerRef = useRef<HTMLTextAreaElement>(null)
+  const rec = useRef<Recording | null>(null)
+  const [voice, setVoice] = useState<'idle' | 'recording' | 'transcribing'>('idle')
+  const [voiceNote, setVoiceNote] = useState<string | null>(null)
 
   useEffect(() => {
     if (chat) document.title = `${chat.title} · ${friend?.displayName ?? ''}`.trim()
@@ -75,6 +80,35 @@ export function ChatWindow({ chatId }: { chatId: string }) {
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
   }, [messages.length])
+
+  const startVoice = useCallback(async () => {
+    if (rec.current) return
+    setVoiceNote(null)
+    try { rec.current = await startRecording(); setVoice('recording') } catch (e) { setVoiceNote(`Microphone unavailable: ${e instanceof Error ? e.message : String(e)}`) }
+  }, [])
+  const stopVoice = useCallback(async () => {
+    const r = rec.current
+    if (!r) return
+    rec.current = null
+    setVoice('transcribing')
+    try {
+      const { text } = await window.asi.voice.transcribe(await r.stop())
+      if (text) setDraft((d) => (d.trim() ? `${d.trimEnd()} ${text}` : text))
+      composerRef.current?.focus()
+    } catch (e) {
+      setVoiceNote(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : String(e))
+    } finally { setVoice('idle') }
+  }, [])
+  const toggleVoice = () => void (rec.current ? stopVoice() : startVoice())
+
+  // hold ⌥Space to talk
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => { if (e.code === 'Space' && e.altKey && !e.repeat) { e.preventDefault(); void startVoice() } }
+    const up = (e: KeyboardEvent) => { if (rec.current && (e.code === 'Space' || e.key === 'Alt')) { e.preventDefault(); void stopVoice() } }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up) }
+  }, [startVoice, stopVoice])
 
   const live = useMemo(() => (friend ? liveFor(friend, allChats.filter((c) => c.id === chatId), isBuiltin(friend.harness)) : null), [friend, allChats, chatId])
 
@@ -113,7 +147,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
         <ToolButton icon="📎" label="Send Files" onClick={() => void window.asi.attachments.pickFiles().then(async (paths) => { if (paths.length) await window.asi.attachments.sendFiles(chatId, paths) })} />
         <ToolButton icon="✏️" label="Doodle" onClick={() => void window.asi.doodle.open(chat.workspaceId, { chatId })} />
         <ToolButton icon="🌐" label="Browser" onClick={() => void window.asi.browser.open('about:blank')} />
-        <ToolButton icon="🎙" label="Voice Clip" disabled />
+        <ToolButton icon={voice === 'recording' ? '⏺' : '🎙'} label={voice === 'recording' ? 'Stop & type' : 'Voice Clip'} disabled={voice === 'transcribing'} onClick={toggleVoice} />
         <ToolButton icon="⌨" label="Terminal" disabled={!terminalPossible} onClick={() => (friend.harness === 'pty' ? setDrawer((v) => !v) : void window.asi.pty.openExternal(chatId))} />
         <ToolButton icon="📳" label="Nudge" onClick={() => void window.asi.chat.nudge(chatId).then((sent) => { if (sent) play('nudge') })} />
         <ToolButton icon="⏹" label="Stop" stop onClick={() => void window.asi.chat.interrupt(chatId)} />
@@ -145,6 +179,13 @@ export function ChatWindow({ chatId }: { chatId: string }) {
         </div>
       </div>
       {drawer && friend.harness === 'pty' ? <TerminalDrawer chatId={chatId} /> : null}
+      {voice !== 'idle' || voiceNote ? (
+        <div className={`voice-note${voice === 'recording' ? ' rec' : ''}`} role="status" data-voice={voice}>
+          {voice === 'recording' ? '● Recording… release ⌥Space (or click Stop & type) to transcribe' : voice === 'transcribing' ? 'Transcribing on this Mac…' : voiceNote}
+          <span className="grow" />
+          <span className="priv">🔒 on this Mac only</span>
+        </div>
+      ) : null}
       {modeNote ? (
         <div className="mode-note" role="status">
           <span className="grow">{modeNote}</span>
@@ -171,6 +212,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
       </div>
       <div className="composer">
         <textarea
+          ref={composerRef}
           className="field"
           aria-label="Message"
           placeholder={`Reply to ${friend.displayName}… (! runs a shell command, /open opens a URL or file)`}

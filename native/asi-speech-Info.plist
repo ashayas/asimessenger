@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>dev.asimessenger.speech</string>
+  <key>CFBundleName</key><string>asi-speech</string>
+  <key>NSSpeechRecognitionUsageDescription</key><string>ASI Messenger uses Apple on-device speech recognition to turn your voice into text. Audio never leaves your Mac.</string>
+</dict></plist>

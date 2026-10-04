@@ -17,11 +17,11 @@
     "test:live": "ASI_LIVE=1 vitest run --config vitest.live.config.ts",
     "icons": "electron scripts/make-icons.cjs",
     "assets": "node scripts/copy-excalidraw-assets.mjs",
-    "predev": "pnpm assets",
-    "prebuild": "pnpm assets",
+    "predev": "pnpm assets && bash scripts/build-native.sh",
+    "prebuild": "pnpm assets && bash scripts/build-native.sh",
     "postinstall": "node scripts/copy-excalidraw-assets.mjs",
     "dist": "pnpm build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --publish never",
-    "test:packaged":"playwright test -c playwright.packaged.config.ts",
+    "test:packaged": "playwright test -c playwright.packaged.config.ts",
     "dist:dir": "pnpm build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir --publish never",
     "release:signed": "bash scripts/release-signed.sh"
   },
@@ -107,6 +107,12 @@
         "height": 380
       }
     },
-    "artifactName": "ASI-Messenger-${version}-${arch}.${ext}"
+    "artifactName": "ASI-Messenger-${version}-${arch}.${ext}",
+    "extraResources": [
+      {
+        "from": "resources/bin",
+        "to": "bin"
+      }
+    ]
   }
 }

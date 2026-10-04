@@ -17,11 +17,16 @@ import { createTerminalService } from './terminal'
 import { createMcpBridge } from './mcp-bridge'
 import { createBrowserManager } from './browser'
 import { completeOnboarding, isOnboarded } from './onboarding'
+import { appleEngine, createVoiceService, fakeEngine, type VoiceEngine } from './voice'
 import { listDrawings, loadDrawing, newDrawingName, saveDrawing, savePng } from './doodle'
 import { ensureDefaults } from './defaults'
 import { installMenu } from './menu'
 
 app.setName(APP_NAME)
+if (process.env['ASI_FAKE_MIC']) {
+  app.commandLine.appendSwitch('use-fake-device-for-media-stream')
+  app.commandLine.appendSwitch('use-fake-ui-for-media-stream')
+}
 if (process.env['ASI_USER_DATA']) app.setPath('userData', process.env['ASI_USER_DATA'])
 
 const iconPath = join(import.meta.dirname, '../../build/icon.png')
@@ -145,6 +150,12 @@ app.whenReady().then(async () => {
   installMenu()
   app.on('before-quit', () => db.close())
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(iconPath))
+  const helper = app.isPackaged ? join(process.resourcesPath, 'bin', 'asi-speech') : join(app.getAppPath(), 'resources/bin/asi-speech')
+  const engines: VoiceEngine[] = process.env['ASI_VOICE_FAKE'] ? [fakeEngine(process.env['ASI_VOICE_FAKE'])] : [appleEngine(helper)]
+  const voice = createVoiceService(engines, () => repo.settings.get<string | null>('voiceEngine', null))
+  ipcMain.handle('voice:transcribe', (_e, wav: Uint8Array) => voice.transcribe(wav))
+  ipcMain.handle('voice:test-mode', () => !!process.env['ASI_FAKE_RECORDER'])
+  ipcMain.handle('voice:status', () => voice.status())
   ipcMain.handle('onboarding:complete', async (e, input) => {
     await completeOnboarding(repo, input)
     broadcastChanged('settings'); broadcastChanged('friends'); broadcastChanged('workspaces')

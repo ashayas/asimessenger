@@ -283,3 +283,7 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .doodle-canvas .excalidraw { height: 100%; }
 .imgview { padding: 16px; display: grid; place-items: start center; }
 .imgview img { max-width: 100%; border: 1px solid var(--rule-soft); background: #fff; }
+
+/* ---------- terminal drawer ---------- */
+.term { height: 220px; flex: none; background: #0f1b2e; padding: 4px 6px; border-top: 2px solid var(--accent-deep); }
+.term .xterm { height: 100%; }

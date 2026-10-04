@@ -71,4 +71,12 @@ const doodle = {
   onOpen: (cb: (a: { chatId: string | null; name: string | null }) => void): (() => void) => { const h = (_e: unknown, a: { chatId: string | null; name: string | null }) => cb(a); ipcRenderer.on('asi:doodle-open', h); return () => ipcRenderer.removeListener('asi:doodle-open', h) }
 }
 
-contextBridge.exposeInMainWorld('asi', { doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })
+const pty = {
+  attach: (chatId: string): Promise<string> => ipcRenderer.invoke('pty:attach', chatId),
+  input: (chatId: string, data: string): Promise<void> => ipcRenderer.invoke('pty:input', chatId, data),
+  resize: (chatId: string, cols: number, rows: number): Promise<void> => ipcRenderer.invoke('pty:resize', chatId, cols, rows),
+  openExternal: (chatId: string): Promise<boolean> => ipcRenderer.invoke('terminal:open-external', chatId),
+  onData: (cb: (chatId: string, data: string) => void): (() => void) => { const h = (_e: unknown, c: string, d: string) => cb(c, d); ipcRenderer.on('asi:pty-data', h); return () => ipcRenderer.removeListener('asi:pty-data', h) }
+}
+
+contextBridge.exposeInMainWorld('asi', { pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })

@@ -43,6 +43,16 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       return shown
     },
 
+    /** Start (or fetch) the live agent session for a chat without sending anything. */
+    async ensureSession(chatId: string) {
+      const chat = await repo.chats.get(chatId)
+      if (!chat) throw new Error(`unknown chat ${chatId}`)
+      const friend = await repo.friends.get(chat.friendId)
+      if (!friend) throw new Error(`unknown friend ${chat.friendId}`)
+      const ws = await repo.workspaces.get(chat.workspaceId)
+      return manager.session(chat, friend, ws?.path ?? process.cwd(), chat.mode)
+    },
+
     /** Send files to the agent; they appear in the transcript as attachments you can reopen. */
     async sendFiles(chatId: string, paths: string[], note = ''): Promise<void> {
       const parts: string[] = []

@@ -13,6 +13,7 @@ import { addCustom, addPreset, availability, detectPresets, testAcp } from './fr
 import { createChatService } from './chat-service'
 import { loadAttachment } from './attachments'
 import { searchAll } from './search'
+import { createTerminalService } from './terminal'
 import { listDrawings, loadDrawing, newDrawingName, saveDrawing, savePng } from './doodle'
 import { ensureDefaults } from './defaults'
 import { installMenu } from './menu'
@@ -90,6 +91,11 @@ app.whenReady().then(async () => {
     await chat.sendDoodle(chatId, name, png, `${ws?.path}/.drawings/${name}.excalidraw`, note)
   })
   ipcMain.handle('doodle:reveal', async (_e, wsId: string) => { const ws = await repo.workspaces.get(wsId); if (ws) shell.showItemInFolder(`${ws.path}/.drawings`) })
+  const terminal = createTerminalService({ repo, chat, manager })
+  ipcMain.handle('pty:attach', (e, chatId: string) => terminal.attach(e.sender, chatId))
+  ipcMain.handle('pty:input', (_e, chatId: string, data: string) => terminal.input(chatId, data))
+  ipcMain.handle('pty:resize', (_e, chatId: string, cols: number, rows: number) => terminal.resize(chatId, cols, rows))
+  ipcMain.handle('terminal:open-external', (_e, chatId: string) => terminal.openExternal(chatId))
   ipcMain.handle('chat:nudge', async (e, chatId: string) => {
     const sent = await chat.nudge(chatId)
     if (sent) shakeWindow(BrowserWindow.fromWebContents(e.sender))

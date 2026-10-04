@@ -2,6 +2,7 @@ import { acpFactory } from './acp/factory'
 import { GENERIC_ACP, GEMINI, HERMES, OPENCODE } from './acp/presets'
 import { claudeFactory } from './claude/factory'
 import { codexFactory } from './codex/factory'
+import { ptyFactory } from './pty/factory'
 import { EchoAgent } from './echo-agent'
 import { FakeAgent } from './fake-agent'
 import type { HarnessManager } from './manager'
@@ -13,6 +14,7 @@ export function registerHarnesses(manager: HarnessManager): void {
   manager.register('echo', async () => new EchoAgent())
   manager.register('claude', claudeFactory)
   manager.register('codex', codexFactory)
+  manager.register('pty', ptyFactory)
   manager.register('fake', async () => new FakeAgent())
   manager.register('acp', (ctx) => {
     const preset = ACP_PRESETS[(ctx.friend.transport ?? 'generic') as keyof typeof ACP_PRESETS] ?? GENERIC_ACP

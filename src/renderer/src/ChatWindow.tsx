@@ -9,6 +9,8 @@ import { MODE_LABEL, canUseMode, lockedReason } from '@shared/safety'
 import type { Mode } from '@shared/models'
 import { MessageView } from './MessageViews'
 import { LabelChips, LabelEditor } from './LabelEditor'
+import { TerminalDrawer } from './TerminalDrawer'
+import { resumeCommand } from '@shared/resume'
 import { play } from './sounds'
 
 /** Stable empty array: zustand selectors must not return a fresh [] each render. */
@@ -43,10 +45,12 @@ export function ChatWindow({ chatId }: { chatId: string }) {
   const [globalDangerous] = useSetting<boolean>('allowDangerous', false)
   const [modeNote, setModeNote] = useState<string | null>(null)
   const [editingLabels, setEditingLabels] = useState(false)
+  const [drawer, setDrawer] = useState(false)
   const chatLabelIds = useData((s) => s.chatLabels[chatId] ?? NO_LABELS)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '`') { e.preventDefault(); setDrawer((v) => !v) }
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'l') { e.preventDefault(); setEditingLabels((v) => !v) }
     }
     window.addEventListener('keydown', onKey)
@@ -77,6 +81,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
   if (!chat || !friend) return <WindowFrame title="ASI Messenger"><div className="empty">Loading…</div></WindowFrame>
 
   const style = avatarFor(friend)
+  const terminalPossible = friend.harness === 'pty' || resumeCommand(friend, chat, '/') !== null
   const presence = live?.presence ?? 'online'
 
   const safety = { globalDangerous, friendDangerous: friend.dangerousAllowed }
@@ -109,7 +114,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
         <ToolButton icon="✏️" label="Doodle" onClick={() => void window.asi.doodle.open(chat.workspaceId, { chatId })} />
         <ToolButton icon="🌐" label="Browser" disabled />
         <ToolButton icon="🎙" label="Voice Clip" disabled />
-        <ToolButton icon="⌨" label="Terminal" disabled />
+        <ToolButton icon="⌨" label="Terminal" disabled={!terminalPossible} onClick={() => (friend.harness === 'pty' ? setDrawer((v) => !v) : void window.asi.pty.openExternal(chatId))} />
         <ToolButton icon="📳" label="Nudge" onClick={() => void window.asi.chat.nudge(chatId).then((sent) => { if (sent) play('nudge') })} />
         <ToolButton icon="⏹" label="Stop" stop onClick={() => void window.asi.chat.interrupt(chatId)} />
       </div>
@@ -139,6 +144,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
           <Avatar label={profile.name.slice(0, 1).toUpperCase() || 'A'} gradient={['#e05297', '#f39ac2']} presence={profile.presence} size="xl" />
         </div>
       </div>
+      {drawer && friend.harness === 'pty' ? <TerminalDrawer chatId={chatId} /> : null}
       {modeNote ? (
         <div className="mode-note" role="status">
           <span className="grow">{modeNote}</span>

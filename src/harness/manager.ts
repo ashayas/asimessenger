@@ -25,6 +25,11 @@ export class HarnessManager {
     return this.factories.has(kind)
   }
 
+  /** The live session for a chat, if any (used for the terminal drawer). */
+  live(chatId: string): AgentSession | undefined {
+    return this.sessions.get(chatId)?.session
+  }
+
   isLive(chatId: string): boolean {
     return this.sessions.has(chatId)
   }

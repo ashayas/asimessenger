@@ -96,7 +96,7 @@ export function createModelManager(opts: ManagerOptions) {
             ok = true
             break
           } catch (e) {
-            if (ac.signal.aborted) throw new Error('download cancelled')
+            if (ac.signal.aborted) throw new Error('download cancelled', { cause: e })
             lastErr = e
           }
         }

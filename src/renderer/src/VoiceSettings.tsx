@@ -21,7 +21,7 @@ export function VoiceSettings() {
 
   if (!o) return null
   const clean = (e: unknown) => (e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : String(e))
-  const install = async (id: string) => { setErr(null); try { await window.asi.voice.install(id) } catch (e) { setErr(clean(e)) } finally { setProg((m) => { const { [id]: _drop, ...rest } = m; return rest }); await load() } }
+  const install = async (id: string) => { setErr(null); try { await window.asi.voice.install(id) } catch (e) { setErr(clean(e)) } finally { setProg((m) => Object.fromEntries(Object.entries(m).filter(([k]) => k !== id))); await load() } }
   const apple = o.engines.find((e) => e.id === 'apple')
   const cohereOn = o.engines.find((e) => e.id === 'cohere-mlx')
 

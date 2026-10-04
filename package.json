@@ -19,7 +19,11 @@
     "assets": "node scripts/copy-excalidraw-assets.mjs",
     "predev": "pnpm assets",
     "prebuild": "pnpm assets",
-    "postinstall": "node scripts/copy-excalidraw-assets.mjs"
+    "postinstall": "node scripts/copy-excalidraw-assets.mjs",
+    "dist": "pnpm build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --publish never",
+    "test:packaged":"playwright test -c playwright.packaged.config.ts",
+    "dist:dir": "pnpm build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir --publish never",
+    "release:signed": "bash scripts/release-signed.sh"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.1",
@@ -41,6 +45,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "eslint": "^10.12.0",
     "prettier": "^3.9.9",
@@ -48,5 +53,60 @@
     "typescript-eslint": "^8.71.0",
     "vite": "^8.3.2",
     "vitest": "^5.0.3"
+  },
+  "build": {
+    "appId": "dev.asimessenger.app",
+    "productName": "ASI Messenger",
+    "copyright": "Apache-2.0",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**",
+      "assets/**",
+      "package.json",
+      "!**/*.map"
+    ],
+    "asarUnpack": [
+      "node_modules/@libsql/**",
+      "node_modules/libsql/**",
+      "node_modules/@lydell/**"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "ASI Messenger records your voice only when you hold the push-to-talk key, and transcribes it on this Mac.",
+        "NSSpeechRecognitionUsageDescription": "ASI Messenger uses Apple on-device speech recognition to turn your voice into text. Audio never leaves your Mac.",
+        "NSAppleEventsUsageDescription": "ASI Messenger opens a chat session in Terminal when you ask it to."
+      }
+    },
+    "dmg": {
+      "title": "ASI Messenger",
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    },
+    "artifactName": "ASI-Messenger-${version}-${arch}.${ext}"
   }
 }

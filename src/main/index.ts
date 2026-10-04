@@ -7,7 +7,8 @@ import { broadcastChanged, registerRepoIpc } from './ipc'
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
-import { openChatWindow, openContactsWindow } from './windows'
+import { openAddFriendWindow, openChatWindow, openContactsWindow } from './windows'
+import { addCustom, addPreset, availability, detectPresets, testAcp } from './friends-service'
 import { createChatService } from './chat-service'
 import { ensureDefaults } from './defaults'
 import { installMenu } from './menu'
@@ -40,6 +41,12 @@ app.whenReady().then(async () => {
   ipcMain.handle('chat:interrupt', (_e, chatId: string) => chat.interrupt(chatId))
   ipcMain.handle('chat:respond', (_e, chatId: string, reqId: string, answer: string, reason?: string) => chat.respond(chatId, reqId, answer, reason))
   ipcMain.handle('window:open-chat', (_e, chatId: string) => { openChatWindow(chatId) })
+  ipcMain.handle('window:open-add-friend', () => { openAddFriendWindow() })
+  ipcMain.handle('friends:detect', () => detectPresets())
+  ipcMain.handle('friends:availability', async () => availability(await repo.friends.list()))
+  ipcMain.handle('friends:add-preset', async (_e, id: string) => { const f = await addPreset(repo, id); broadcastChanged('friends'); return f })
+  ipcMain.handle('friends:add-custom', async (_e, c) => { const f = await addCustom(repo, c); broadcastChanged('friends'); return f })
+  ipcMain.handle('friends:test-acp', (_e, command: string, args: string[]) => testAcp(command, args))
   installMenu()
   app.on('before-quit', () => db.close())
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(iconPath))

@@ -9,6 +9,8 @@ let cached: Promise<NodeJS.ProcessEnv> | null = null
  * Ask the login shell for its environment once and merge it over process.env.
  */
 export function loginEnv(): Promise<NodeJS.ProcessEnv> {
+  // tests pin PATH so detection is deterministic
+  if (process.env['ASI_TEST_PATH']) return Promise.resolve({ ...process.env, PATH: process.env['ASI_TEST_PATH'] })
   if (cached) return cached
   cached = new Promise((resolve) => {
     const shell = process.env['SHELL'] || '/bin/zsh'

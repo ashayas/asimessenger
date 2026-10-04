@@ -24,4 +24,13 @@ const chat = {
   openWindow: (chatId: string): Promise<void> => ipcRenderer.invoke('window:open-chat', chatId)
 }
 
-contextBridge.exposeInMainWorld('asi', { platform: process.platform, api, onChanged, pickFolder, chat })
+const friends = {
+  detect: (): Promise<unknown> => ipcRenderer.invoke('friends:detect'),
+  availability: (): Promise<Record<string, boolean>> => ipcRenderer.invoke('friends:availability'),
+  addPreset: (id: string): Promise<unknown> => ipcRenderer.invoke('friends:add-preset', id),
+  addCustom: (c: { name: string; command: string; args: string[]; kind: 'acp' | 'pty' }): Promise<unknown> => ipcRenderer.invoke('friends:add-custom', c),
+  testAcp: (command: string, args: string[]): Promise<unknown> => ipcRenderer.invoke('friends:test-acp', command, args),
+  openAddWindow: (): Promise<void> => ipcRenderer.invoke('window:open-add-friend')
+}
+
+contextBridge.exposeInMainWorld('asi', { platform: process.platform, api, onChanged, pickFolder, chat, friends })

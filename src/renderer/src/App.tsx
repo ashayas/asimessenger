@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AddFriend } from './AddFriend'
 import { ChatWindow } from './ChatWindow'
 import { ContactList } from './ContactList'
 import { Gallery } from './Gallery'
@@ -21,6 +22,7 @@ export function App() {
   useEffect(() => startDataSync(), [])
   useGlobalShortcuts()
   if (route === '/gallery') return <Gallery />
+  if (route === '/add-friend') return <AddFriend />
   const chat = /^\/chat\/(.+)$/.exec(route)
   if (chat) return <ChatWindow chatId={chat[1]!} />
   if (route === '/' || route === '/contacts') return <ContactList />

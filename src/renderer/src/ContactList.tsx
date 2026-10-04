@@ -9,13 +9,13 @@ type Tab = 'friends' | 'chats' | 'labels'
 const SELECTABLE: Presence[] = ['online', 'busy', 'away', 'offline']
 
 export function ContactList() {
-  const { friends, chats, profile, setProfile, workspaces, activeWorkspaceId, setActiveWorkspace, addWorkspaceFromFolder, openFriend, newChatWith, openChat } = useData()
+  const { friends, chats, availability, profile, setProfile, workspaces, activeWorkspaceId, setActiveWorkspace, addWorkspaceFromFolder, openFriend, newChatWith, openChat } = useData()
   const [tab, setTab] = useState<Tab>('friends')
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
-  const { groups, live } = useMemo(() => groupFriends(friends, chats, {}, filter), [friends, chats, filter])
+  const { groups, live } = useMemo(() => groupFriends(friends, chats, availability, filter), [friends, chats, availability, filter])
   const friendById = useMemo(() => new Map(friends.map((f) => [f.id, f])), [friends])
   const wsChats = useMemo(() => chats.filter((c) => c.workspaceId === activeWorkspaceId), [chats, activeWorkspaceId])
   const unreadTotal = wsChats.reduce((n, c) => n + c.unreadCount, 0)
@@ -143,7 +143,7 @@ export function ContactList() {
 
       <div className="foot">
         <Btn className="wide" disabled={!selected} onClick={() => selected && void newChatWith(selected)} title="Start a new chat with the selected friend (⌘N)">New chat with selected friend</Btn>
-        <Btn className="wide" disabled title="Registering a CLI arrives with the friends registry">＋ Add a friend</Btn>
+        <Btn className="wide" onClick={() => void window.asi.friends.openAddWindow()} title="Register a coding agent CLI (⌘⇧N)">＋ Add a friend</Btn>
       </div>
     </WindowFrame>
   )

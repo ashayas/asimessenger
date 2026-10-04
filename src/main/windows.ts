@@ -56,3 +56,18 @@ export function openChatWindow(chatId: string): BrowserWindow {
 export function openChatWindowIds(): string[] {
   return [...chatWindows.entries()].filter(([, w]) => !w.isDestroyed()).map(([id]) => id)
 }
+
+let addFriendWindow: BrowserWindow | null = null
+export function openAddFriendWindow(): BrowserWindow {
+  if (addFriendWindow && !addFriendWindow.isDestroyed()) {
+    addFriendWindow.show()
+    addFriendWindow.focus()
+    return addFriendWindow
+  }
+  const win = new BrowserWindow(baseOptions({ width: 500, height: 640, minWidth: 420, minHeight: 420, title: 'Add a Friend' }))
+  addFriendWindow = win
+  win.once('ready-to-show', () => win.show())
+  win.on('closed', () => { addFriendWindow = null })
+  loadRoute(win, '/add-friend')
+  return win
+}

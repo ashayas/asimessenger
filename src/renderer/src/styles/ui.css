@@ -179,3 +179,17 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .risk { font-size: 10.5px; padding: 0 6px; border-radius: 8px; background: var(--ok-bg); color: var(--ok-ink); border: 1px solid #b4ddaa; }
 .risk.med { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-border); }
 .risk.high { background: var(--danger-bg); color: var(--danger-ink); border-color: var(--danger-border); }
+
+/* ---------- add a friend ---------- */
+.add-intro { padding: 8px 12px; color: var(--ink-soft); }
+.add-list { flex: 1; min-height: 0; overflow-y: auto; background: var(--pane); border-block: 1px solid var(--rule-soft); }
+.add-row { display: flex; gap: 10px; align-items: center; padding: 6px 12px; border-top: 1px solid var(--rule-soft); }
+.add-row:first-child { border-top: 0; }
+.add-row .grow, .byo .grow { flex: 1; min-width: 0; }
+.add-row .meta { color: var(--ink-soft); font-size: 11px; overflow-wrap: anywhere; }
+.byo { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: linear-gradient(180deg, var(--glass-a), var(--glass-b)); flex: none; }
+.byo .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.field.mono { font-family: var(--font-mono); font-size: 11.5px; }
+.note { padding: 5px 9px; border-radius: 3px; border: 1px solid var(--warn-border); background: var(--warn-bg); color: var(--warn-ink); user-select: text; }
+.note.ok { background: var(--ok-bg); color: var(--ok-ink); border-color: #b4ddaa; }
+.note.bad { background: var(--danger-bg); color: var(--danger-ink); border-color: var(--danger-border); }

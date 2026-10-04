@@ -5,7 +5,13 @@ import { useData } from './store'
 export function useGlobalShortcuts(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return
+      if (e.shiftKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault()
+        void window.asi.friends.openAddWindow()
+        return
+      }
+      if (e.shiftKey) return
       if (/^[1-9]$/.test(e.key)) {
         const { workspaces, setActiveWorkspace } = useData.getState()
         const ws = workspaces.find((w) => w.slot === Number(e.key))

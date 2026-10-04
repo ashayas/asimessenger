@@ -15,6 +15,7 @@ interface DataState {
   chats: Chat[]
   profile: Profile
   activeWorkspaceId: string | null
+  availability: Record<string, boolean>
   refresh(): Promise<void>
   setProfile(patch: Partial<Profile>): Promise<void>
   setActiveWorkspace(id: string): Promise<void>
@@ -34,17 +35,19 @@ export const useData = create<DataState>((set, get) => ({
   chats: [],
   profile: DEFAULT_PROFILE,
   activeWorkspaceId: null,
+  availability: {},
   async refresh() {
     const api = window.asi.api
-    const [workspaces, friends, chats, profile, stored] = await Promise.all([
+    const [workspaces, friends, chats, profile, stored, availability] = await Promise.all([
       api.workspaces.list(),
       api.friends.list(),
       api.chats.list(),
       api.settings.get<Profile>('profile', DEFAULT_PROFILE),
-      api.settings.get<string | null>('activeWorkspaceId', null)
+      api.settings.get<string | null>('activeWorkspaceId', null),
+      window.asi.friends.availability()
     ])
     const activeWorkspaceId = workspaces.some((w) => w.id === stored) ? stored : (workspaces[0]?.id ?? null)
-    set({ workspaces, friends, chats, profile, activeWorkspaceId, loaded: true })
+    set({ workspaces, friends, chats, profile, activeWorkspaceId, availability, loaded: true })
   },
   async setProfile(patch) {
     const next = { ...get().profile, ...patch }

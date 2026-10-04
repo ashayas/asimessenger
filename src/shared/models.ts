@@ -34,6 +34,7 @@ export interface Chat {
   harnessSessionId: string | null
   status: Presence
   statusText: string | null
+  mode: Mode
   unreadCount: number
   createdAt: number
   lastActivityAt: number

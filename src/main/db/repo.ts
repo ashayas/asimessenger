@@ -21,7 +21,7 @@ const toFriend = (r: Row): Friend => ({
 const toChat = (r: Row): Chat => ({
   id: String(r['id']), workspaceId: String(r['workspace_id']), friendId: String(r['friend_id']),
   title: String(r['title']), harnessSessionId: (r['harness_session_id'] as string | null) ?? null,
-  status: r['status'] as Presence, statusText: (r['status_text'] as string | null) ?? null, unreadCount: Number(r['unread_count']),
+  status: r['status'] as Presence, statusText: (r['status_text'] as string | null) ?? null, mode: (r['mode'] as Mode) ?? 'ask', unreadCount: Number(r['unread_count']),
   createdAt: Number(r['created_at']), lastActivityAt: Number(r['last_activity_at'])
 })
 const toMessage = (r: Row): Message => ({
@@ -115,12 +115,13 @@ export function createRepo(db: Db) {
     },
 
     chats: {
-      async create(c: { workspaceId: string; friendId: string; title?: string }): Promise<Chat> {
+      async create(c: { workspaceId: string; friendId: string; title?: string; mode?: Mode }): Promise<Chat> {
         const id = randomUUID()
         const t = now()
+        const mode = c.mode ?? (await all('SELECT default_mode FROM friends WHERE id = ?', [c.friendId]))[0]?.['default_mode'] ?? 'ask'
         await run(
-          'INSERT INTO chats(id,workspace_id,friend_id,title,created_at,last_activity_at) VALUES (?,?,?,?,?,?)',
-          [id, c.workspaceId, c.friendId, c.title ?? 'New chat', t, t]
+          'INSERT INTO chats(id,workspace_id,friend_id,title,mode,created_at,last_activity_at) VALUES (?,?,?,?,?,?,?)',
+          [id, c.workspaceId, c.friendId, c.title ?? 'New chat', mode as string, t, t]
         )
         return (await this.get(id))!
       },
@@ -138,6 +139,9 @@ export function createRepo(db: Db) {
       },
       async rename(id: string, title: string): Promise<void> {
         await run('UPDATE chats SET title = ? WHERE id = ?', [title, id])
+      },
+      async setMode(id: string, mode: Mode): Promise<void> {
+        await run('UPDATE chats SET mode = ? WHERE id = ?', [mode, id])
       },
       async setSession(id: string, sessionId: string | null): Promise<void> {
         await run('UPDATE chats SET harness_session_id = ? WHERE id = ?', [sessionId, id])

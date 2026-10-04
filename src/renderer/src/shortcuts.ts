@@ -12,6 +12,11 @@ export function useGlobalShortcuts(): void {
         return
       }
       if (e.shiftKey) return
+      if (e.key === ',') {
+        e.preventDefault()
+        void window.asi.safety.openOptions()
+        return
+      }
       if (/^[1-9]$/.test(e.key)) {
         const { workspaces, setActiveWorkspace } = useData.getState()
         const ws = workspaces.find((w) => w.slot === Number(e.key))

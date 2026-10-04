@@ -113,6 +113,7 @@ export function ContactList() {
                         <div className="nm">
                           <StatusDot presence={l.presence} />
                           {f.displayName}
+                          {chats.some((c) => c.friendId === id && c.mode === 'dangerous') ? <span className="danger-badge" title="A chat with this friend is in dangerous mode">⚠</span> : null}
                           {l.unread > 0 ? <span className="badge">{l.unread}</span> : null}
                         </div>
                         <div className="st funky">{l.message ?? (l.presence === 'offline' ? 'not available' : '')}</div>

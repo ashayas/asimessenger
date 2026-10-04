@@ -97,3 +97,39 @@ test('echo friend replies', async () => {
   await service.send(c.id, 'ping')
   await waitFor(async () => (await repo.messages.list(c.id)).some((m) => m.text === 'echo: ping'))
 })
+
+test('dangerous mode is refused unless the global switch AND the friend opt-in are on', async () => {
+  await expect(service.setMode(chatId, 'dangerous')).rejects.toThrow(/turned off/)
+  await service.setGlobalDangerous(true)
+  await expect(service.setMode(chatId, 'dangerous')).rejects.toThrow(/this friend/i)
+  const chat = (await repo.chats.get(chatId))!
+  await service.setFriendDangerous(chat.friendId, true)
+  await service.setMode(chatId, 'dangerous')
+  expect((await repo.chats.get(chatId))!.mode).toBe('dangerous')
+})
+
+test('turning the global switch off drops dangerous chats to Ask and ends their sessions', async () => {
+  const chat = (await repo.chats.get(chatId))!
+  await service.setGlobalDangerous(true)
+  await service.setFriendDangerous(chat.friendId, true)
+  await service.setMode(chatId, 'dangerous')
+  await service.send(chatId, 'start a session')
+  await waitFor(async () => manager.isLive(chatId))
+  await service.setGlobalDangerous(false)
+  expect((await repo.chats.get(chatId))!.mode).toBe('ask')
+  expect(manager.isLive(chatId)).toBe(false)
+})
+
+test('permission requests get a heuristic risk label', async () => {
+  await service.send(chatId, '/script permission')
+  await waitFor(async () => (await repo.messages.list(chatId)).some((m) => m.kind === 'permission'))
+  const card = (await repo.messages.list(chatId)).find((m) => m.kind === 'permission')!
+  expect((card.body as { risk: string }).risk).toBe('high') // rm -rf dist
+})
+
+test('new chats inherit the friend default mode; the mode is what the session starts with', async () => {
+  const ws = (await repo.workspaces.list())[0]!
+  const f = await repo.friends.create({ harness: 'fake', displayName: 'Planner', defaultMode: 'plan' })
+  const c = await repo.chats.create({ workspaceId: ws.id, friendId: f.id })
+  expect(c.mode).toBe('plan')
+})

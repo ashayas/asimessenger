@@ -52,7 +52,7 @@ export class HarnessManager {
   }
 
   async send(chat: Chat, friend: Friend, cwd: string, turn: UserTurn): Promise<void> {
-    const s = await this.session(chat, friend, cwd)
+    const s = await this.session(chat, friend, cwd, chat.mode)
     s.send(turn)
   }
 

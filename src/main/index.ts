@@ -7,7 +7,7 @@ import { broadcastChanged, registerRepoIpc } from './ipc'
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
-import { openAddFriendWindow, openChatWindow, openContactsWindow } from './windows'
+import { openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow } from './windows'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from './friends-service'
 import { createChatService } from './chat-service'
 import { ensureDefaults } from './defaults'
@@ -38,6 +38,10 @@ app.whenReady().then(async () => {
   app.on('will-quit', () => void manager.disposeAll())
   const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged })
   ipcMain.handle('chat:send', (_e, chatId: string, text: string, quote?: { name: string; text: string }) => chat.send(chatId, text, quote))
+  ipcMain.handle('safety:set-global-dangerous', (_e, on: boolean) => chat.setGlobalDangerous(on))
+  ipcMain.handle('safety:set-friend-dangerous', (_e, id: string, on: boolean) => chat.setFriendDangerous(id, on))
+  ipcMain.handle('window:open-options', () => { openOptionsWindow() })
+  ipcMain.handle('chat:set-mode', (_e, chatId: string, mode: string) => chat.setMode(chatId, mode as never))
   ipcMain.handle('chat:interrupt', (_e, chatId: string) => chat.interrupt(chatId))
   ipcMain.handle('chat:respond', (_e, chatId: string, reqId: string, answer: string, reason?: string) => chat.respond(chatId, reqId, answer, reason))
   ipcMain.handle('window:open-chat', (_e, chatId: string) => { openChatWindow(chatId) })

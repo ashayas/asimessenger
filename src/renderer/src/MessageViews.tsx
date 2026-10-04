@@ -57,8 +57,11 @@ function ToolBlock({ tool }: { tool: Tool }) {
 }
 
 function PermissionCard({ chatId, p }: { chatId: string; p: Perm }) {
+  const [denying, setDenying] = useState(false)
+  const [reason, setReason] = useState('')
+  const answer = (id: string, why?: string) => void window.asi.chat.respond(chatId, p.reqId, id, why)
   return (
-    <div className="card perm" data-kind="permission" data-decision={p.decision ?? 'pending'}>
+    <div className="card perm" data-kind="permission" data-decision={p.decision ?? 'pending'} data-risk={p.risk}>
       <div className="row">
         <b>Wants to run: {p.tool}</b>
         {p.risk ? <span className={`risk ${p.risk}`}>{p.risk} risk</span> : null}
@@ -66,13 +69,21 @@ function PermissionCard({ chatId, p }: { chatId: string; p: Perm }) {
       <div className="mono">{p.summary}</div>
       {p.decision ? (
         <div className="decided">{DECISION_LABEL[p.decision] ?? p.decision}{p.reason ? ` — ${p.reason}` : ''}</div>
+      ) : denying ? (
+        <div className="deny-reason">
+          <input className="field" aria-label="Reason for denying" autoFocus placeholder="Tell the agent why (optional)" value={reason} onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') answer('deny', reason.trim() || undefined) }} />
+          <Btn kind="danger" onClick={() => answer('deny', reason.trim() || undefined)}>Deny</Btn>
+          <Btn onClick={() => setDenying(false)}>Back</Btn>
+        </div>
       ) : (
         <div className="row">
-          {p.options.map((o) => (
-            <Btn key={o.id} kind={o.id === 'allow-once' ? 'primary' : o.id === 'deny' ? 'danger' : undefined} onClick={() => void window.asi.chat.respond(chatId, p.reqId, o.id)}>
-              {o.label}
-            </Btn>
-          ))}
+          {p.options.map((o) =>
+            o.id === 'deny' ? (
+              <Btn key={o.id} kind="danger" onClick={() => setDenying(true)}>Deny…</Btn>
+            ) : (
+              <Btn key={o.id} kind={o.id === 'allow-once' ? 'primary' : undefined} onClick={() => answer(o.id)}>{o.label}</Btn>
+            )
+          )}
         </div>
       )}
     </div>

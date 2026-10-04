@@ -10,7 +10,7 @@ export function installMenu(): void {
   const workspaces: MenuItemConstructorOptions[] = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => hint(`Workspace ${n}`, `CmdOrCtrl+${n}`))
 
   const template: MenuItemConstructorOptions[] = [
-    { label: APP_NAME, submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] },
+    { label: APP_NAME, submenu: [{ role: 'about' }, { type: 'separator' }, hint('Options…', 'CmdOrCtrl+,'), { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] },
     { label: 'File', submenu: [hint('New Chat', 'CmdOrCtrl+N'), hint('Add a Friend…', 'CmdOrCtrl+Shift+N'), { type: 'separator' }, { role: 'close' }] },
     { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
     { label: 'Workspaces', submenu: workspaces },

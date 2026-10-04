@@ -23,7 +23,7 @@ const SCRIPTS: Record<string, (args: { prompt: string; id: string }) => Step[]> 
   ],
   permission: ({ id }) => [
     { t: 'status', phase: 'waiting', detail: 'rm -rf dist' },
-    { t: 'permission', reqId: `${id}-p1`, tool: 'exec', summary: 'rm -rf dist && pnpm build', risk: 'med', options: [{ id: 'allow-once', label: 'Allow once' }, { id: 'allow-chat', label: 'Allow for this chat' }, { id: 'deny', label: 'Deny' }] },
+    { t: 'permission', reqId: `${id}-p1`, tool: 'exec', summary: 'rm -rf dist && pnpm build', options: [{ id: 'allow-once', label: 'Allow once' }, { id: 'allow-chat', label: 'Allow for this chat' }, { id: 'deny', label: 'Deny' }] },
     { await: 'answer' },
     { t: 'text', id, delta: 'Permission handled.' },
     { t: 'turn_end', reason: 'done' }

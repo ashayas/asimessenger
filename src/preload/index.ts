@@ -19,6 +19,7 @@ const pickFolder = (): Promise<string | null> => ipcRenderer.invoke('dialog:pick
 
 const chat = {
   send: (chatId: string, text: string, quote?: { name: string; text: string }): Promise<unknown> => ipcRenderer.invoke('chat:send', chatId, text, quote),
+  setMode: (chatId: string, mode: string): Promise<void> => ipcRenderer.invoke('chat:set-mode', chatId, mode),
   interrupt: (chatId: string): Promise<void> => ipcRenderer.invoke('chat:interrupt', chatId),
   respond: (chatId: string, reqId: string, answer: string, reason?: string): Promise<void> => ipcRenderer.invoke('chat:respond', chatId, reqId, answer, reason),
   openWindow: (chatId: string): Promise<void> => ipcRenderer.invoke('window:open-chat', chatId)
@@ -33,4 +34,10 @@ const friends = {
   openAddWindow: (): Promise<void> => ipcRenderer.invoke('window:open-add-friend')
 }
 
-contextBridge.exposeInMainWorld('asi', { platform: process.platform, api, onChanged, pickFolder, chat, friends })
+const safety = {
+  setGlobalDangerous: (on: boolean): Promise<void> => ipcRenderer.invoke('safety:set-global-dangerous', on),
+  setFriendDangerous: (id: string, on: boolean): Promise<void> => ipcRenderer.invoke('safety:set-friend-dangerous', id, on),
+  openOptions: (): Promise<void> => ipcRenderer.invoke('window:open-options')
+}
+
+contextBridge.exposeInMainWorld('asi', { platform: process.platform, api, onChanged, pickFolder, chat, friends, safety })

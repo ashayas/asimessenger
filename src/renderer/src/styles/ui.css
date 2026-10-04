@@ -193,3 +193,26 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .note { padding: 5px 9px; border-radius: 3px; border: 1px solid var(--warn-border); background: var(--warn-bg); color: var(--warn-ink); user-select: text; }
 .note.ok { background: var(--ok-bg); color: var(--ok-ink); border-color: #b4ddaa; }
 .note.bad { background: var(--danger-bg); color: var(--danger-ink); border-color: var(--danger-border); }
+
+/* ---------- options ---------- */
+.opts { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px; background: var(--pane); user-select: text; }
+.opts h3 { margin: 0 0 4px; font: bold 13px var(--font-title); color: var(--accent-deep); }
+.opts .hint { color: var(--ink-soft); margin: 4px 0 8px; }
+.check { display: flex; gap: 8px; align-items: center; font-weight: bold; margin: 6px 0; }
+.friend-opts { margin-top: 8px; border: 1px solid var(--rule-soft); border-radius: 4px; overflow: hidden; }
+.friend-opt { display: flex; gap: 10px; align-items: center; padding: 6px 10px; border-top: 1px solid var(--rule-soft); }
+.friend-opt:first-child { border-top: 0; }
+.friend-opt .grow { flex: 1; }
+.note .row { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
+
+/* ---------- mode strip ---------- */
+.modes { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 4px 8px; border-top: 1px solid var(--rule); background: linear-gradient(180deg, var(--glass-a), var(--glass-b)); flex: none; font-size: 11px; }
+.mode { display: inline-flex; gap: 4px; align-items: center; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--rule); background: var(--pane); }
+.mode.sel { border-color: var(--accent-deep); background: var(--select); font-weight: bold; }
+.mode.locked { color: var(--ink-faint); border-style: dashed; }
+.mode.sel.dangerous { background: var(--danger-bg); border-color: var(--busy); color: var(--danger-ink); }
+.modes .sp { flex: 1; }
+.mode-note { padding: 4px 10px; background: var(--warn-bg); color: var(--warn-ink); border-top: 1px solid var(--warn-border); display: flex; gap: 8px; align-items: center; }
+.mode-note .grow { flex: 1; }
+.deny-reason { display: flex; gap: 6px; align-items: center; flex: 1 1 100%; }
+.danger-badge { color: var(--busy); }

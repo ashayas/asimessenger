@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Chat, Friend, Message } from '@shared/models'
 import { avatarFor } from '@shared/harness-meta'
 import { isBuiltin, liveFor } from '@shared/grouping'
-import { Avatar, StatusDot, ToolButton, WindowFrame } from './ui/kit'
+import { Avatar, Btn, StatusDot, ToolButton, WindowFrame } from './ui/kit'
 import { useData } from './store'
+import { useSetting } from './hooks'
+import { MODE_LABEL, canUseMode, lockedReason } from '@shared/safety'
+import type { Mode } from '@shared/models'
 import { MessageView } from './MessageViews'
 
 function useChat(chatId: string) {
@@ -32,6 +35,8 @@ export function ChatWindow({ chatId }: { chatId: string }) {
   const profile = useData((s) => s.profile)
   const allChats = useData((s) => s.chats)
   const [draft, setDraft] = useState('')
+  const [globalDangerous] = useSetting<boolean>('allowDangerous', false)
+  const [modeNote, setModeNote] = useState<string | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -54,6 +59,13 @@ export function ChatWindow({ chatId }: { chatId: string }) {
   const style = avatarFor(friend)
   const presence = live?.presence ?? 'online'
 
+  const safety = { globalDangerous, friendDangerous: friend.dangerousAllowed }
+  const pickMode = async (m: Mode) => {
+    setModeNote(null)
+    if (!canUseMode(m, safety)) return setModeNote(lockedReason(safety))
+    try { await window.asi.chat.setMode(chatId, m) } catch (err) { setModeNote(err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : String(err)) }
+  }
+
   const send = () => {
     const text = draft.trim()
     if (!text) return
@@ -70,7 +82,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
   }
 
   return (
-    <WindowFrame title={`${chat.title} · ${friend.displayName} · Conversation`}>
+    <WindowFrame title={`${chat.mode === 'dangerous' ? '⚠ DANGEROUS · ' : ''}${chat.title} · ${friend.displayName} · Conversation`} danger={chat.mode === 'dangerous'}>
       <div className="toolbar">
         <ToolButton icon="👥" label="Invite" disabled />
         <ToolButton icon="📎" label="Send Files" disabled />
@@ -102,6 +114,30 @@ export function ChatWindow({ chatId }: { chatId: string }) {
           <Avatar label={style.label} gradient={style.gradient} presence={presence} size="xl" working={presence === 'busy'} waiting={presence === 'away'} />
           <Avatar label={profile.name.slice(0, 1).toUpperCase() || 'A'} gradient={['#e05297', '#f39ac2']} presence={profile.presence} size="xl" />
         </div>
+      </div>
+      {modeNote ? (
+        <div className="mode-note" role="status">
+          <span className="grow">{modeNote}</span>
+          <Btn onClick={() => void window.asi.safety.openOptions()}>Open Options</Btn>
+        </div>
+      ) : null}
+      <div className="modes" role="radiogroup" aria-label="Permission mode">
+        {(['ask', 'auto-edit', 'plan', 'dangerous'] as Mode[]).map((m) => {
+          const locked = !canUseMode(m, safety)
+          return (
+            <button
+              key={m}
+              role="radio"
+              aria-checked={chat.mode === m}
+              data-mode={m}
+              className={`mode${chat.mode === m ? ' sel' : ''}${locked ? ' locked' : ''}${m === 'dangerous' ? ' dangerous' : ''}`}
+              title={locked ? (lockedReason(safety) ?? '') : MODE_LABEL[m]}
+              onClick={() => void pickMode(m)}
+            >
+              {m === 'ask' ? '🛡' : m === 'auto-edit' ? '✎' : m === 'plan' ? '▤' : '⚠'} {MODE_LABEL[m]}{locked ? ' (locked)' : ''}
+            </button>
+          )
+        })}
       </div>
       <div className="composer">
         <textarea

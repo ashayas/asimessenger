@@ -71,3 +71,18 @@ export function openAddFriendWindow(): BrowserWindow {
   loadRoute(win, '/add-friend')
   return win
 }
+
+let optionsWindow: BrowserWindow | null = null
+export function openOptionsWindow(): BrowserWindow {
+  if (optionsWindow && !optionsWindow.isDestroyed()) {
+    optionsWindow.show()
+    optionsWindow.focus()
+    return optionsWindow
+  }
+  const win = new BrowserWindow(baseOptions({ width: 560, height: 520, minWidth: 460, minHeight: 360, title: 'Options' }))
+  optionsWindow = win
+  win.once('ready-to-show', () => win.show())
+  win.on('closed', () => { optionsWindow = null })
+  loadRoute(win, '/options')
+  return win
+}

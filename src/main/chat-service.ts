@@ -1,6 +1,8 @@
 import type { Repo } from './db/repo'
 import type { Message } from '@shared/models'
 import type { PermDecision, UserTurn } from '@shared/events'
+import type { Mode } from '@shared/models'
+import { canUseMode, lockedReason } from '@shared/safety'
 import type { HarnessManager } from '../harness/manager'
 import type { Ingestor } from './ingest'
 
@@ -34,6 +36,40 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
         notify('messages'); notify('chats')
       }
       return msg
+    },
+
+    /** Change a chat's permission mode. Dangerous needs the global switch AND the friend's opt-in. */
+    async setMode(chatId: string, mode: Mode): Promise<void> {
+      const chat = await repo.chats.get(chatId)
+      if (!chat) throw new Error(`unknown chat ${chatId}`)
+      const friend = await repo.friends.get(chat.friendId)
+      const state = { globalDangerous: await repo.settings.get('allowDangerous', false), friendDangerous: !!friend?.dangerousAllowed }
+      if (!canUseMode(mode, state)) throw new Error(lockedReason(state) ?? 'that mode is not allowed')
+      await repo.chats.setMode(chatId, mode)
+      manager.setMode(chatId, mode)
+      notify('chats')
+    },
+
+    /** Global switch. Turning it off drops every dangerous chat back to Ask and restarts those sessions. */
+    async setGlobalDangerous(on: boolean): Promise<void> {
+      await repo.settings.set('allowDangerous', on)
+      notify('settings')
+      if (!on) await this.revokeDangerous()
+    },
+
+    async setFriendDangerous(friendId: string, on: boolean): Promise<void> {
+      await repo.friends.setDangerousAllowed(friendId, on)
+      notify('friends')
+      if (!on) await this.revokeDangerous(friendId)
+    },
+
+    async revokeDangerous(friendId?: string): Promise<void> {
+      for (const c of await repo.chats.list(friendId ? { friendId } : {})) {
+        if (c.mode !== 'dangerous') continue
+        await repo.chats.setMode(c.id, 'ask')
+        await manager.dispose(c.id) // a bypass-permissions process must not keep running
+      }
+      notify('chats')
     },
 
     /** Nudge. */

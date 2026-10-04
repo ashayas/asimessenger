@@ -1,6 +1,7 @@
 import type { Repo } from './db/repo'
 import type { AgentEvent } from '@shared/events'
 import type { Presence } from '@shared/status'
+import { heuristicRisk } from '@shared/safety'
 
 const PHASE_PRESENCE: Record<string, Presence> = { idle: 'online', done: 'online', thinking: 'busy', tool: 'busy', waiting: 'away', error: 'busy' }
 
@@ -66,7 +67,8 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void) {
       }
       case 'permission': {
         await flush(chatId)
-        await repo.messages.append({ chatId, role: 'agent', kind: 'permission', body: { ...e, decision: null }, text: `${e.tool}: ${e.summary}` })
+        const risk = e.risk ?? heuristicRisk(e.tool, e.summary)
+        await repo.messages.append({ chatId, role: 'agent', kind: 'permission', body: { ...e, risk, decision: null }, text: `${e.tool}: ${e.summary}` })
         await repo.chats.setStatus(chatId, 'away', `waiting on u: ${e.summary}`)
         notify('chats'); notify('messages')
         return

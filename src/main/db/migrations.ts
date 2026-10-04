@@ -116,5 +116,7 @@ export const MIGRATIONS: string[] = [
     INSERT INTO search_fts(kind, ref_id, workspace_id, title, body)
     SELECT 'message', new.id, c.workspace_id, c.title, new.text FROM chats c WHERE c.id = new.chat_id AND new.text IS NOT NULL AND new.text <> '';
   END;
-  `
+  `,
+  /* 5: per-chat permission mode */
+  `ALTER TABLE chats ADD COLUMN mode TEXT NOT NULL DEFAULT 'ask';`
 ]

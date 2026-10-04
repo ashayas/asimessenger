@@ -44,10 +44,15 @@ export function ChatWindow({ chatId }: { chatId: string }) {
     if (chat) document.title = `${chat.title} · ${friend?.displayName ?? ''}`.trim()
   }, [chat, friend])
 
-  // mark read whenever new agent messages arrive while this window is open
+  // mark read only while you are actually looking at the window
   useEffect(() => {
-    if (chat && chat.unreadCount > 0) void window.asi.api.chats.markRead(chatId)
+    if (chat && chat.unreadCount > 0) void window.asi.windowFocused().then((f) => { if (f) void window.asi.api.chats.markRead(chatId) })
   }, [chat, chatId])
+  useEffect(() => {
+    const onFocus = () => void window.asi.api.chats.markRead(chatId)
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [chatId])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })

@@ -21,6 +21,9 @@ const chat = {
   send: (chatId: string, text: string, quote?: { name: string; text: string }): Promise<unknown> => ipcRenderer.invoke('chat:send', chatId, text, quote),
   setMode: (chatId: string, mode: string): Promise<void> => ipcRenderer.invoke('chat:set-mode', chatId, mode),
   nudge: (chatId: string): Promise<boolean> => ipcRenderer.invoke('chat:nudge', chatId),
+  openNextUnread: (): Promise<string | null> => ipcRenderer.invoke('chat:open-next-unread'),
+  toastOpenChat: (chatId: string): Promise<void> => ipcRenderer.invoke('toast:open-chat', chatId),
+  toastDismiss: (): Promise<void> => ipcRenderer.invoke('toast:dismiss'),
   interrupt: (chatId: string): Promise<void> => ipcRenderer.invoke('chat:interrupt', chatId),
   respond: (chatId: string, reqId: string, answer: string, reason?: string): Promise<void> => ipcRenderer.invoke('chat:respond', chatId, reqId, answer, reason),
   openWindow: (chatId: string): Promise<void> => ipcRenderer.invoke('window:open-chat', chatId)
@@ -41,4 +44,6 @@ const safety = {
   openOptions: (): Promise<void> => ipcRenderer.invoke('window:open-options')
 }
 
-contextBridge.exposeInMainWorld('asi', { platform: process.platform, api, onChanged, pickFolder, chat, friends, safety })
+const windowFocused = (): Promise<boolean> => ipcRenderer.invoke('window:is-focused')
+
+contextBridge.exposeInMainWorld('asi', { platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })

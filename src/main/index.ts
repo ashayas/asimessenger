@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { APP_NAME } from '@shared/app'
 import { openDb } from './db/db'
 import { createRepo } from './db/repo'
-import { broadcastChanged, registerRepoIpc } from './ipc'
+import { broadcastChanged, onChanged, registerRepoIpc } from './ipc'
+import { closeToastsFor, createAttentionHandler, openNextUnread, refreshBadge } from './notifications'
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
@@ -29,7 +30,15 @@ app.whenReady().then(async () => {
     const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
     return r.canceled ? null : (r.filePaths[0] ?? null)
   })
-  const ingestor = createIngestor(repo, broadcastChanged)
+  const attention = createAttentionHandler(repo)
+  const ingestor = createIngestor(repo, broadcastChanged, (a) => void attention(a))
+  let badgeTimer: ReturnType<typeof setTimeout> | null = null
+  onChanged((topic) => {
+    if (topic !== 'chats' && topic !== 'messages') return
+    if (badgeTimer) clearTimeout(badgeTimer)
+    badgeTimer = setTimeout(() => void refreshBadge(repo), 80)
+  })
+  void refreshBadge(repo)
   const manager = new HarnessManager({
     onEvent: (chatId, e) => void ingestor.ingest(chatId, e),
     onResumeId: (chatId, id) => void repo.chats.setSession(chatId, id)
@@ -47,6 +56,10 @@ app.whenReady().then(async () => {
     if (sent) shakeWindow(BrowserWindow.fromWebContents(e.sender))
     return sent
   })
+  ipcMain.handle('window:is-focused', (e) => BrowserWindow.fromWebContents(e.sender)?.isFocused() ?? false)
+  ipcMain.handle('chat:open-next-unread', () => openNextUnread(repo))
+  ipcMain.handle('toast:open-chat', (e, chatId: string) => { openChatWindow(chatId); closeToastsFor(chatId); BrowserWindow.fromWebContents(e.sender)?.close() })
+  ipcMain.handle('toast:dismiss', (e) => { BrowserWindow.fromWebContents(e.sender)?.close() })
   ipcMain.handle('chat:interrupt', (_e, chatId: string) => chat.interrupt(chatId))
   ipcMain.handle('chat:respond', (_e, chatId: string, reqId: string, answer: string, reason?: string) => chat.respond(chatId, reqId, answer, reason))
   ipcMain.handle('window:open-chat', (_e, chatId: string) => { openChatWindow(chatId) })

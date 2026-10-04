@@ -18,7 +18,15 @@ interface ChatState {
  * Turns the normalized event stream into persisted messages and live chat status.
  * Events for one chat are processed strictly in order.
  */
-export function createIngestor(repo: Repo, notify: (topic: string) => void) {
+export interface Attention {
+  chatId: string
+  kind: 'message' | 'permission' | 'question' | 'error'
+  text: string
+  risk?: string
+  reqId?: string
+}
+
+export function createIngestor(repo: Repo, notify: (topic: string) => void, onAttention: (a: Attention) => void = () => {}) {
   const states = new Map<string, ChatState>()
   const queues = new Map<string, Promise<void>>()
   const state = (chatId: string): ChatState => {
@@ -83,6 +91,7 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void) {
         await repo.messages.append({ chatId, role: 'agent', kind: 'permission', body: { ...e, risk, decision: null }, text: `${e.tool}: ${e.summary}` })
         await repo.chats.setStatus(chatId, 'away', statusLine({ phase: 'waiting', detail: e.summary }, await lettering(chatId)))
         notify('chats'); notify('messages')
+        onAttention({ chatId, kind: 'permission', text: e.summary, risk, reqId: e.reqId })
         return
       }
       case 'question': {
@@ -90,6 +99,7 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void) {
         await repo.messages.append({ chatId, role: 'agent', kind: 'question', body: { ...e, answer: null }, text: e.prompt })
         await repo.chats.setStatus(chatId, 'away', statusLine({ phase: 'waiting', detail: 'question' }, await lettering(chatId)))
         notify('chats'); notify('messages')
+        onAttention({ chatId, kind: 'question', text: e.prompt, reqId: e.reqId })
         return
       }
       case 'attachment': {
@@ -119,6 +129,11 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void) {
         if (e.reason === 'error') await repo.messages.append({ chatId, role: 'system', kind: 'error', body: { error: e.error ?? 'error' }, text: e.error ?? 'error' })
         await repo.chats.setStatus(chatId, 'online', text)
         notify('chats'); notify('messages')
+        if (e.reason === 'error') onAttention({ chatId, kind: 'error', text: e.error ?? 'error' })
+        else if (e.reason === 'done') {
+          const last = (await repo.messages.list(chatId)).filter((m) => m.role === 'agent' && m.kind === 'text').at(-1)
+          if (last?.text) onAttention({ chatId, kind: 'message', text: last.text })
+        }
         return
       }
     }

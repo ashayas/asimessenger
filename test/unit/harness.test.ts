@@ -145,3 +145,25 @@ test('nudge interrupts a running turn, leaves a transcript line, and is rate lim
   expect(await service.nudge(chatId, 14_000)).toBe(true)
   expect((await repo.messages.list(chatId)).filter((m) => m.kind === 'nudge')).toHaveLength(2)
 })
+
+test('attention events fire for replies, permissions and questions (not for your own interrupts)', async () => {
+  const seen: { kind: string; text: string }[] = []
+  const ing = createIngestor(repo, () => {}, (a) => seen.push({ kind: a.kind, text: a.text }))
+  const mgr = new HarnessManager({ onEvent: (id, e) => void ing.ingest(id, e) })
+  mgr.register('fake', async () => new FakeAgent())
+  const svc = createChatService({ repo, manager: mgr, ingestor: ing, notify: () => {} })
+  await svc.send(chatId, 'hello there')
+  await waitFor(async () => seen.some((s) => s.kind === 'message'))
+  expect(seen.find((s) => s.kind === 'message')!.text).toBe('You said: hello there')
+  await svc.send(chatId, '/script permission')
+  await waitFor(async () => seen.some((s) => s.kind === 'permission'))
+  await svc.send(chatId, '/script question')
+  await waitFor(async () => seen.some((s) => s.kind === 'question'))
+  const before = seen.length
+  await svc.send(chatId, '/script long')
+  await waitFor(async () => (await repo.messages.list(chatId)).some((m) => m.kind === 'tool' && m.text?.includes('Long task')))
+  await svc.interrupt(chatId)
+  await new Promise((r) => setTimeout(r, 200))
+  expect(seen.length).toBe(before)
+  await mgr.disposeAll()
+})

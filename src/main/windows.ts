@@ -5,7 +5,7 @@ import { APP_NAME } from '@shared/app'
 const chatWindows = new Map<string, BrowserWindow>()
 let contactsWindow: BrowserWindow | null = null
 
-function baseOptions(over: Electron.BrowserWindowConstructorOptions): Electron.BrowserWindowConstructorOptions {
+export function baseOptions(over: Electron.BrowserWindowConstructorOptions): Electron.BrowserWindowConstructorOptions {
   return {
     title: APP_NAME,
     show: false,
@@ -16,7 +16,7 @@ function baseOptions(over: Electron.BrowserWindowConstructorOptions): Electron.B
   }
 }
 
-function loadRoute(win: BrowserWindow, route: string): void {
+export function loadRoute(win: BrowserWindow, route: string): void {
   const dev = process.env['ELECTRON_RENDERER_URL']
   if (dev) void win.loadURL(`${dev}#${route}`)
   else void win.loadFile(join(import.meta.dirname, '../renderer/index.html'), { hash: route })
@@ -51,6 +51,18 @@ export function openChatWindow(chatId: string): BrowserWindow {
   win.on('closed', () => chatWindows.delete(chatId))
   loadRoute(win, `/chat/${chatId}`)
   return win
+}
+
+export function windowFor(chatId: string): BrowserWindow | undefined {
+  const w = chatWindows.get(chatId)
+  return w && !w.isDestroyed() ? w : undefined
+}
+
+export function toastOptions(over: Electron.BrowserWindowConstructorOptions): Electron.BrowserWindowConstructorOptions {
+  return {
+    ...baseOptions({}), titleBarStyle: 'default', frame: false, resizable: false, movable: true, minimizable: false, maximizable: false, fullscreenable: false,
+    skipTaskbar: true, focusable: false, hasShadow: true, ...over
+  }
 }
 
 export function openChatWindowIds(): string[] {

@@ -11,8 +11,9 @@ import type { Mode } from '@shared/models'
 import { canUseMode, lockedReason } from '@shared/safety'
 import { ruleTitle } from '@shared/title'
 import type { HarnessManager } from '../harness/manager'
-import { attachmentPrompt, imageMime, imagePrompt, MAX_IMAGE_BYTES, safeImageName } from '@shared/attachments'
-import { copyFile, mkdir, stat, writeFile } from 'node:fs/promises'
+import { attachmentPrompt, filePrompt, imageMime, imagePrompt, kindForFile, MAX_FILE_BYTES, MAX_IMAGE_BYTES, MAX_PASTED_FILE_BYTES, safeFileName, safeImageName } from '@shared/attachments'
+import { constants as fsConstants } from 'node:fs'
+import { copyFile, mkdir, realpath, stat, writeFile } from 'node:fs/promises'
 import { basename, join, sep } from 'node:path'
 import { readPickedFile } from './attachments'
 import type { Ingestor } from './ingest'
@@ -21,6 +22,8 @@ import type { Chat } from '@shared/models'
 
 
 const NUDGE_COOLDOWN_MS = 3000
+/** What a pending ask_user returns when the turn is stopped or nudged. A nudge is between you and the transcript; the agent just learns the question went unanswered. */
+const NO_ANSWER = 'The human did not answer.'
 
 const SHELL_OUTPUT_MAX = 100_000
 const SHELL_TIMEOUT_MS = 120_000
@@ -35,6 +38,8 @@ export interface QueuedPrompt {
 export interface Opener {
   url(u: string): void
   path(p: string): void
+  /** Show a file in Finder. */
+  reveal?(p: string): void
 }
 
 export function createChatService(deps: { repo: Repo; manager: HarnessManager; ingestor: Ingestor; notify: (topic: string) => void; opener?: Opener; worktrees?: Worktrees }) {
@@ -73,6 +78,38 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
     const dest = join(await attachmentsDir(chatId), safeImageName(basename(path)))
     await copyFile(path, dest)
     return dest
+  }
+
+  /** A fresh folder inside `.attachments`, so a file keeps its own name and two files with the same name never collide. */
+  async function uniqueAttachmentDir(chatId: string): Promise<string> {
+    const dir = join(await attachmentsDir(chatId), `${Date.now().toString(36)}${randomUUID().slice(0, 4)}`)
+    await mkdir(dir, { recursive: true })
+    return dir
+  }
+
+  /** Any file goes into the chat's `.attachments` folder (a copy-on-write clone where the disk allows it) unless it already lives in the workspace. */
+  async function fileInto(chatId: string, path: string): Promise<string> {
+    const chat = await repo.chats.get(chatId)
+    const ws = chat ? await repo.workspaces.get(chat.workspaceId) : null
+    const root = chat ? rootOf(chat, ws) : (ws?.path ?? process.cwd())
+    if (path === root || path.startsWith(root + sep)) return path
+    const dest = join(await uniqueAttachmentDir(chatId), safeFileName(basename(path)))
+    await copyFile(path, dest, fsConstants.COPYFILE_FICLONE)
+    return dest
+  }
+
+  /** The real path of a file an agent or a message points at, if (and only if) it is inside this chat's workspace or worktree. */
+  async function insideChat(chatId: string, path: string): Promise<string> {
+    const chat = await repo.chats.get(chatId)
+    if (!chat) throw new Error(`unknown chat ${chatId}`)
+    const ws = await repo.workspaces.get(chat.workspaceId)
+    const roots = [chat.worktreePath, ws?.path].filter((r): r is string => !!r)
+    const real = await realpath(isAbsolute(path) ? path : resolvePath(roots[0] ?? process.cwd(), path))
+    for (const r of roots) {
+      const root = await realpath(r).catch(() => r)
+      if (real === root || real.startsWith(root + sep)) return real
+    }
+    throw new Error('that file is outside this workspace')
   }
 
   return {
@@ -224,6 +261,32 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       return path
     },
 
+    /** Save a pasted file (no path on disk) into `.attachments/`. Pasted bytes pass through memory, so these are capped lower than files with a path. */
+    async saveFile(chatId: string, name: string, bytes: Uint8Array): Promise<string> {
+      if (bytes.byteLength > MAX_PASTED_FILE_BYTES) throw new Error(`pasted files are limited to ${MAX_PASTED_FILE_BYTES / 1024 ** 2} MB; drag the file in instead`)
+      const path = join(await uniqueAttachmentDir(chatId), safeFileName(name))
+      await writeFile(path, bytes)
+      return path
+    },
+
+    /** An agent offers a file by path: it must be inside this chat's workspace. Returns what the card needs. */
+    async resolveAgentFile(chatId: string, path: string): Promise<{ path: string; bytes: number }> {
+      const real = await insideChat(chatId, path)
+      const st = await stat(real)
+      if (st.isDirectory()) throw new Error('that is a folder; send a file')
+      return { path: real, bytes: st.size }
+    },
+
+    /** Open a file attachment with its default app, or show it in Finder. Only files inside the chat's workspace. */
+    async openAttachmentFile(messageId: string, mode: 'open' | 'reveal' = 'open'): Promise<void> {
+      const msg = await repo.messages.get(messageId)
+      const a = msg?.kind === 'attachment' ? (msg.body as { path?: string }) : null
+      if (!msg || !a?.path) throw new Error('that attachment has no file')
+      const real = await insideChat(msg.chatId, a.path)
+      if (mode === 'reveal') opener.reveal?.(real)
+      else opener.path(real)
+    },
+
     /** Send files to the agent; they appear in the transcript as attachments you can reopen. Pictures go as images. */
     async sendFiles(chatId: string, paths: string[], note = ''): Promise<void> {
       const parts: string[] = []
@@ -240,10 +303,22 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
           parts.push(imagePrompt(name, path, lead))
           continue
         }
-        const f = await readPickedFile(p0)
-        const m = await repo.messages.append({ chatId, role: 'user', kind: 'attachment', body: { t: 'attachment', id: `u-${Date.now()}-${i}`, kind: f.kind, name: f.name, path: p0, body: f.text }, text: f.name })
-        await repo.attachments.add({ messageId: m.id, kind: f.kind, name: f.name, path: p0, body: f.text })
-        parts.push(attachmentPrompt(f.name, f.text, lead))
+        const st = await stat(p0)
+        if (st.isDirectory()) throw new Error(`${basename(p0)} is a folder. Zip it first and attach the zip.`)
+        if (st.size > MAX_FILE_BYTES) throw new Error(`${basename(p0)} is larger than ${MAX_FILE_BYTES / 1024 ** 3} GB`)
+        let inline: Awaited<ReturnType<typeof readPickedFile>> | null = null
+        if (kindForFile(basename(p0), st.size) !== 'file') inline = await readPickedFile(p0).catch(() => null) // a "text" file that is really binary falls through to a plain file
+        if (inline) {
+          const m = await repo.messages.append({ chatId, role: 'user', kind: 'attachment', body: { t: 'attachment', id: `u-${Date.now()}-${i}`, kind: inline.kind, name: inline.name, path: p0, body: inline.text }, text: inline.name })
+          await repo.attachments.add({ messageId: m.id, kind: inline.kind, name: inline.name, path: p0, body: inline.text })
+          parts.push(attachmentPrompt(inline.name, inline.text, lead))
+          continue
+        }
+        const path = await fileInto(chatId, p0)
+        const name = basename(p0)
+        const m = await repo.messages.append({ chatId, role: 'user', kind: 'attachment', body: { t: 'attachment', id: `u-${Date.now()}-${i}`, kind: 'file', name, path, bytes: st.size }, text: name })
+        await repo.attachments.add({ messageId: m.id, kind: 'file', name, path })
+        parts.push(filePrompt(name, path, st.size, lead))
       }
       // your own words belong in the transcript too, not only in the prompt the agent receives
       if (note.trim() && parts.length) await repo.messages.append({ chatId, role: 'user', kind: 'text', body: { text: note.trim() }, text: note.trim() })
@@ -352,7 +427,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
 
     /** Plain stop. */
     async interrupt(chatId: string): Promise<void> {
-      cancelAsks(chatId, 'The human interrupted before answering.')
+      cancelAsks(chatId, NO_ANSWER)
       shells.get(chatId)?.kill('SIGINT')
       await manager.interrupt(chatId)
     },
@@ -372,7 +447,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       const running = manager.isLive(chatId) && (await repo.chats.get(chatId))?.status !== 'online'
       await repo.messages.append({ chatId, role: 'system', kind: 'nudge', body: { interrupted: running }, text: running ? 'You sent a nudge and stopped the agent.' : 'You sent a nudge.' })
       notify('messages')
-      cancelAsks(chatId, 'The human sent a nudge instead of answering.')
+      cancelAsks(chatId, NO_ANSWER)
       if (running) await manager.interrupt(chatId)
       return true
     },

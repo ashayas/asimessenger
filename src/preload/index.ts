@@ -68,6 +68,8 @@ const attachments = {
   pickFiles: (): Promise<string[]> => ipcRenderer.invoke('dialog:pick-files'),
   sendFiles: (chatId: string, paths: string[], note?: string): Promise<void> => ipcRenderer.invoke('chat:send-files', chatId, paths, note),
   saveImage: (chatId: string, name: string, bytes: Uint8Array): Promise<string> => ipcRenderer.invoke('chat:save-image', chatId, name, bytes),
+  saveFile: (chatId: string, name: string, bytes: Uint8Array): Promise<string> => ipcRenderer.invoke('chat:save-file', chatId, name, bytes),
+  openFile: (messageId: string, mode: 'open' | 'reveal'): Promise<void> => ipcRenderer.invoke('attachments:open-file', messageId, mode),
   /** The real path of a file dragged in from Finder. */
   pathFor: (file: File): string => webUtils.getPathForFile(file)
 }

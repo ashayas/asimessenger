@@ -450,3 +450,6 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .queued[data-held="true"] { background: var(--warn-wash, #fdf0d8); }
 .composer .queue-toggle { align-self: stretch; padding: 0 12px; }
 .composer .queue-toggle.on { background: var(--select); color: var(--select-ink); }
+
+.chip-file .sz { color: var(--ink-soft); }
+.card .file .btn + .btn { margin-left: 4px; }

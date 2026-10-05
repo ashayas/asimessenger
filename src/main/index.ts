@@ -100,7 +100,11 @@ app.whenReady().then(async () => {
   const bridge = createMcpBridge({
     chatExists: async (id) => !!(await repo.chats.get(id)),
     askUser: (id, q, choices) => chatRef.current!.askUser(id, q, choices),
-    sendAttachment: async (id, a) => { await ingestor.ingest(id, { t: 'attachment', id: `mcp-${Date.now()}`, kind: a.kind, name: a.name, path: a.path, body: a.content }) },
+    sendAttachment: async (id, a) => {
+      // a file the agent points at must be inside the workspace; the card then opens it with the default app
+      const file = a.kind === 'file' && a.path ? await chatRef.current!.resolveAgentFile(id, a.path) : null
+      await ingestor.ingest(id, { t: 'attachment', id: `mcp-${Date.now()}`, kind: a.kind, name: a.name, path: file?.path ?? a.path, body: a.content, bytes: file?.bytes })
+    },
     openUrl: async (id, url) => { await ingestor.ingest(id, { t: 'open_url', url }); browser.open(url) },
     openDrawing: async (id, name) => { const c = await repo.chats.get(id); if (c) openDoodleWindow(c.workspaceId, { chatId: id, name }) },
     setStatus: async (id, text) => { await repo.chats.setStatus(id, 'busy', text); broadcastChanged('chats') }
@@ -115,7 +119,7 @@ app.whenReady().then(async () => {
   registerHarnesses(manager, { http: httpFactory(secrets), asi: async () => new AsiAgent({ repo, decider: () => brain.decider(), discover: () => discoverSessions({ home: process.env['ASI_DISCOVERY_HOME'] ?? homedir() }), search: (q) => searchAll(repo, q) }) })
   app.on('will-quit', () => void manager.disposeAll())
   const worktrees = createWorktrees({ dir: join(app.getPath('userData'), 'worktrees'), env: await loginEnv() })
-  const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged, worktrees, opener: { url: (u) => browser.open(u), path: (p) => void shell.openPath(p) } })
+  const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged, worktrees, opener: { url: (u) => browser.open(u), path: (p) => void shell.openPath(p), reveal: (p) => shell.showItemInFolder(p) } })
   chatRef.current = chat
   ipcMain.handle('chat:send', (_e, chatId: string, text: string, quote?: { name: string; text: string }) => chat.send(chatId, text, quote))
   ipcMain.handle('safety:set-global-dangerous', (_e, on: boolean) => chat.setGlobalDangerous(on))
@@ -148,6 +152,8 @@ app.whenReady().then(async () => {
     return r.canceled ? [] : r.filePaths
   })
   ipcMain.handle('chat:save-image', (_e, chatId: string, name: string, bytes: Uint8Array) => chat.saveImage(chatId, name, bytes))
+  ipcMain.handle('chat:save-file', (_e, chatId: string, name: string, bytes: Uint8Array) => chat.saveFile(chatId, name, bytes))
+  ipcMain.handle('attachments:open-file', (_e, messageId: string, mode: 'open' | 'reveal') => chat.openAttachmentFile(messageId, mode))
   ipcMain.handle('chat:send-files', (_e, chatId: string, paths: string[], note?: string) => chat.sendFiles(chatId, paths, note))
   ipcMain.handle('window:open-search', () => { openSearchWindow() })
   ipcMain.handle('search:all', (_e, q: string) => searchAll(repo, q))

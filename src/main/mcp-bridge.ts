@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { randomBytes } from 'node:crypto'
 import type { AddressInfo } from 'node:net'
 import type { AttachmentKind } from '@shared/events'
+import { kindForFile } from '@shared/attachments'
 import type { McpEndpoint } from '../harness/types'
 
 type Obj = Record<string, unknown>
@@ -23,8 +24,8 @@ const TOOLS = [
   },
   {
     name: 'send_attachment',
-    description: 'Send the human a file-like attachment (markdown note, code, diff, plan) that they can open and reply to. Provide content, or a path inside the workspace.',
-    inputSchema: { type: 'object', properties: { name: { type: 'string' }, kind: { type: 'string', enum: ['markdown', 'code', 'diff', 'plan', 'image'] }, content: { type: 'string' }, path: { type: 'string' } }, required: ['name'] }
+    description: 'Send the human an attachment: a markdown note, code, diff or plan they can open and reply to, or any file (a spreadsheet, CSV, PDF, archive) by its path inside the workspace with kind "file". Provide content, or a path.',
+    inputSchema: { type: 'object', properties: { name: { type: 'string' }, kind: { type: 'string', enum: ['markdown', 'code', 'diff', 'plan', 'image', 'file'] }, content: { type: 'string' }, path: { type: 'string' } }, required: ['name'] }
   },
   {
     name: 'open_url',
@@ -43,7 +44,7 @@ const TOOLS = [
   }
 ]
 
-const KINDS = new Set(['markdown', 'code', 'diff', 'plan', 'image'])
+const KINDS = new Set(['markdown', 'code', 'diff', 'plan', 'image', 'file'])
 const ok = (text: string) => ({ content: [{ type: 'text', text }] })
 const fail = (text: string) => ({ content: [{ type: 'text', text }], isError: true })
 
@@ -74,8 +75,9 @@ export function createMcpBridge(actions: BridgeActions) {
         case 'send_attachment': {
           const n = String(args['name'] ?? '').trim()
           if (!n) return fail('name is required')
-          const kind = (KINDS.has(String(args['kind'])) ? args['kind'] : n.endsWith('.md') ? 'markdown' : 'code') as AttachmentKind
+          const kind = (KINDS.has(String(args['kind'])) ? args['kind'] : args['path'] && !args['content'] ? kindForFile(String(args['path'])) : n.endsWith('.md') ? 'markdown' : 'code') as AttachmentKind
           if (!args['content'] && !args['path']) return fail('provide content or path')
+          if (kind === 'file' && !args['path']) return fail('a file attachment needs a path inside the workspace')
           await actions.sendAttachment(chatId, { name: n, kind, content: args['content'] ? String(args['content']) : undefined, path: args['path'] ? String(args['path']) : undefined })
           return ok('Sent to the human as an attachment.')
         }

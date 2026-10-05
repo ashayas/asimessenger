@@ -36,6 +36,14 @@ options · onboarding · toast        MCP bridge  (127.0.0.1, token)  ←── 
 | Voice | `src/main/{voice,cohere-engine,model-manager,voice-runtime,voice-setup}.ts`, `native/` |
 | Release | `scripts/`, `build/entitlements.mac.plist`, `docs/releasing.md` |
 
+## Attachments
+
+Everything you attach lands in the chat's `.attachments/` folder (in its worktree for isolated chats), each file in its own folder so names never collide. Pictures are also passed to
+the agent natively (`UserTurn.images`). Small markdown, code and diffs (up to 200 KB) are read and inlined, and open in the viewer so you can reply to a line. Anything else (CSV,
+spreadsheets, PDFs, archives, big or binary "text") is a `file` attachment: it is cloned with `copyfile(FICLONE)` rather than read into memory, the agent gets its path and size in the
+prompt, and the card opens it with the default app. Folders are refused (zip them); a file over 2 GB is refused; a pasted file with no path on disk is capped at 100 MB because its bytes pass
+through memory. Opening a card only works for files inside the chat's workspace, which also covers files an agent hands back with `send_attachment` (`kind: "file"`).
+
 ## Usage and limits
 
 Two kinds of numbers, kept apart. **Spend** is a log (`usage_log`) with one row per call or turn, written from `{ t: 'usage' }` events; each

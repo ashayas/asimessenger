@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Message } from '@shared/models'
 import type { AgentEvent } from '@shared/events'
 import { Btn } from './ui/kit'
-import { badgeFor } from '@shared/attachments'
+import { badgeFor, fmtBytes } from '@shared/attachments'
 import { findLocalUrls } from '@shared/browser'
 
 type Tool = Extract<AgentEvent, { t: 'tool' }>
@@ -145,10 +145,15 @@ function AttachmentCard({ a, messageId }: { a: Attach; messageId: string }) {
   return (
     <div className="card" data-kind="attachment">
       {thumb ? <img className="thumb" src={thumb} alt={a.name} data-testid="thumb" onClick={() => void window.asi.attachments.open(messageId)} /> : null}
-      <div className="file">
-        <div className="ic">{badgeFor(a.kind)}</div>
-        <div className="grow"><b>{a.name}</b><div className="says">{a.kind} · sent as attachment</div></div>
-        <Btn onClick={() => void window.asi.attachments.open(messageId)}>Open</Btn>
+      <div className="file" data-attachment-kind={a.kind}>
+        <div className="ic">{badgeFor(a.kind, a.name)}</div>
+        <div className="grow"><b>{a.name}</b><div className="says">{a.kind === 'file' ? `${a.bytes !== undefined ? `${fmtBytes(a.bytes)} · ` : ''}file · saved with this chat` : `${a.kind} · sent as attachment`}</div></div>
+        {a.kind === 'file' ? (
+          <>
+            <Btn onClick={() => void window.asi.attachments.openFile(messageId, 'open')} title="Open with the default app">Open</Btn>
+            <Btn onClick={() => void window.asi.attachments.openFile(messageId, 'reveal')} title="Show in Finder">Show in Finder</Btn>
+          </>
+        ) : <Btn onClick={() => void window.asi.attachments.open(messageId)}>Open</Btn>}
       </div>
     </div>
   )

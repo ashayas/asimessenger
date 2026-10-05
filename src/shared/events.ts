@@ -5,7 +5,8 @@ export type Phase = 'idle' | 'thinking' | 'tool' | 'waiting' | 'error' | 'done'
 export type ToolKind = 'exec' | 'edit' | 'read' | 'search' | 'web' | 'mcp'
 export type Risk = 'low' | 'med' | 'high'
 export type PermDecision = 'allow-once' | 'allow-chat' | 'deny'
-export type AttachmentKind = 'markdown' | 'code' | 'diff' | 'image' | 'plan'
+/** `file` is anything the app cannot show inline (spreadsheets, PDFs, archives, big text): it is kept on disk and opened with the default app. */
+export type AttachmentKind = 'markdown' | 'code' | 'diff' | 'image' | 'plan' | 'file'
 
 export interface FileChange {
   path: string
@@ -38,7 +39,7 @@ export type AgentEvent =
     }
   | { t: 'permission'; reqId: string; tool: string; summary: string; risk?: Risk; options: PermOption[] }
   | { t: 'question'; reqId: string; prompt: string; choices?: string[] }
-  | { t: 'attachment'; id: string; kind: AttachmentKind; name: string; path?: string; body?: string }
+  | { t: 'attachment'; id: string; kind: AttachmentKind; name: string; path?: string; body?: string; bytes?: number }
   | { t: 'open_url'; url: string }
   | { t: 'links'; items: { label: string; detail?: string; target: SearchTarget }[] }
   | { t: 'title'; title: string }

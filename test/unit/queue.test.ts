@@ -122,3 +122,22 @@ test('each chat has its own slot, and deleting a chat drops its held prompt', as
   await service.deleteChat(chatId)
   expect(service.getQueued(chatId)).toBeNull()
 })
+
+test('a nudge is a transcript line only: nothing about it is ever sent to the agent, and a pending question just goes unanswered', async () => {
+  await service.send(chatId, 'first'); await settle()
+  const answer = service.askUser(chatId, 'which fruit?', ['apple', 'pear'])
+  await settle()
+  const before = sent().length
+  expect(await service.nudge(chatId, 1_000_000)).toBe(true)
+  await settle()
+  expect(agent.interrupted).toBe(1)
+  expect(sent()).toHaveLength(before) // no new turn, no text, nothing that mentions a nudge
+  expect(await answer).toBe('The human did not answer.')
+  expect(await answer).not.toMatch(/nudge/i)
+  const line = (await repo.messages.list(chatId)).find((m) => m.kind === 'nudge')!
+  expect(line.role).toBe('system')
+  expect(line.text).toMatch(/You sent a nudge/) // it is still in the transcript for you
+  // and the next thing you say does not carry it along
+  await service.send(chatId, 'carry on'); await settle()
+  expect(sent().at(-1)).toBe('carry on')
+})

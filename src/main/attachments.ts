@@ -36,11 +36,11 @@ export async function readImageInsideWorkspace(path: string, workspace: string):
 export async function loadAttachment(repo: Repo, messageId: string): Promise<LoadedAttachment> {
   const msg = await repo.messages.get(messageId)
   if (!msg || msg.kind !== 'attachment') throw new Error('attachment not found')
-  const a = msg.body as { name: string; kind: AttachmentKind; body?: string; path?: string }
+  const a = msg.body as { name: string; kind: AttachmentKind; body?: string; path?: string; bytes?: number }
   const chat = await repo.chats.get(msg.chatId)
   const friend = chat ? await repo.friends.get(chat.friendId) : null
   let text = a.body ?? ''
-  if (!text && a.path) {
+  if (!text && a.path && a.kind !== 'file') {
     const ws = chat ? await repo.workspaces.get(chat.workspaceId) : null
     // an isolated chat's files live in its worktree; its workspace folder is still a valid place to point at
     const roots = [chat?.worktreePath, ws?.path].filter((r): r is string => !!r)

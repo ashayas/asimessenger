@@ -81,6 +81,7 @@ Warp-style **command blocks**, **permission cards** with a risk label, **questio
 - **Nudge** interrupts the agent mid-turn, with the shake and the sound.
 - **Modes** per chat: Ask · Auto-edit · Plan. **Dangerous is locked** behind a global switch *and* a per-friend opt-in; revoking either drops you back to Ask.
 - Every chat is **persisted**. A new chat with a friend is a new session; old ones resume.
+- **Attach anything.** Drag in, paste or pick any file, of any type or size: CSVs, spreadsheets, PDFs, archives, big logs. Pictures go to the agent as images; small code and markdown open in the viewer; everything else is kept in the chat's `.attachments/` folder (a copy-on-write clone where the disk allows) and the agent is told where it is. It shows as a file card with Open and Show in Finder. Agents can hand files back the same way.
 - `!cmd` runs a shell command in the workspace, `/open <url|path>` opens it.
 - **Queue your next prompt** (`/queue …`, or the ⏳ toggle, ⌘⇧J) while the agent works. It is sent when the turn succeeds and held for you if the agent stops or fails.
 

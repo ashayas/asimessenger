@@ -1,4 +1,4 @@
-import { imageMime } from '@shared/attachments'
+import { fileBadge, fmtBytes, imageMime, MAX_FILE_BYTES } from '@shared/attachments'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Chat, Friend, Message } from '@shared/models'
 import { avatarFor } from '@shared/harness-meta'
@@ -61,7 +61,7 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
   const [editingLabels, setEditingLabels] = useState(false)
   const [drawer, setDrawer] = useState(false)
   /** Pictures and files waiting to go out with the next message (dropped, pasted). */
-  const [pending, setPending] = useState<{ id: string; name: string; path: string; preview?: string }[]>([])
+  const [pending, setPending] = useState<{ id: string; name: string; path: string; preview?: string; size?: number }[]>([])
   const [dropping, setDropping] = useState(false)
   const [attachNote, setAttachNote] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<{ branch: string | null; dirty: number; isolated: boolean } | null>(null)
@@ -128,9 +128,11 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
         const real = window.asi.attachments.pathFor(f)
         const preview = isImage ? await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsDataURL(f) }) : undefined
         // a pasted picture has no file on disk: save it into the workspace first
-        const path = real || (isImage ? await window.asi.attachments.saveImage(chatId, name, new Uint8Array(await f.arrayBuffer())) : '')
+        if (f.size > MAX_FILE_BYTES) throw new Error(`${name} is larger than ${MAX_FILE_BYTES / 1024 ** 3} GB`)
+        // a file dragged in from Finder has a path and is never read into memory; a pasted one has only bytes
+        const path = real || (isImage ? await window.asi.attachments.saveImage(chatId, name, new Uint8Array(await f.arrayBuffer())) : await window.asi.attachments.saveFile(chatId, name, new Uint8Array(await f.arrayBuffer())))
         if (!path) throw new Error(`could not read ${name}`)
-        setPending((p) => [...p, { id: `${Date.now()}-${Math.random()}`, name, path, preview }])
+        setPending((p) => [...p, { id: `${Date.now()}-${Math.random()}`, name, path, preview, size: f.size }])
       } catch (e) {
         setAttachNote(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : String(e))
       }
@@ -285,8 +287,8 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
         <div className="tray" data-testid="tray" {...dropProps}>
           {pending.map((p) => (
             <span key={p.id} className="chip-file" data-testid="pending-file">
-              {p.preview ? <img src={p.preview} alt="" /> : <span className="ic">FILE</span>}
-              <span className="nm">{p.name}</span>
+              {p.preview ? <img src={p.preview} alt="" /> : <span className="ic">{fileBadge(p.name)}</span>}
+              <span className="nm">{p.name}{p.size !== undefined && !p.preview ? <span className="sz"> · {fmtBytes(p.size)}</span> : null}</span>
               <button aria-label={`Remove ${p.name}`} onClick={() => setPending((l) => l.filter((x) => x.id !== p.id))}>×</button>
             </span>
           ))}

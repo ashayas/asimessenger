@@ -13,6 +13,15 @@ export function encodeWav(chunks: Float32Array[], sampleRate = 16000): Uint8Arra
   return out
 }
 
+/** Loudest sample of a 16-bit PCM WAV, 0..1. A clip that never gets above a hair is silence, whatever the engine might imagine in it. */
+export function peakLevel(bytes: Uint8Array): number {
+  if (bytes.length < 46) return 0
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  let peak = 0
+  for (let o = 44; o + 1 < bytes.length; o += 2) peak = Math.max(peak, Math.abs(v.getInt16(o, true)))
+  return peak / 32768
+}
+
 export interface WavInfo { sampleRate: number; channels: number; bits: number; samples: number; seconds: number }
 
 export function readWavHeader(bytes: Uint8Array): WavInfo | null {

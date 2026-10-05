@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readWavHeader } from '@shared/wav'
+import { peakLevel, readWavHeader } from '@shared/wav'
 
 export interface VoiceEngine {
   id: string
@@ -14,19 +14,24 @@ export interface VoiceEngine {
 }
 
 export const MAX_SECONDS = 120
+/** Below this peak (about -38 dBFS) nothing was said. */
+export const SILENCE_PEAK = 0.012
 
 /** Apple's on-device recognizer through our small Swift helper. Never leaves the Mac. */
 export function appleEngine(helperPath: string): VoiceEngine {
   const run = (args: string[], timeout: number) =>
-    new Promise<{ code: number; out: string }>((resolve) => {
-      execFile(helperPath, args, { timeout }, (err, stdout) => resolve({ code: err ? 1 : 0, out: stdout.trim() }))
+    new Promise<{ code: number; out: string; signal: string | null; timedOut: boolean }>((resolve) => {
+      execFile(helperPath, args, { timeout }, (err, stdout) => resolve({ code: err ? 1 : 0, out: stdout.trim(), signal: err?.signal ?? null, timedOut: !!err?.killed && err.signal === 'SIGTERM' }))
     })
   return {
     id: 'apple',
     name: 'Apple on-device speech',
     available: async () => existsSync(helperPath),
     async transcribe(wavPath, language) {
-      const { out } = await run([wavPath, language], 60_000)
+      const { out, signal, timedOut } = await run([wavPath, language], 60_000)
+      if (timedOut) throw new Error('speech recognition took too long')
+      // macOS aborts the helper when the app it runs under cannot ask for Speech Recognition permission (a dev run, for example)
+      if (!out && signal === 'SIGABRT') throw new Error('macOS would not let ASI Messenger ask for Speech Recognition permission here. The installed app asks once; from source, allow Speech Recognition for your terminal in System Settings, Privacy & Security, or use Cohere Transcribe in Options, Voice.')
       let json: { text?: string; error?: string }
       try { json = JSON.parse(out.split('\n').pop() ?? '{}') } catch { throw new Error('the speech helper returned nothing') }
       if (json.error) throw new Error(json.error)
@@ -55,10 +60,12 @@ export function createVoiceService(engines: VoiceEngine[], pick: () => Promise<s
       }
       return null
     },
-    async transcribe(wav: Uint8Array, language = 'en-US'): Promise<{ text: string; engine: string; seconds: number }> {
+    async transcribe(wav: Uint8Array, language = 'en-US'): Promise<{ text: string; engine: string; seconds: number; silent?: boolean }> {
       const info = readWavHeader(wav)
       if (!info) throw new Error('that does not look like a recording')
       if (info.seconds < 0.25) return { text: '', engine: '', seconds: info.seconds } // a stray click
+      // speech models invent words for pure silence, so a clip that never rises above the noise floor is not sent to one
+      if (peakLevel(wav) < SILENCE_PEAK) return { text: '', engine: '', seconds: info.seconds, silent: true }
       if (info.seconds > MAX_SECONDS) throw new Error(`recordings are limited to ${MAX_SECONDS} seconds`)
       const id = await this.selectedId()
       const engine = engines.find((e) => e.id === id)

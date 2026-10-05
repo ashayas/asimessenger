@@ -111,7 +111,8 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
     rec.current = null
     setVoice('transcribing')
     try {
-      const { text } = await window.asi.voice.transcribe(await r.stop())
+      const { text, silent } = await window.asi.voice.transcribe(await r.stop())
+      if (silent) setVoiceNote('I did not hear anything. Check the input device and volume in System Settings, Sound.')
       if (text) setDraft((d) => (d.trim() ? `${d.trimEnd()} ${text}` : text))
       composerRef.current?.focus()
     } catch (e) {

@@ -3,7 +3,8 @@ import { expect, test } from 'vitest'
 import { appleEngine, createVoiceService, fakeEngine, type VoiceEngine } from '../../src/main/voice'
 import { encodeWav } from '../../src/shared/wav'
 
-const clip = (seconds: number) => encodeWav([new Float32Array(Math.round(16000 * seconds))])
+/** A clip with a clear tone in it (a real recording has sound; pure zeros count as silence). */
+const clip = (seconds: number, level = 0.3) => encodeWav([Float32Array.from({ length: Math.round(16000 * seconds) }, (_, i) => level * Math.sin(i / 8))])
 const engine = (id: string, available: boolean, text = id): VoiceEngine => ({ id, name: id, available: async () => available, transcribe: async () => ` ${text} ` })
 
 test('picks the chosen engine, falls back to the first available one, and reports status', async () => {
@@ -31,4 +32,29 @@ test('the Apple helper is built and says it can run on-device', async () => {
   expect(await apple.available()).toBe(true)
   expect(readFileSync(helper).length).toBeGreaterThan(10_000)
   expect(await appleEngine('/nonexistent/asi-speech').available()).toBe(false)
+})
+
+test('a helper that macOS aborts, or that hangs, produces an explanation instead of "returned nothing"', async () => {
+  const { chmodSync, mkdtempSync, writeFileSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const dir = mkdtempSync(join(tmpdir(), 'asi-helper-'))
+  const aborting = join(dir, 'abort.sh'); writeFileSync(aborting, '#!/bin/sh\nkill -ABRT $$\n'); chmodSync(aborting, 0o755)
+  await expect(appleEngine(aborting).transcribe('/x.wav', 'en-US')).rejects.toThrow(/Speech Recognition permission/)
+  const silent = join(dir, 'silent.sh'); writeFileSync(silent, '#!/bin/sh\nexit 0\n'); chmodSync(silent, 0o755)
+  await expect(appleEngine(silent).transcribe('/x.wav', 'en-US')).rejects.toThrow(/returned nothing/)
+  const ok = join(dir, 'ok.sh'); writeFileSync(ok, '#!/bin/sh\necho \'{"text":"hello there"}\'\n'); chmodSync(ok, 0o755)
+  expect(await appleEngine(ok).transcribe('/x.wav', 'en-US')).toBe('hello there')
+})
+
+test('a clip with no sound never reaches an engine, which would make words up; quiet speech still does', async () => {
+  let calls = 0
+  const counting: VoiceEngine = { id: 'apple', name: 'apple', available: async () => true, transcribe: async () => { calls++; return 'invented words' } }
+  const svc = createVoiceService([counting], async () => null)
+  const silent = await svc.transcribe(clip(2, 0))
+  expect(silent).toEqual({ text: '', engine: '', seconds: 2, silent: true })
+  expect((await svc.transcribe(clip(2, 0.004))).silent).toBe(true) // room noise
+  expect(calls).toBe(0)
+  expect((await svc.transcribe(clip(2, 0.05))).text).toBe('invented words') // quiet but real
+  expect(calls).toBe(1)
 })

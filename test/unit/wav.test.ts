@@ -19,3 +19,11 @@ test('empty recordings and non-WAV data are handled', () => {
   expect(readWavHeader(new Uint8Array(10))).toBeNull()
   expect(readWavHeader(new Uint8Array(64))).toBeNull()
 })
+
+test('peakLevel reads the loudest sample as 0..1', async () => {
+  const { peakLevel } = await import('../../src/shared/wav')
+  expect(peakLevel(encodeWav([new Float32Array(100)]))).toBe(0)
+  expect(peakLevel(encodeWav([Float32Array.from([0, 0.5, -0.25, 0])]))).toBeCloseTo(0.5, 3)
+  expect(peakLevel(encodeWav([Float32Array.from([-1])]))).toBe(1)
+  expect(peakLevel(new Uint8Array(10))).toBe(0)
+})

@@ -24,9 +24,9 @@ export interface Recording {
 
 /** Start capturing the microphone. Audio stays in memory until you stop; nothing is sent anywhere by this module. */
 export async function startRecording(): Promise<Recording> {
-  // Tests (and machines with no audio hardware) swap only the capture step for one second of silence.
+  // Tests (and machines with no audio hardware) swap only the capture step for one second of a quiet tone (silence would be rejected before reaching an engine).
   if (await window.asi.voice.testMode()) {
-    return { stop: async () => encodeWav([new Float32Array(TARGET_RATE)], TARGET_RATE) }
+    return { stop: async () => encodeWav([Float32Array.from({ length: TARGET_RATE }, (_, i) => 0.1 * Math.sin(i / 9))], TARGET_RATE) }
   }
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
   const ctx = new AudioContext({ sampleRate: TARGET_RATE })

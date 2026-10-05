@@ -120,5 +120,7 @@ export const MIGRATIONS: string[] = [
   /* 5: per-chat permission mode */
   `ALTER TABLE chats ADD COLUMN mode TEXT NOT NULL DEFAULT 'ask';`,
   /* 6: where a chat's title came from, so a title you typed is never rewritten (existing chats count as yours) */
-  `ALTER TABLE chats ADD COLUMN title_source TEXT NOT NULL DEFAULT 'user';`
+  `ALTER TABLE chats ADD COLUMN title_source TEXT NOT NULL DEFAULT 'user';`,
+  /* 7: isolated chats run in their own git worktree (folder the agent works in, and its branch) */
+  `ALTER TABLE chats ADD COLUMN worktree_path TEXT; ALTER TABLE chats ADD COLUMN branch TEXT;`
 ]

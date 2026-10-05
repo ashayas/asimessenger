@@ -16,6 +16,8 @@ import { copyFile, mkdir, stat, writeFile } from 'node:fs/promises'
 import { basename, join, sep } from 'node:path'
 import { readPickedFile } from './attachments'
 import type { Ingestor } from './ingest'
+import type { Worktrees } from './worktrees'
+import type { Chat } from '@shared/models'
 
 
 const NUDGE_COOLDOWN_MS = 3000
@@ -28,8 +30,10 @@ export interface Opener {
   path(p: string): void
 }
 
-export function createChatService(deps: { repo: Repo; manager: HarnessManager; ingestor: Ingestor; notify: (topic: string) => void; opener?: Opener }) {
+export function createChatService(deps: { repo: Repo; manager: HarnessManager; ingestor: Ingestor; notify: (topic: string) => void; opener?: Opener; worktrees?: Worktrees }) {
   const { repo, manager, ingestor, notify } = deps
+  /** Where this chat's agent works: its own worktree when it has one, otherwise the workspace folder. */
+  const rootOf = (chat: Chat, ws: { path: string } | null): string => chat.worktreePath ?? ws?.path ?? process.cwd()
   const opener: Opener = deps.opener ?? { url: () => {}, path: () => {} }
   const shells = new Map<string, ChildProcess>()
   const lastNudge = new Map<string, number>()
@@ -44,7 +48,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
     const chat = await repo.chats.get(chatId)
     if (!chat) throw new Error(`unknown chat ${chatId}`)
     const ws = await repo.workspaces.get(chat.workspaceId)
-    const dir = join(ws?.path ?? process.cwd(), '.attachments')
+    const dir = join(rootOf(chat, ws), '.attachments')
     await mkdir(dir, { recursive: true })
     return dir
   }
@@ -55,7 +59,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
     if (st.size > MAX_IMAGE_BYTES) throw new Error(`${basename(path)} is larger than 10 MB`)
     const chat = await repo.chats.get(chatId)
     const ws = chat ? await repo.workspaces.get(chat.workspaceId) : null
-    const root = ws?.path ?? process.cwd()
+    const root = chat ? rootOf(chat, ws) : (ws?.path ?? process.cwd())
     if (path === root || path.startsWith(root + sep)) return path
     const dest = join(await attachmentsDir(chatId), safeImageName(basename(path)))
     await copyFile(path, dest)
@@ -78,7 +82,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       if (chat.titleSource === 'default') await repo.chats.setAutoTitle(chatId, opts.silentUser ? (await repo.messages.list(chatId)).find((m) => m.kind === 'attachment')?.text ?? ruleTitle(clean) : ruleTitle(clean), 'rule')
       notify('messages')
       try {
-        await manager.send(chat, friend, ws?.path ?? process.cwd(), { text: clean, quote, images: opts.images })
+        await manager.send(chat, friend, rootOf(chat, ws), { text: clean, quote, images: opts.images })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         await repo.messages.append({ chatId, role: 'system', kind: 'error', body: { error: message }, text: message })
@@ -93,7 +97,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       const chat = await repo.chats.get(chatId)
       if (!chat) throw new Error(`unknown chat ${chatId}`)
       const ws = await repo.workspaces.get(chat.workspaceId)
-      const cwd = ws?.path ?? process.cwd()
+      const cwd = rootOf(chat, ws)
       const id = `sh-${randomUUID()}`
       const base = { t: 'tool', id, kind: 'exec', title: 'Shell', command: cmd, cwd } as const
       const msg = await repo.messages.append({ chatId, role: 'user', kind: 'tool', body: { ...base, done: false }, text: cmd })
@@ -122,14 +126,14 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       const ws = await repo.workspaces.get(chat.workspaceId)
       const say = async (text: string) => { const m = await repo.messages.append({ chatId, role: 'system', kind: 'system', body: { text }, text }); notify('messages'); return m }
       const asUrl = normalizeUrl(target)
-      const existsHere = existsSync(isAbsolute(target) ? target : resolvePath(ws?.path ?? process.cwd(), target)) // README.md is a file, not the .md domain
+      const existsHere = existsSync(isAbsolute(target) ? target : resolvePath(rootOf(chat, ws), target)) // README.md is a file, not the .md domain
       if (!existsHere && (/^(https?:\/\/|localhost|127\.0\.0\.1|\[::1\])/i.test(target) || (!target.includes('/') && /^[\w-]+(\.[\w-]+)+(:\d+)?$/.test(target)))) {
         if (!isAllowedNavigation(asUrl)) return say(`Cannot open ${target}`)
         opener.url(asUrl)
         return say(`Opened ${asUrl} in the browser.`)
       }
       if (/^[a-z][a-z0-9+.-]*:/i.test(target) && !/^https?:/i.test(target)) return say(`Cannot open ${target}: only web addresses and file paths`)
-      const root = ws?.path ?? process.cwd()
+      const root = rootOf(chat, ws)
       const full = isAbsolute(target) ? target : resolvePath(root, target)
       opener.path(full)
       return say(`Opened ${full}.`)
@@ -142,7 +146,62 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       const friend = await repo.friends.get(chat.friendId)
       if (!friend) throw new Error(`unknown friend ${chat.friendId}`)
       const ws = await repo.workspaces.get(chat.workspaceId)
-      return manager.session(chat, friend, ws?.path ?? process.cwd(), chat.mode)
+      return manager.session(chat, friend, rootOf(chat, ws), chat.mode)
+    },
+
+    /** A new chat in its own git worktree: a fresh branch from the repo's current HEAD, so parallel agents never touch the same files. */
+    async newIsolatedChat(workspaceId: string, friendId: string): Promise<Chat> {
+      if (!deps.worktrees) throw new Error('isolated chats are not available')
+      const ws = await repo.workspaces.get(workspaceId)
+      if (!ws) throw new Error('unknown workspace')
+      const wt = await deps.worktrees.create(ws.path)
+      try {
+        return await repo.chats.create({ workspaceId, friendId, worktree: wt })
+      } catch (e) {
+        await deps.worktrees.remove(wt.path, wt.branch, ws.path) // nothing references it yet, so clean up
+        throw e
+      }
+    },
+
+    /** What deleting this chat would do to its worktree, for the confirmation. */
+    async worktreeInfo(chatId: string): Promise<{ isolated: boolean; branch: string | null; path: string | null; dirty: number }> {
+      const chat = await repo.chats.get(chatId)
+      if (!chat?.worktreePath || !deps.worktrees) return { isolated: false, branch: null, path: null, dirty: 0 }
+      return { isolated: true, branch: chat.branch, path: chat.worktreePath, dirty: await deps.worktrees.dirtyCount(chat.worktreePath) }
+    },
+
+    /** Delete a chat. Its worktree goes with it only when nothing would be lost; otherwise the folder or branch stays and the note says so. */
+    async deleteChat(chatId: string): Promise<{ note: string | null }> {
+      const chat = await repo.chats.get(chatId)
+      if (!chat) return { note: null }
+      cancelAsks(chatId, 'The chat was deleted.')
+      await manager.dispose(chatId)
+      let note: string | null = null
+      if (chat.worktreePath && chat.branch && deps.worktrees) {
+        const ws = await repo.workspaces.get(chat.workspaceId)
+        const r = await deps.worktrees.remove(chat.worktreePath, chat.branch, ws?.path ?? chat.worktreePath)
+        note = r.note
+      }
+      await repo.chats.remove(chatId)
+      notify('chats'); notify('messages')
+      return { note }
+    },
+
+    /** Delete every chat, tidying the safe-to-remove worktrees. Returns how many chats went and any worktrees that were kept. */
+    async deleteAllChats(): Promise<{ count: number; kept: string[] }> {
+      const kept: string[] = []
+      if (deps.worktrees) {
+        for (const c of await repo.chats.list()) {
+          if (!c.worktreePath || !c.branch) continue
+          const ws = await repo.workspaces.get(c.workspaceId)
+          const r = await deps.worktrees.remove(c.worktreePath, c.branch, ws?.path ?? c.worktreePath)
+          if (r.note) kept.push(r.note)
+        }
+      }
+      await manager.disposeAll()
+      const count = await repo.data.deleteAllChats()
+      notify('chats'); notify('messages')
+      return { count, kept }
     },
 
     /** Save a pasted or dropped picture into the chat's workspace (`.attachments/`) and return where it went. */

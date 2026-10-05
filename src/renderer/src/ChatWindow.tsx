@@ -56,6 +56,7 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
   const [pending, setPending] = useState<{ id: string; name: string; path: string; preview?: string }[]>([])
   const [dropping, setDropping] = useState(false)
   const [attachNote, setAttachNote] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<{ branch: string | null; dirty: number; isolated: boolean } | null>(null)
   const chatLabelIds = useData((s) => s.chatLabels[chatId] ?? NO_LABELS)
 
   useEffect(() => {
@@ -196,9 +197,23 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
         <b>To:</b> {friend.displayName} <StatusDot presence={presence} />
         {live?.message ? <span className={friend.letteringStyle === 'plain' ? '' : 'funky'}> — {live.message}</span> : null}
         <span className="grow" />
+        {chat.branch ? <span className="branch" data-testid="branch" title={`Works in its own worktree: ${chat.worktreePath}`}>⎇ {chat.branch}</span> : null}
         <LabelChips ids={chatLabelIds} />
         <button className="linkish" onClick={() => setEditingLabels((v) => !v)} title="Label this chat (⌘L)">🏷 Label</button>
+        <button className="linkish" onClick={() => void window.asi.chat.worktreeInfo(chatId).then(setDeleting)} title="Delete this chat">🗑 Delete</button>
       </div>
+      {deleting ? (
+        <div className="mode-note" role="alert" data-testid="delete-confirm">
+          <span className="grow">
+            Delete this chat and its history?
+            {deleting.isolated ? (deleting.dirty > 0
+              ? ` Its worktree has ${deleting.dirty} uncommitted change${deleting.dirty === 1 ? '' : 's'}, so the folder will be kept.`
+              : ` Its worktree (${deleting.branch}) is removed if clean; the branch is kept if it has unmerged commits.`) : ''}
+          </span>
+          <Btn kind="danger" onClick={() => void window.asi.chat.delete(chatId)}>Delete</Btn>
+          <Btn onClick={() => setDeleting(null)}>Cancel</Btn>
+        </div>
+      ) : null}
       {editingLabels ? <LabelEditor target={{ kind: 'chat', id: chatId }} onClose={() => setEditingLabels(false)} /> : null}
       <div className={`convo${dropping ? ' dropping' : ''}`} {...dropProps}>
         <div className="transcript" data-testid="transcript">

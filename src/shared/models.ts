@@ -33,6 +33,9 @@ export interface Chat {
   friendId: string
   title: string
   titleSource: TitleSource
+  /** Set for an isolated chat: the git worktree folder the agent works in, and its branch. */
+  worktreePath: string | null
+  branch: string | null
   harnessSessionId: string | null
   status: Presence
   statusText: string | null

@@ -15,7 +15,7 @@ const RANK: Record<string, number> = { away: 0, busy: 1 }
 const byUrgency = (a: Chat, b: Chat): number => (RANK[a.status] ?? 2) - (RANK[b.status] ?? 2) || b.lastActivityAt - a.lastActivityAt
 
 export function ContactList() {
-  const { friends, chats, availability, labels, friendLabels, chatLabels, profile, setProfile, workspaces, activeWorkspaceId, setActiveWorkspace, addWorkspaceFromFolder, openFriend, newChatWith, openChat } = useData()
+  const { friends, chats, availability, labels, friendLabels, chatLabels, profile, setProfile, workspaces, activeWorkspaceId, setActiveWorkspace, addWorkspaceFromFolder, openFriend, newChatWith, newIsolatedChatWith, openChat } = useData()
   const [tab, setTab] = useState<Tab>('friends')
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
@@ -26,6 +26,7 @@ export function ContactList() {
   const wsChats = useMemo(() => chats.filter((c) => c.workspaceId === activeWorkspaceId), [chats, activeWorkspaceId])
   // a friend's row reflects the chats in this workspace, so five Claudes in one folder read as one friend with five sessions
   const { groups, live } = useMemo(() => groupFriends(friends, wsChats, availability, filter), [friends, wsChats, availability, filter])
+  const [note, setNote] = useState<string | null>(null)
   const [closed, setClosed] = useState<Record<string, boolean>>({})
   const chatsByFriend = useMemo(() => {
     const m = new Map<string, Chat[]>()
@@ -147,7 +148,7 @@ export function ContactList() {
                       <div key={c.id} className="subchat" data-subchat={c.title} data-presence={c.status} onDoubleClick={() => void openChat(c.id)} title="Double-click to open this chat">
                         <StatusDot presence={c.status as Presence} />
                         <div className="who">
-                          <div className="nm">{c.title}{c.mode === 'dangerous' ? <span className="danger-badge" title="Dangerous mode">⚠</span> : null}{c.unreadCount > 0 ? <span className="badge">{c.unreadCount}</span> : null}</div>
+                          <div className="nm">{c.title}{c.branch ? <span className="branch" title={c.worktreePath ?? undefined}>⎇ {c.branch.replace(/^asi\//, '')}</span> : null}{c.mode === 'dangerous' ? <span className="danger-badge" title="Dangerous mode">⚠</span> : null}{c.unreadCount > 0 ? <span className="badge">{c.unreadCount}</span> : null}</div>
                           <div className={`st${f.letteringStyle === 'plain' ? '' : ' funky'}`} title={c.statusText ?? undefined}>{c.statusText ?? PRESENCE_LABEL[c.status as Presence]}</div>
                         </div>
                       </div>
@@ -172,6 +173,7 @@ export function ContactList() {
                   <div className="who">
                     <div className="nm">
                       {c.title}
+                      {c.branch ? <span className="branch" title={c.worktreePath ?? undefined}>⎇ {c.branch.replace(/^asi\//, '')}</span> : null}
                       <LabelChips ids={chatLabels[c.id] ?? []} />
                       {c.mode === 'dangerous' ? <span className="danger-badge" title="Dangerous mode">⚠</span> : null}
                       {c.unreadCount > 0 ? <span className="badge">{c.unreadCount}</span> : null}
@@ -204,7 +206,9 @@ export function ContactList() {
       <div className="foot">
         {labeling && selected ? <LabelEditor target={{ kind: 'friend', id: selected }} onClose={() => setLabeling(false)} /> : null}
         <Btn className="wide" disabled={!selected} onClick={() => setLabeling((v) => !v)} title="Add or remove labels on the selected friend">🏷 Label selected friend</Btn>
-        <Btn className="wide" disabled={!selected} onClick={() => selected && void newChatWith(selected)} title="Start a new chat with the selected friend (⌘N)">New chat with selected friend</Btn>
+        <Btn className="wide" disabled={!selected} onClick={() => { setNote(null); if (selected) void newChatWith(selected) }} title="Start a new chat with the selected friend (⌘N)">New chat with selected friend</Btn>
+        <Btn className="wide" disabled={!selected} onClick={() => { setNote(null); if (selected) void newIsolatedChatWith(selected).catch((e: unknown) => setNote(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : String(e))) }} title="Start the chat on its own git branch in its own folder, so it cannot collide with other agents working in this repo">⎇ New chat in its own worktree</Btn>
+        {note ? <div className="foot-note" role="status">{note}</div> : null}
         <Btn className="wide" onClick={() => void window.asi.friends.openAddWindow()} title="Register a coding agent CLI (⌘⇧N)">＋ Add a friend</Btn>
       </div>
     </WindowFrame>

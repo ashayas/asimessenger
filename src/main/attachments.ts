@@ -42,7 +42,13 @@ export async function loadAttachment(repo: Repo, messageId: string): Promise<Loa
   let text = a.body ?? ''
   if (!text && a.path) {
     const ws = chat ? await repo.workspaces.get(chat.workspaceId) : null
-    text = a.kind === 'image' ? await readImageInsideWorkspace(a.path, ws?.path ?? '/nonexistent') : await readInsideWorkspace(a.path, ws?.path ?? '/nonexistent')
+    // an isolated chat's files live in its worktree; its workspace folder is still a valid place to point at
+    const roots = [chat?.worktreePath, ws?.path].filter((r): r is string => !!r)
+    let last: unknown = new Error('that file is outside this workspace')
+    for (const root of roots.length ? roots : ['/nonexistent']) {
+      try { text = a.kind === 'image' ? await readImageInsideWorkspace(a.path, root) : await readInsideWorkspace(a.path, root); last = null; break } catch (e) { last = e }
+    }
+    if (last) throw last
   }
   return { chatId: msg.chatId, name: a.name, kind: a.kind, text, path: a.path ?? null, friendName: friend?.displayName ?? 'Agent' }
 }

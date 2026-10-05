@@ -37,7 +37,7 @@ export function createTerminalService(deps: { repo: Repo; chat: ChatService; man
       const friend = c ? await repo.friends.get(c.friendId) : null
       const ws = c ? await repo.workspaces.get(c.workspaceId) : null
       if (!c || !friend || !ws) return false
-      const cmd = resumeCommand(friend, c, ws.path)
+      const cmd = resumeCommand(friend, c, c.worktreePath ?? ws.path)
       if (!cmd) return false
       await new Promise<void>((resolve, reject) =>
         execFile('osascript', ['-e', 'on run argv', '-e', 'tell application "Terminal"', '-e', 'activate', '-e', 'do script (item 1 of argv)', '-e', 'end tell', '-e', 'end run', cmd], (err) => (err ? reject(err) : resolve()))

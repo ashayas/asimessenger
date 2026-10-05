@@ -26,6 +26,8 @@ interface DataState {
   /** Open the most recent chat with this friend in the active workspace (creating one if none), in its own window. */
   openFriend(friendId: string): Promise<void>
   newChatWith(friendId: string): Promise<void>
+  /** A new chat in its own git worktree. Rejects with a readable message when the workspace is not a usable repo. */
+  newIsolatedChatWith(friendId: string): Promise<void>
   openChat(chatId: string): Promise<void>
 }
 
@@ -87,6 +89,12 @@ export const useData = create<DataState>((set, get) => ({
     const { activeWorkspaceId } = get()
     if (!activeWorkspaceId) return
     const chat = await window.asi.api.chats.create({ workspaceId: activeWorkspaceId, friendId })
+    await get().openChat(chat.id)
+  },
+  async newIsolatedChatWith(friendId) {
+    const { activeWorkspaceId } = get()
+    if (!activeWorkspaceId) return
+    const chat = await window.asi.chat.newIsolated(activeWorkspaceId, friendId)
     await get().openChat(chat.id)
   },
   async openChat(chatId) {

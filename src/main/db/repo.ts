@@ -21,7 +21,7 @@ const toFriend = (r: Row): Friend => ({
 })
 const toChat = (r: Row): Chat => ({
   id: String(r['id']), workspaceId: String(r['workspace_id']), friendId: String(r['friend_id']),
-  title: String(r['title']), titleSource: ((r['title_source'] as string | null) ?? 'user') as TitleSource, harnessSessionId: (r['harness_session_id'] as string | null) ?? null,
+  title: String(r['title']), titleSource: ((r['title_source'] as string | null) ?? 'user') as TitleSource, worktreePath: (r['worktree_path'] as string | null) ?? null, branch: (r['branch'] as string | null) ?? null, harnessSessionId: (r['harness_session_id'] as string | null) ?? null,
   status: r['status'] as Presence, statusText: (r['status_text'] as string | null) ?? null, mode: (r['mode'] as Mode) ?? 'ask', unreadCount: Number(r['unread_count']),
   createdAt: Number(r['created_at']), lastActivityAt: Number(r['last_activity_at'])
 })
@@ -141,13 +141,13 @@ export function createRepo(db: Db) {
     },
 
     chats: {
-      async create(c: { workspaceId: string; friendId: string; title?: string; mode?: Mode }): Promise<Chat> {
+      async create(c: { workspaceId: string; friendId: string; title?: string; mode?: Mode; worktree?: { path: string; branch: string } }): Promise<Chat> {
         const id = randomUUID()
         const t = now()
         const mode = c.mode ?? (await all('SELECT default_mode FROM friends WHERE id = ?', [c.friendId]))[0]?.['default_mode'] ?? 'ask'
         await run(
-          'INSERT INTO chats(id,workspace_id,friend_id,title,title_source,mode,created_at,last_activity_at) VALUES (?,?,?,?,?,?,?,?)',
-          [id, c.workspaceId, c.friendId, c.title ?? 'New chat', c.title ? 'user' : 'default', mode as string, t, t]
+          'INSERT INTO chats(id,workspace_id,friend_id,title,title_source,mode,worktree_path,branch,created_at,last_activity_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
+          [id, c.workspaceId, c.friendId, c.title ?? 'New chat', c.title ? 'user' : 'default', mode as string, c.worktree?.path ?? null, c.worktree?.branch ?? null, t, t]
         )
         return (await this.get(id))!
       },

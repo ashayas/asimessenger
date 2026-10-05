@@ -36,6 +36,16 @@ options · onboarding · toast        MCP bridge  (127.0.0.1, token)  ←── 
 | Voice | `src/main/{voice,cohere-engine,model-manager,voice-runtime,voice-setup}.ts`, `native/` |
 | Release | `scripts/`, `build/entitlements.mac.plist`, `docs/releasing.md` |
 
+## Isolated chats (git worktrees)
+
+"New chat in its own worktree" (`src/main/worktrees.ts`) runs `git worktree add -b asi/<name>` from the repo's current HEAD into
+`<app data>/worktrees/<repo>/<name>` (outside the repo, so it stays clean). The chat stores `worktree_path` and `branch`, and every
+place that used the workspace folder (the agent's cwd, `!cmd`, `/open`, pictures in `.attachments/`, the attachment viewer, "continue in
+Terminal") uses the chat's worktree instead. When the workspace is a sub-folder of a repo, the agent starts in the same sub-folder of
+the worktree. Removal never forces: a worktree with uncommitted changes stays (and you are told where), a branch with unmerged commits
+stays, and "Delete all chats" follows the same rules. A folder that is not a repo, or a repo with no commits, gets a clear message and
+nothing is created.
+
 ## Chat titles
 
 A chat's title has a source (`chats.title_source`), and a better source may replace a worse one: `default` ("New chat") →

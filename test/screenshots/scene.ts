@@ -23,8 +23,8 @@ export async function buildScene(win: Page, homePath: string): Promise<{ c1: str
     const gemini = await api.friends.create({ harness: 'acp', displayName: 'Gemini CLI', avatar: 'gemini', command: 'gemini', transport: 'gemini' })
     await api.friends.create({ harness: 'pi', displayName: 'Pi', avatar: 'pi', command: 'pi' })
 
-    const chat = async (ws: string, friend: string, title: string, status: 'busy' | 'away' | 'online', text: string | null, unread = 0, mode?: 'dangerous') => {
-      const c = await api.chats.create({ workspaceId: ws, friendId: friend, title })
+    const chat = async (ws: string, friend: string, title: string, status: 'busy' | 'away' | 'online', text: string | null, unread = 0, mode?: 'dangerous', branch?: string) => {
+      const c = await api.chats.create({ workspaceId: ws, friendId: friend, title, ...(branch ? { worktree: { path: `/Users/ashaya/Library/Application Support/ASI Messenger/worktrees/honeycomb/${branch}`, branch: `asi/${branch}` } } : {}) })
       await api.chats.setStatus(c.id, status, text)
       if (mode) await api.chats.setMode(c.id, mode)
       for (let i = 0; i < unread; i++) await api.messages.append({ chatId: c.id, role: 'agent', kind: 'text', body: { text: 'ping' }, text: 'ping' })
@@ -32,12 +32,12 @@ export async function buildScene(win: Page, homePath: string): Promise<{ c1: str
     }
 
     // honeycomb: the busy repo, five Claude Codes at once
-    const c1 = await chat(home.id, claude.id, 'auth refactor', 'away', '(⊙_⊙) waiting on u: rm -rf dist')
+    const c1 = await chat(home.id, claude.id, 'auth refactor', 'away', '(⊙_⊙) waiting on u: rm -rf dist', 0, undefined, 'amber-otter')
     const homeChats = [c1.id]
-    homeChats.push((await chat(home.id, claude.id, 'flaky session test', 'busy', '✧ ʀᴜɴɴɪɴɢ ᴛᴇsᴛs ✧ session.test.ts')).id)
-    homeChats.push((await chat(home.id, claude.id, 'migrate to vite 7', 'busy', '~*~ editing vite.config.ts ~*~')).id)
-    homeChats.push((await chat(home.id, claude.id, 'docs pass', 'online', 'all done ★', 2)).id)
-    homeChats.push((await chat(home.id, claude.id, 'rate limiting', 'online', null, 0, 'dangerous')).id)
+    homeChats.push((await chat(home.id, claude.id, 'flaky session test', 'busy', '✧ ʀᴜɴɴɪɴɢ ᴛᴇsᴛs ✧ session.test.ts', 0, undefined, 'brisk-heron')).id)
+    homeChats.push((await chat(home.id, claude.id, 'migrate to vite 7', 'busy', '~*~ editing vite.config.ts ~*~', 0, undefined, 'calm-lynx')).id)
+    homeChats.push((await chat(home.id, claude.id, 'docs pass', 'online', 'all done ★', 2, undefined, 'snappy-finch')).id)
+    homeChats.push((await chat(home.id, claude.id, 'rate limiting', 'online', null, 0, 'dangerous', 'plucky-newt')).id)
     const c2 = await chat(home.id, codex.id, 'build fix', 'busy', '~*~ fixing the build ~*~')
     homeChats.push(c2.id)
     homeChats.push((await chat(home.id, oc.id, 'api routes', 'busy', '~*~ editing api/routes.ts ~*~')).id)

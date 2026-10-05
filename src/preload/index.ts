@@ -25,6 +25,10 @@ const chat = {
   toastOpenChat: (chatId: string): Promise<void> => ipcRenderer.invoke('toast:open-chat', chatId),
   toastDismiss: (): Promise<void> => ipcRenderer.invoke('toast:dismiss'),
   interrupt: (chatId: string): Promise<void> => ipcRenderer.invoke('chat:interrupt', chatId),
+  newIsolated: (workspaceId: string, friendId: string): Promise<unknown> => ipcRenderer.invoke('chat:new-isolated', workspaceId, friendId),
+  worktreeInfo: (chatId: string): Promise<unknown> => ipcRenderer.invoke('chat:worktree-info', chatId),
+  delete: (chatId: string): Promise<unknown> => ipcRenderer.invoke('chat:delete', chatId),
+  isRepo: (workspaceId: string): Promise<boolean> => ipcRenderer.invoke('workspace:is-repo', workspaceId),
   respond: (chatId: string, reqId: string, answer: string, reason?: string): Promise<void> => ipcRenderer.invoke('chat:respond', chatId, reqId, answer, reason),
   openWindow: (chatId: string): Promise<void> => ipcRenderer.invoke('window:open-chat', chatId)
 }

@@ -45,6 +45,8 @@ Run as many agents as you like, in as many repos as you like. A **friend** is a 
 </tr>
 </table>
 
+**Parallel agents without collisions:** **New chat in its own worktree** starts a chat on its own git branch (`asi/amber-otter`) in its own folder, outside the repo, so five agents can edit the same repo at once without touching each other's files. The branch shows on the chat and in every list. Deleting the chat removes a clean worktree; uncommitted work or unmerged commits are never thrown away.
+
 The Friends tab nests a friend's chats under it (`×5`, collapsible) and scopes its status to the active workspace. Chats are titled from your first message, then by the agent's own title or a model if you connect one, and never over a title you typed. Windows are resizable from a compact messenger (about 460 px) up to full screen:
 
 <p align="center"><img src="docs/images/compact.png" alt="The same chat window at messenger size" width="34%"></p>

@@ -7,7 +7,7 @@ const friend = (id: string, name: string, harness: Friend['harness'] = 'claude')
   dangerousAllowed: false, letteringStyle: 'funky', secretRef: null, createdAt: 0
 })
 const chat = (id: string, friendId: string, status: Chat['status'], statusText: string | null = null, unread = 0): Chat => ({
-  id, workspaceId: 'w', friendId, title: id, titleSource: 'user', harnessSessionId: null, status, statusText, mode: 'ask', unreadCount: unread, createdAt: 0, lastActivityAt: 1
+  id, workspaceId: 'w', friendId, title: id, titleSource: 'user', worktreePath: null, branch: null, harnessSessionId: null, status, statusText, mode: 'ask', unreadCount: unread, createdAt: 0, lastActivityAt: 1
 })
 
 test('groups by what each agent is doing; waiting beats working beats idle', () => {

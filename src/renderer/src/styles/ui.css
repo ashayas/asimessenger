@@ -386,3 +386,7 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 /* large and full-screen windows: keep the conversation a readable column instead of stretching it edge to edge */
 .transcript { padding-inline: max(12px, calc((100% - 1040px) / 2)); }
 .composer { padding-inline: max(8px, calc((100% - 1040px) / 2 + 4px)); }
+
+/* isolated chats: the git branch a chat works on */
+.branch { font: 10.5px var(--font-mono); color: var(--accent-deep); border: 1px solid var(--rule); border-radius: 8px; padding: 0 6px; background: var(--pane-tint); white-space: nowrap; }
+.foot-note { font-size: 11px; color: var(--danger-ink); padding: 2px 10px 0; }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, safeStorage, shell, systemPreferences } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, Notification, safeStorage, shell, systemPreferences } from 'electron'
 import { join } from 'node:path'
 import { APP_NAME } from '@shared/app'
 import { openDb } from './db/db'
@@ -8,9 +8,11 @@ import { closeToastsFor, createAttentionHandler, openNextUnread, refreshBadge } 
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
-import { openOnboardingWindow, createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow, openTabsWindow, setChatRouter, setTabsActive, takePendingTabs, showChat } from './windows'
+import { openOnboardingWindow, createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow, openTabsWindow, setChatRouter, setTabsActive, takePendingTabs, showChat, windowFor } from './windows'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from './friends-service'
 import { createChatService } from './chat-service'
+import { createWorktrees } from './worktrees'
+import { loginEnv } from '../harness/env'
 import { loadAttachment } from './attachments'
 import { searchAll } from './search'
 import { createTerminalService } from './terminal'
@@ -107,7 +109,8 @@ app.whenReady().then(async () => {
   })
   registerHarnesses(manager, { http: httpFactory(secrets), asi: async () => new AsiAgent({ repo, decider: () => brain.decider(), discover: () => discoverSessions({ home: process.env['ASI_DISCOVERY_HOME'] ?? homedir() }), search: (q) => searchAll(repo, q) }) })
   app.on('will-quit', () => void manager.disposeAll())
-  const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged, opener: { url: (u) => browser.open(u), path: (p) => void shell.openPath(p) } })
+  const worktrees = createWorktrees({ dir: join(app.getPath('userData'), 'worktrees'), env: await loginEnv() })
+  const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged, worktrees, opener: { url: (u) => browser.open(u), path: (p) => void shell.openPath(p) } })
   chatRef.current = chat
   ipcMain.handle('chat:send', (_e, chatId: string, text: string, quote?: { name: string; text: string }) => chat.send(chatId, text, quote))
   ipcMain.handle('safety:set-global-dangerous', (_e, on: boolean) => chat.setGlobalDangerous(on))
@@ -120,7 +123,7 @@ app.whenReady().then(async () => {
     await writeFile(target, JSON.stringify(data, null, 2))
     return target
   })
-  ipcMain.handle('data:delete-all-chats', async () => { await manager.disposeAll(); const n = await repo.data.deleteAllChats(); broadcastChanged('chats'); broadcastChanged('messages'); return n })
+  ipcMain.handle('data:delete-all-chats', async () => (await chat.deleteAllChats()).count)
   ipcMain.handle('window:open-options', () => { openOptionsWindow() })
   ipcMain.handle('chat:set-mode', (_e, chatId: string, mode: string) => chat.setMode(chatId, mode as never))
   ipcMain.handle('attachments:load', (_e, messageId: string) => loadAttachment(repo, messageId))
@@ -175,6 +178,16 @@ app.whenReady().then(async () => {
   ipcMain.handle('chat:open-next-unread', () => openNextUnread(repo))
   ipcMain.handle('toast:open-chat', (e, chatId: string) => { showChat(chatId); closeToastsFor(chatId); BrowserWindow.fromWebContents(e.sender)?.close() })
   ipcMain.handle('toast:dismiss', (e) => { BrowserWindow.fromWebContents(e.sender)?.close() })
+  ipcMain.handle('chat:new-isolated', async (_e, workspaceId: string, friendId: string) => { const c = await chat.newIsolatedChat(workspaceId, friendId); broadcastChanged('chats'); return c })
+  ipcMain.handle('chat:worktree-info', (_e, chatId: string) => chat.worktreeInfo(chatId))
+  ipcMain.handle('chat:delete', async (_e, chatId: string) => {
+    const win = windowFor(chatId)
+    const r = await chat.deleteChat(chatId)
+    if (win && !win.isDestroyed()) win.close()
+    if (r.note && Notification.isSupported()) new Notification({ title: 'Chat deleted', body: r.note }).show()
+    return r
+  })
+  ipcMain.handle('workspace:is-repo', async (_e, workspaceId: string) => { const ws = await repo.workspaces.get(workspaceId); return ws ? worktrees.isRepo(ws.path) : false })
   ipcMain.handle('chat:interrupt', (_e, chatId: string) => chat.interrupt(chatId))
   ipcMain.handle('chat:respond', (_e, chatId: string, reqId: string, answer: string, reason?: string) => chat.respond(chatId, reqId, answer, reason))
   ipcMain.handle('window:open-chat', (_e, chatId: string) => { showChat(chatId) })

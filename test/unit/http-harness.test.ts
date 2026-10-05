@@ -117,8 +117,8 @@ test('manifests are validated: https only (localhost may use http), paths, strea
 })
 
 test('the factory reads the token from the keychain and refuses when it is missing', async () => {
-  const f = friendFor({ harness: 'http', displayName: 'North', args: [JSON.stringify(manifest({ auth: { type: 'bearer', secret: 'north' } }))] }) as never
+  const f = friendFor({ harness: 'http', displayName: 'Remote', args: [JSON.stringify(manifest({ auth: { type: 'bearer', secret: 'remote' } }))] }) as never
   const ok = await httpFactory({ get: async () => 'secret-token' })({ friend: f, chatId: 'c', cwd: '/', mode: 'ask' })
   expect(ok).toBeInstanceOf(HttpSession)
-  await expect(httpFactory({ get: async () => null })({ friend: f, chatId: 'c', cwd: '/', mode: 'ask' })).rejects.toThrow(/no token stored for North/)
+  await expect(httpFactory({ get: async () => null })({ friend: f, chatId: 'c', cwd: '/', mode: 'ask' })).rejects.toThrow(/no token stored for Remote/)
 })

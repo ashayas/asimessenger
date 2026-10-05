@@ -9,8 +9,7 @@ pnpm test         # unit tests
 ```
 
 Start with [docs/architecture.md](docs/architecture.md). The one contract every agent integration targets is
-`src/shared/events.ts`; [docs/harnesses.md](docs/harnesses.md) shows how to add one, and
-[docs/cohere-north.md](docs/cohere-north.md) is the hand-off guide for connecting Cohere North.
+`src/shared/events.ts`; [docs/harnesses.md](docs/harnesses.md) shows how to add one.
 
 ## Rules
 

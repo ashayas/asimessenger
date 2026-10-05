@@ -70,10 +70,10 @@ test('HTTP friends validate the manifest, keep the token in the keychain and the
   const stored: Record<string, string> = {}
   const secrets = { set: async (n: string, v: string) => { stored[n] = v } }
   const manifest = JSON.stringify({ baseUrl: 'https://agents.example.com/api', send: { path: '/chat', body: { m: '{{text}}' } }, stream: 'sse', map: { text: 'delta' } })
-  await expect(addCustom(repo, { name: 'North', command: '', args: [], kind: 'http', manifest: '{oops' }, secrets)).rejects.toThrow(/valid JSON/)
-  await expect(addCustom(repo, { name: 'North', command: '', args: [], kind: 'http', manifest: manifest.replace('https://agents.example.com/api', 'http://agents.example.com') }, secrets)).rejects.toThrow(/https/)
-  const f = await addCustom(repo, { name: 'North', command: '', args: [], kind: 'http', manifest, token: ' tok-123 ' }, secrets)
-  expect(f).toMatchObject({ harness: 'http', displayName: 'North', command: null })
+  await expect(addCustom(repo, { name: 'Remote', command: '', args: [], kind: 'http', manifest: '{oops' }, secrets)).rejects.toThrow(/valid JSON/)
+  await expect(addCustom(repo, { name: 'Remote', command: '', args: [], kind: 'http', manifest: manifest.replace('https://agents.example.com/api', 'http://agents.example.com') }, secrets)).rejects.toThrow(/https/)
+  const f = await addCustom(repo, { name: 'Remote', command: '', args: [], kind: 'http', manifest, token: ' tok-123 ' }, secrets)
+  expect(f).toMatchObject({ harness: 'http', displayName: 'Remote', command: null })
   const saved = JSON.parse(f.args[0]!)
   expect(saved.auth).toEqual({ type: 'bearer', secret: expect.stringMatching(/^http-/) })
   expect(stored[saved.auth.secret]).toBe('tok-123')

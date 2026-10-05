@@ -11,7 +11,7 @@ knows those events, so a new harness never needs UI work.
 | `pi` | `pi --mode rpc` (JSONL) + a bundled gate extension | Pi |
 | `acp` | Agent Client Protocol over stdio | OpenCode, Gemini CLI, Hermes, anything ACP |
 | `pty` | a real pseudo-terminal | any CLI with no protocol |
-| `http` | manifest-driven HTTP (SSE / NDJSON / JSON) | hosted agents, e.g. Cohere North in a fork |
+| `http` | manifest-driven HTTP (SSE / NDJSON / JSON) | hosted agents |
 | `asi`, `echo`, `fake` | in-process | ASI, a smoke-test friend, tests |
 
 All structured harnesses also get **ASI's MCP tools** (`ask_user`, `send_attachment`, `open_url`, `open_drawing`,
@@ -49,12 +49,6 @@ Add a friend › **HTTP**, paste a manifest, enter the token (kept in the macOS 
   "cancel": { "path": "/chat/{{session}}/stop" }        // optional; Nudge always drops the connection too
 }
 ```
-
-### Cohere North
-
-North is not built in. A fork or contributor with access to North's API connects it; the full hand-off guide (what to
-collect from Cohere, manifest vs. dedicated harness, event mapping, tests, safety, definition of done) is
-[cohere-north.md](cohere-north.md).
 
 ## Add a protocol (code)
 

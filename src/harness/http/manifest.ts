@@ -1,7 +1,7 @@
 /**
  * A manifest describes how to talk to any HTTP agent: where to POST, what the body looks like,
  * how the reply streams, and which fields hold the text / conversation id / errors.
- * Adding a service (for example Cohere North) is writing one of these; no core code changes.
+ * Adding a service is writing one of these; no core code changes.
  */
 export interface HttpManifest {
   baseUrl: string

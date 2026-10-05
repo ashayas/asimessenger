@@ -122,5 +122,19 @@ export const MIGRATIONS: string[] = [
   /* 6: where a chat's title came from, so a title you typed is never rewritten (existing chats count as yours) */
   `ALTER TABLE chats ADD COLUMN title_source TEXT NOT NULL DEFAULT 'user';`,
   /* 7: isolated chats run in their own git worktree (folder the agent works in, and its branch) */
-  `ALTER TABLE chats ADD COLUMN worktree_path TEXT; ALTER TABLE chats ADD COLUMN branch TEXT;`
+  `ALTER TABLE chats ADD COLUMN worktree_path TEXT; ALTER TABLE chats ADD COLUMN branch TEXT;`,
+  /* 8: spend log. One row per call or turn an agent reports; deliberately not tied to chats, so totals survive deleting a chat */
+  `
+  CREATE TABLE usage_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts INTEGER NOT NULL,
+    chat_id TEXT, chat_title TEXT, friend_id TEXT, friend_name TEXT, workspace_id TEXT, workspace_name TEXT,
+    harness TEXT, model TEXT,
+    input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_read_tokens INTEGER NOT NULL DEFAULT 0, cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL
+  );
+  CREATE INDEX usage_log_ts ON usage_log(ts);
+  CREATE INDEX usage_log_chat ON usage_log(chat_id);
+  `
 ]

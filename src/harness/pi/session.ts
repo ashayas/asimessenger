@@ -183,7 +183,7 @@ export class PiSession implements AgentSession {
     if (msg['role'] !== 'assistant') return
     const u = (msg['usage'] ?? {}) as Obj
     const cost = (u['cost'] ?? {}) as Obj
-    if (u['input'] !== undefined) this.hub.emit({ t: 'usage', inputTokens: Number(u['input'] ?? 0), outputTokens: Number(u['output'] ?? 0), costUsd: typeof cost['total'] === 'number' ? cost['total'] : undefined })
+    if (u['input'] !== undefined) this.hub.emit({ t: 'usage', inputTokens: Number(u['input'] ?? 0), outputTokens: Number(u['output'] ?? 0), cacheReadTokens: Number(u['cacheRead'] ?? 0) || undefined, cacheWriteTokens: Number(u['cacheWrite'] ?? 0) || undefined, costUsd: typeof cost['total'] === 'number' ? cost['total'] : undefined, model: typeof msg['model'] === 'string' ? msg['model'] : undefined })
     if (msg['stopReason'] === 'error') this.lastError = String(msg['errorMessage'] ?? 'the model returned an error').split('\n')[0]!
   }
 

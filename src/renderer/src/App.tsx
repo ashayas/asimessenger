@@ -1,3 +1,4 @@
+import { UsageWindow } from './UsageWindow'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { AddFriend } from './AddFriend'
 import { AttachmentViewer } from './AttachmentViewer'
@@ -34,6 +35,7 @@ export function App() {
   if (route === '/gallery') return <Gallery />
   if (route === '/add-friend') return <AddFriend />
   if (route === '/options') return <Options />
+  if (route === '/usage') return <UsageWindow />
   if (route === '/welcome') return <Welcome />
   if (route === '/browser') return <Browser />
   if (route === '/search') return <Palette />

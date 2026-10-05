@@ -4,6 +4,7 @@ import { EventHub } from '../emitter'
 import type { AgentEvent, AgentSession, FileChange, PermDecision, ToolKind, UserTurn } from '@shared/events'
 import type { Mode } from '@shared/models'
 import { loadImages } from '../images'
+import { mapClaudeRateLimit } from './limits'
 
 type Obj = Record<string, unknown>
 
@@ -54,6 +55,8 @@ export class ClaudeSession implements AgentSession {
   private pending = new Map<string, { toolUseId: string; input: Obj; suggestions: unknown; question?: { prompt: string } }>()
   private interrupting = false
   private active = false
+  /** Claude reports a running cost for the whole session; we publish what each turn added. */
+  private lastTotalCost = 0
   private reqN = 0
 
   constructor(private o: ClaudeOptions) {
@@ -162,6 +165,7 @@ export class ClaudeSession implements AgentSession {
       case 'user': return this.onUser(m['message'] as Obj)
       case 'control_request': return this.onControl(m)
       case 'result': return this.onResult(m)
+      case 'rate_limit_event': return this.onRateLimit((m['rate_limit_info'] ?? {}) as Obj)
       default: return // system, rate_limit_event, ...
     }
   }
@@ -246,10 +250,21 @@ export class ClaudeSession implements AgentSession {
     })
   }
 
+  /** Claude's rolling subscription windows (5-hour, weekly), sent with each turn. */
+  private onRateLimit(info: Obj): void {
+    const ev = mapClaudeRateLimit(info)
+    if (ev) this.hub.emit(ev)
+  }
+
   private onResult(m: Obj): void {
     this.active = false
     const usage = (m['usage'] ?? {}) as Obj
-    this.hub.emit({ t: 'usage', inputTokens: Number(usage['input_tokens'] ?? 0), outputTokens: Number(usage['output_tokens'] ?? 0), costUsd: typeof m['total_cost_usd'] === 'number' ? m['total_cost_usd'] : undefined })
+    const total = typeof m['total_cost_usd'] === 'number' ? m['total_cost_usd'] : undefined
+    // the session total only goes up; a fresh process (resume) starts again from zero
+    const costUsd = total === undefined ? undefined : Math.max(0, total >= this.lastTotalCost ? total - this.lastTotalCost : total)
+    if (total !== undefined) this.lastTotalCost = total
+    const model = Object.keys((m['modelUsage'] ?? {}) as Obj)[0]
+    this.hub.emit({ t: 'usage', inputTokens: Number(usage['input_tokens'] ?? 0), outputTokens: Number(usage['output_tokens'] ?? 0), cacheReadTokens: Number(usage['cache_read_input_tokens'] ?? 0), cacheWriteTokens: Number(usage['cache_creation_input_tokens'] ?? 0), costUsd, model })
     this.streamed.clear()
     if (this.interrupting) return void this.hub.emit({ t: 'turn_end', reason: 'interrupted' })
     if (m['is_error']) this.hub.emit({ t: 'turn_end', reason: 'error', error: String(m['result'] ?? m['subtype'] ?? 'error').split('\n')[0] })

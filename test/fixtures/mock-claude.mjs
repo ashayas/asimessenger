@@ -5,6 +5,7 @@ const rl = readline.createInterface({ input: process.stdin })
 const out = (m) => process.stdout.write(JSON.stringify(m) + '\n')
 const sid = process.argv.includes('--resume') ? process.argv[process.argv.indexOf('--resume') + 1] : process.argv[process.argv.indexOf('--session-id') + 1]
 let interrupted = false
+let turnN = 0
 const waiting = new Map()
 const delta = (idx, text) => out({ type: 'stream_event', event: { type: 'content_block_delta', index: idx, delta: { type: 'text_delta', text } } })
 const startMsg = (id) => out({ type: 'stream_event', event: { type: 'message_start', message: { id } } })
@@ -18,7 +19,11 @@ rl.on('line', async (line) => {
   const imgs = m.message.content.filter((b) => b.type === 'image' && b.source?.type === 'base64' && b.source.media_type === 'image/png').length
   const text = m.message.content.map((b) => b.text).join('') + (imgs ? ` [img:${imgs}]` : '')
   out({ type: 'system', subtype: 'init', session_id: sid })
-  const result = (extra = {}) => out({ type: 'result', subtype: 'success', is_error: false, result: 'ok', session_id: sid, usage: { input_tokens: 3, output_tokens: 2 }, total_cost_usd: 0.001, ...extra })
+  const result = (extra = {}) => {
+    turnN++
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed', resetsAt: 4102444800, rateLimitType: 'five_hour', isUsingOverage: false, unifiedWindows: { five_hour: { utilization: 0.3 + turnN / 100, resetsAt: 4102444800 }, seven_day: { utilization: 0.5, resetsAt: 4102876800 } } }, session_id: sid })
+    out({ type: 'result', subtype: 'success', is_error: false, result: 'ok', session_id: sid, usage: { input_tokens: 3, output_tokens: 2, cache_read_input_tokens: 1000, cache_creation_input_tokens: 200 }, total_cost_usd: 0.001 * turnN, modelUsage: { 'claude-haiku-4-5': {} }, ...extra })
+  }
   if (text.includes('slow')) {
     startMsg('msg_slow')
     for (let i = 0; i < 300 && !interrupted; i++) { delta(0, '.'); await new Promise((r) => setTimeout(r, 50)) }

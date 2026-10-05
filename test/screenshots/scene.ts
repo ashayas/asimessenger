@@ -63,6 +63,19 @@ export async function buildScene(win: Page, homePath: string): Promise<{ c1: str
     await ap(c1.id, 'agent', 'permission', { t: 'permission', reqId: 'p1', tool: 'Edit', summary: 'src/auth/session.ts', risk: 'low', options: [{ id: 'allow-once', label: 'Allow once' }, { id: 'allow-chat', label: 'Allow for this chat' }, { id: 'deny', label: 'Deny' }], decision: null }, 'Edit src/auth/session.ts')
     await ap(c1.id, 'agent', 'question', { t: 'question', reqId: 'q1', prompt: 'Should the refresh lock be per tab or global (BroadcastChannel)?', choices: ['Per tab', 'Global'], answer: null }, 'lock question')
     await api.chats.markRead(c1.id)
+    // usage: what the agents report, plus plausible spend over the last two weeks
+    const now = Date.now()
+    const hr = Math.floor(now / 1000)
+    await api.settings.set('limits:claude', { provider: 'claude', plan: null, status: 'allowed', note: null, asOf: now - 2 * 60_000, windows: [{ id: 'five_hour', label: '5-hour', usedPercent: 62, resetsAt: hr + 2 * 3600 + 14 * 60 }, { id: 'seven_day', label: 'Weekly', usedPercent: 41, resetsAt: hr + 4 * 86400 }] })
+    await api.settings.set('limits:codex', { provider: 'codex', plan: 'plus', status: 'allowed', note: null, asOf: now - 30_000, windows: [{ id: 'five_hour', label: '5-hour', usedPercent: 12, resetsAt: hr + 3 * 3600 + 40 * 60 }, { id: 'seven_day', label: 'Weekly', usedPercent: 33, resetsAt: hr + 5 * 86400 }] })
+    await api.settings.set('account:codex', { lifetimeTokens: 761_086_938, peakDailyTokens: 164_959_675, asOf: now, last14: Array.from({ length: 14 }, (_, i) => ({ day: new Date(now - (13 - i) * 86_400_000).toISOString().slice(0, 10), tokens: [4, 12, 0, 22, 31, 18, 9, 0, 41, 27, 33, 15, 38, 25][i]! * 1_000_000 })) })
+    const spend = [[claude, home, 'auth refactor', 1_400_000, 0.0, 18.4], [claude, home, 'flaky session test', 900_000, 0, 11.2], [codex, home, 'build fix', 2_100_000, null, 0], [oc, home, 'api routes', 600_000, null, 0], [claude, fantasy, 'chapter 3 outline', 300_000, 0, 3.1], [claude, rent, 'stripe webhook retries', 700_000, 0, 8.7]] as const
+    for (let d = 13; d >= 0; d--) {
+      for (const [f, w, title, tokens, , cost] of spend) {
+        const share = [0.1, 0.4, 0.8, 0.2, 1, 0.7, 0.3, 0.05, 0.9, 0.6, 0.5, 0.8, 1.1, 0.7][13 - d]! * (0.5 + ((title.length * 7 + d * 3) % 10) / 10)
+        await api.usage.record({ chatId: title === 'auth refactor' ? c1.id : title, chatTitle: title, friendId: f.id, friendName: f.displayName, workspaceId: w.id, workspaceName: w === home ? 'honeycomb' : w.name, harness: f.harness, inputTokens: Math.round((tokens * share) / 90), outputTokens: Math.round((tokens * share) / 60), cacheReadTokens: Math.round(tokens * share * 0.9), cacheWriteTokens: Math.round((tokens * share) / 20), costUsd: cost ? (cost * share) / 14 : null, ts: now - d * 86_400_000 - (title.length % 5) * 3_600_000 })
+      }
+    }
     const att = (await api.messages.list(c1.id)).find((m) => m.kind === 'attachment')!.id
     return { c1: c1.id, c2: c2.id, att, ws: home.id, homeChats }
   }, homePath)

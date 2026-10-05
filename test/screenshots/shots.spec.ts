@@ -42,6 +42,15 @@ test('capture the README screenshots from a demo scene', async () => {
     await viewer.getByText('Two tabs call').selectText()
     await shot(viewer, 'attachment.png')
 
+    // usage window
+    p = h.app.waitForEvent('window')
+    await h.win.keyboard.press('Meta+u')
+    const usageWin = await p
+    await expect(usageWin.getByTestId('usage-window')).toBeVisible()
+    await size(h, '#/usage', 780, 1100, 380, 20)
+    await shot(usageWin, 'usage.png')
+    await usageWin.close().catch(() => {})
+
     // ⌘K
     p = h.app.waitForEvent('window')
     await h.win.keyboard.press('Meta+k')

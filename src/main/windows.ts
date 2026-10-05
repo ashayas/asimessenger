@@ -99,6 +99,21 @@ export function openOptionsWindow(): BrowserWindow {
   return win
 }
 
+let usageWindow: BrowserWindow | null = null
+export function openUsageWindow(): BrowserWindow {
+  if (usageWindow && !usageWindow.isDestroyed()) {
+    usageWindow.show()
+    usageWindow.focus()
+    return usageWindow
+  }
+  const win = new BrowserWindow(baseOptions({ width: 760, height: 820, minWidth: 520, minHeight: 420, title: 'Usage' }))
+  usageWindow = win
+  win.once('ready-to-show', () => win.show())
+  win.on('closed', () => { usageWindow = null })
+  loadRoute(win, '/usage')
+  return win
+}
+
 /** The nudge shake: a quick decaying jitter of the window position. */
 export function shakeWindow(win: BrowserWindow | null): void {
   if (!win || win.isDestroyed() || win.isFullScreen()) return

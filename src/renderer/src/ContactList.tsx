@@ -4,6 +4,7 @@ import { avatarFor } from '@shared/harness-meta'
 import { PRESENCE_LABEL, type Presence } from '@shared/status'
 import { Avatar, Banner, Btn, StatusDot, WindowFrame } from './ui/kit'
 import { useData } from './store'
+import { UsageStrip } from './UsageStrip'
 import { LabelChips, LabelEditor } from './LabelEditor'
 import type { Chat } from '@shared/models'
 
@@ -66,6 +67,8 @@ export function ContactList() {
           />
         }
       />
+
+      <UsageStrip />
 
       <div className="ws" role="tablist" aria-label="Workspaces">
         {workspaces.map((w) => (

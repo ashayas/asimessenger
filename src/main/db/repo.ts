@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Db } from './db'
 import { canReplaceTitle, type TitleSource } from '@shared/title'
+import type { UsageGroup, UsageTotals } from '@shared/usage'
 import type { Chat, Friend, HarnessKind, Label, Message, MessageRole, Mode, SearchHit, Workspace } from '@shared/models'
 import type { Presence } from '@shared/status'
 
@@ -271,6 +272,43 @@ export function createRepo(db: Db) {
         const n = Number((await all('SELECT COUNT(*) AS c FROM chats'))[0]?.['c'] ?? 0)
         await run('DELETE FROM chats')
         return n
+      }
+    },
+
+    usage: {
+      /** Record what one call or turn spent. Names are copied in, so the numbers still read right after a chat or friend is deleted. */
+      async record(e: { chatId: string | null; chatTitle?: string | null; friendId?: string | null; friendName?: string | null; workspaceId?: string | null; workspaceName?: string | null; harness?: string | null; model?: string | null; inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number; costUsd?: number | null; ts?: number }): Promise<void> {
+        await run(
+          'INSERT INTO usage_log(ts,chat_id,chat_title,friend_id,friend_name,workspace_id,workspace_name,harness,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,cost_usd) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+          [e.ts ?? now(), e.chatId, e.chatTitle ?? null, e.friendId ?? null, e.friendName ?? null, e.workspaceId ?? null, e.workspaceName ?? null, e.harness ?? null, e.model ?? null, Math.max(0, Math.round(e.inputTokens)), Math.max(0, Math.round(e.outputTokens)), Math.max(0, Math.round(e.cacheReadTokens ?? 0)), Math.max(0, Math.round(e.cacheWriteTokens ?? 0)), e.costUsd ?? null]
+        )
+      },
+      /** Totals since a time (ms), optionally for one chat. */
+      async totals(sinceMs = 0, chatId?: string): Promise<UsageTotals> {
+        const r = (await all(`SELECT COALESCE(SUM(input_tokens),0) i, COALESCE(SUM(output_tokens),0) o, COALESCE(SUM(cache_read_tokens),0) cr, COALESCE(SUM(cache_write_tokens),0) cw, COALESCE(SUM(cost_usd),0) c, COUNT(*) n, COUNT(cost_usd) p FROM usage_log WHERE ts >= ?${chatId ? ' AND chat_id = ?' : ''}`, chatId ? [sinceMs, chatId] : [sinceMs]))[0]!
+        return { inputTokens: Number(r['i']), outputTokens: Number(r['o']), cacheReadTokens: Number(r['cr']), cacheWriteTokens: Number(r['cw']), costUsd: Number(r['c']), calls: Number(r['n']), pricedCalls: Number(r['p']) }
+      },
+      /** Grouped totals since a time. `by` picks the grouping; the label is the newest name seen for that key. */
+      async grouped(by: 'friend' | 'workspace' | 'chat', sinceMs = 0, limit = 50): Promise<UsageGroup[]> {
+        const [key, label] = by === 'friend' ? ['friend_id', 'friend_name'] : by === 'workspace' ? ['workspace_id', 'workspace_name'] : ['chat_id', 'chat_title']
+        const rows = await all(`SELECT COALESCE(${key}, '?') k, (SELECT ${label} FROM usage_log u2 WHERE COALESCE(u2.${key}, '?') = COALESCE(usage_log.${key}, '?') ORDER BY u2.ts DESC LIMIT 1) l, SUM(input_tokens) i, SUM(output_tokens) o, SUM(cache_read_tokens) cr, SUM(cache_write_tokens) cw, COALESCE(SUM(cost_usd),0) c, COUNT(*) n, COUNT(cost_usd) p FROM usage_log WHERE ts >= ? GROUP BY k ORDER BY (SUM(input_tokens)+SUM(output_tokens)+SUM(cache_read_tokens)+SUM(cache_write_tokens)) DESC LIMIT ?`, [sinceMs, limit])
+        return rows.map((r) => ({ key: String(r['k']), label: String(r['l'] ?? 'Unknown'), inputTokens: Number(r['i']), outputTokens: Number(r['o']), cacheReadTokens: Number(r['cr']), cacheWriteTokens: Number(r['cw']), costUsd: Number(r['c']), calls: Number(r['n']), pricedCalls: Number(r['p']) }))
+      },
+      /** Tokens and cost per local day for the last `days` days, oldest first, zero-filled. */
+      async daily(days: number, nowMs = now()): Promise<{ day: string; tokens: number; costUsd: number }[]> {
+        const start = new Date(nowMs); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - (days - 1))
+        const rows = await all("SELECT strftime('%Y-%m-%d', ts/1000, 'unixepoch', 'localtime') d, SUM(input_tokens+output_tokens+cache_read_tokens+cache_write_tokens) t, COALESCE(SUM(cost_usd),0) c FROM usage_log WHERE ts >= ? GROUP BY d", [start.getTime()])
+        const by = new Map(rows.map((r) => [String(r['d']), { tokens: Number(r['t']), costUsd: Number(r['c']) }]))
+        const out: { day: string; tokens: number; costUsd: number }[] = []
+        for (let i = 0; i < days; i++) {
+          const d = new Date(start); d.setDate(start.getDate() + i)
+          const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+          out.push({ day, ...(by.get(day) ?? { tokens: 0, costUsd: 0 }) })
+        }
+        return out
+      },
+      async reset(): Promise<void> {
+        await run('DELETE FROM usage_log')
       }
     },
 

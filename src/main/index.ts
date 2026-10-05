@@ -8,10 +8,12 @@ import { closeToastsFor, createAttentionHandler, openNextUnread, refreshBadge } 
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
-import { openOnboardingWindow, createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow, openTabsWindow, setChatRouter, setTabsActive, takePendingTabs, showChat, windowFor } from './windows'
+import { openOnboardingWindow, createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow, openUsageWindow, openTabsWindow, setChatRouter, setTabsActive, takePendingTabs, showChat, windowFor } from './windows'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from './friends-service'
 import { createChatService } from './chat-service'
 import { createWorktrees } from './worktrees'
+import { createUsageService } from './usage-service'
+import { which } from '../harness/env'
 import { loginEnv } from '../harness/env'
 import { loadAttachment } from './attachments'
 import { searchAll } from './search'
@@ -71,7 +73,10 @@ app.whenReady().then(async () => {
   ipcMain.handle('asi:brain-disconnect', async () => { await brain.disconnect(); broadcastChanged('settings') })
   const attention = createAttentionHandler(repo)
   const titler = createTitler(repo, () => brain.titleModel())
-  const ingestor = createIngestor(repo, broadcastChanged, (a) => void attention(a), async (tool, summary) => (await assessRisk(await brain.decider(), tool, summary)).risk, (chatId) => void titler.maybeRetitle(chatId).then((changed) => { if (changed) broadcastChanged('chats') }))
+  const ingestor = createIngestor(repo, broadcastChanged, (a) => void attention(a), async (tool, summary) => (await assessRisk(await brain.decider(), tool, summary)).risk, (chatId, reason) => {
+    if (reason === 'done') void titler.maybeRetitle(chatId).then((changed) => { if (changed) broadcastChanged('chats') })
+    void chatRef.current?.onTurnEnd(chatId, reason)
+  })
   let badgeTimer: ReturnType<typeof setTimeout> | null = null
   onChanged((topic) => {
     if (topic !== 'chats' && topic !== 'messages') return
@@ -124,6 +129,15 @@ app.whenReady().then(async () => {
     return target
   })
   ipcMain.handle('data:delete-all-chats', async () => (await chat.deleteAllChats()).count)
+  const usage = createUsageService({
+    repo, notify: broadcastChanged,
+    probeOptions: async (provider) => { const env = await loginEnv(); const exe = which(provider === 'claude' ? 'claude' : 'codex', env); return exe ? { command: exe, env } : null }
+  })
+  ipcMain.handle('usage:overview', (_e, range?: 'today' | 'week' | 'month' | 'all') => usage.overview(range))
+  ipcMain.handle('usage:refresh', (_e, provider: 'claude' | 'codex') => usage.refresh(provider))
+  ipcMain.handle('usage:reset', () => usage.reset())
+  ipcMain.handle('usage:chat', (_e, chatId: string) => usage.forChat(chatId))
+  ipcMain.handle('window:open-usage', () => { openUsageWindow() })
   ipcMain.handle('window:open-options', () => { openOptionsWindow() })
   ipcMain.handle('chat:set-mode', (_e, chatId: string, mode: string) => chat.setMode(chatId, mode as never))
   ipcMain.handle('attachments:load', (_e, messageId: string) => loadAttachment(repo, messageId))
@@ -179,6 +193,10 @@ app.whenReady().then(async () => {
   ipcMain.handle('toast:open-chat', (e, chatId: string) => { showChat(chatId); closeToastsFor(chatId); BrowserWindow.fromWebContents(e.sender)?.close() })
   ipcMain.handle('toast:dismiss', (e) => { BrowserWindow.fromWebContents(e.sender)?.close() })
   ipcMain.handle('chat:new-isolated', async (_e, workspaceId: string, friendId: string) => { const c = await chat.newIsolatedChat(workspaceId, friendId); broadcastChanged('chats'); return c })
+  ipcMain.handle('chat:queue', (_e, chatId: string, text: string, quote?: { name: string; text: string }) => chat.queuePrompt(chatId, text, quote))
+  ipcMain.handle('chat:queued', (_e, chatId: string) => chat.getQueued(chatId))
+  ipcMain.handle('chat:queue-take', (_e, chatId: string) => chat.takeQueued(chatId))
+  ipcMain.handle('chat:queue-send-now', (_e, chatId: string) => chat.sendQueuedNow(chatId))
   ipcMain.handle('chat:worktree-info', (_e, chatId: string) => chat.worktreeInfo(chatId))
   ipcMain.handle('chat:delete', async (_e, chatId: string) => {
     const win = windowFor(chatId)

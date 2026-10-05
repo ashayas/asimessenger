@@ -34,6 +34,24 @@ Every agent CLI you register is a **friend**. The contact list groups them by wh
 </tr>
 </table>
 
+## Usage you can see
+
+Your subscription limits and your spend are on the buddy list itself, always visible: Claude Code's 5-hour and weekly windows, Codex's 5-hour and weekly windows, and today's tokens and cost. Click it (or press ⌘U) for the full picture.
+
+<table>
+<tr>
+<td valign="top"><img src="docs/images/usage.png" alt="Usage window: plan limits for Claude Code and Codex, spend by day, agent, workspace and chat"></td>
+<td width="42%" valign="top">
+
+- **Plan limits come from the agents.** Claude Code reports its windows with every turn; Codex answers a free query that also includes work done in the terminal. A window that has reset says so instead of showing an old number.
+- **Spend is per call, never double counted.** Agents report running totals in different ways, so each adapter publishes only what a turn added. Cost shows only where an agent reports one; "not reported" is never shown as free.
+- **By agent, workspace and chat**, a 14-day chart, and a per-chat total in each chat's header. It survives deleting a chat.
+- **Refresh** asks Codex for free. Claude only reports limits while it answers, so its Refresh sends one tiny request.
+
+</td>
+</tr>
+</table>
+
 ## Five repos, a dozen chats, one window
 
 Run as many agents as you like, in as many repos as you like. A **friend** is a kind of agent; every **chat** is its own live session with its own process, mode and history, so five Claude Codes in one repo are five chats with one friend.
@@ -64,6 +82,7 @@ Warp-style **command blocks**, **permission cards** with a risk label, **questio
 - **Modes** per chat: Ask · Auto-edit · Plan. **Dangerous is locked** behind a global switch *and* a per-friend opt-in; revoking either drops you back to Ask.
 - Every chat is **persisted**. A new chat with a friend is a new session; old ones resume.
 - `!cmd` runs a shell command in the workspace, `/open <url|path>` opens it.
+- **Queue your next prompt** (`/queue …`, or the ⏳ toggle, ⌘⇧J) while the agent works. It is sent when the turn succeeds and held for you if the agent stops or fails.
 
 </td>
 <td width="52%" valign="top"><img src="docs/images/chat.png" alt="A conversation with Claude Code showing a command block, attachment, permission card and question"></td>
@@ -102,6 +121,7 @@ Also built in: an **in-app browser** for dev servers your agents start, **push-t
 - **Local first.** One SQLite (libSQL) file on your Mac. No account, no server, no telemetry.
 - **Voice stays on the machine.** Apple on-device speech works out of the box; Cohere Transcribe 4-bit (MLX) is an optional 1.5 GB download from this repo's releases. No Hugging Face account.
 - **Secrets in your keychain**, never in the database.
+- **Secrets are masked before any model sees text.** API keys, tokens, passwords and private keys are redacted from what is sent for risk labels, "which chat?" and chat titles.
 - **Safe by default.** Ask mode everywhere, risk-labelled permission cards, workspace-confined file reads, an http(s)-only sandboxed browser.
 
 ## Install

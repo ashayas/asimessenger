@@ -2,7 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron'
 import type { Repo } from './db/repo'
 import { CHANGED_CHANNEL, REPO_CHANNEL_PREFIX } from '@shared/api'
 
-const READ_ONLY = new Set(['list', 'get', 'query', 'forChat', 'forFriend', 'assignments', 'exportAll'])
+const READ_ONLY = new Set(['list', 'get', 'query', 'forChat', 'forFriend', 'assignments', 'exportAll', 'totals', 'grouped', 'daily'])
 
 /** Tells every window that data in `topic` changed so stores can refetch. */
 const listeners = new Set<(topic: string) => void>()

@@ -25,6 +25,10 @@ const chat = {
   toastOpenChat: (chatId: string): Promise<void> => ipcRenderer.invoke('toast:open-chat', chatId),
   toastDismiss: (): Promise<void> => ipcRenderer.invoke('toast:dismiss'),
   interrupt: (chatId: string): Promise<void> => ipcRenderer.invoke('chat:interrupt', chatId),
+  queue: (chatId: string, text: string, quote?: { name: string; text: string }): Promise<{ queued: boolean }> => ipcRenderer.invoke('chat:queue', chatId, text, quote),
+  queued: (chatId: string): Promise<unknown> => ipcRenderer.invoke('chat:queued', chatId),
+  takeQueued: (chatId: string): Promise<string | null> => ipcRenderer.invoke('chat:queue-take', chatId),
+  sendQueuedNow: (chatId: string): Promise<void> => ipcRenderer.invoke('chat:queue-send-now', chatId),
   newIsolated: (workspaceId: string, friendId: string): Promise<unknown> => ipcRenderer.invoke('chat:new-isolated', workspaceId, friendId),
   worktreeInfo: (chatId: string): Promise<unknown> => ipcRenderer.invoke('chat:worktree-info', chatId),
   delete: (chatId: string): Promise<unknown> => ipcRenderer.invoke('chat:delete', chatId),
@@ -46,6 +50,14 @@ const safety = {
   setGlobalDangerous: (on: boolean): Promise<void> => ipcRenderer.invoke('safety:set-global-dangerous', on),
   setFriendDangerous: (id: string, on: boolean): Promise<void> => ipcRenderer.invoke('safety:set-friend-dangerous', id, on),
   openOptions: (): Promise<void> => ipcRenderer.invoke('window:open-options')
+}
+
+const usage = {
+  overview: (range?: string): Promise<unknown> => ipcRenderer.invoke('usage:overview', range),
+  refresh: (provider: 'claude' | 'codex'): Promise<void> => ipcRenderer.invoke('usage:refresh', provider),
+  reset: (): Promise<void> => ipcRenderer.invoke('usage:reset'),
+  forChat: (chatId: string): Promise<unknown> => ipcRenderer.invoke('usage:chat', chatId),
+  open: (): Promise<void> => ipcRenderer.invoke('window:open-usage')
 }
 
 const windowFocused = (): Promise<boolean> => ipcRenderer.invoke('window:is-focused')
@@ -136,4 +148,4 @@ const tabs = {
   onOpen: (cb: (a: { chatId: string }) => void): (() => void) => { const h = (_e: unknown, a: { chatId: string }) => cb(a); ipcRenderer.on('asi:tabs-open', h); return () => ipcRenderer.removeListener('asi:tabs-open', h) }
 }
 
-contextBridge.exposeInMainWorld('asi', { tabs, data, brain, voice, onboarding, browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })
+contextBridge.exposeInMainWorld('asi', { usage, tabs, data, brain, voice, onboarding, browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })

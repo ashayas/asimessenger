@@ -1,5 +1,6 @@
 import type { Risk } from '@shared/events'
 import { heuristicRisk } from '@shared/safety'
+import { redactDeep, redactSecrets } from '@shared/redact'
 import { cleanTitle } from '@shared/title'
 
 /** Typed questions in, probabilities out. Clef (Cloudflare) and Jev answer this shape; the heuristic one runs offline. */
@@ -47,7 +48,7 @@ export function clefDecider(c: ClefConfig): Decider {
         const res = await (c.fetchImpl ?? fetch)(`${c.baseUrl ?? 'https://api.cloudflare.com'}/client/v4/accounts/${encodeURIComponent(c.accountId)}/ai/run/@cf/cloudflare/${model}`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model, state, questions }),
+          body: JSON.stringify({ model, state: redactSecrets(state).text, questions: redactDeep(questions) }),
           signal: ctl.signal
         })
         const body = (await res.json().catch(() => null)) as { result?: unknown; success?: boolean; errors?: { message: string }[] } | null
@@ -127,7 +128,7 @@ export function systemOneDecider(c: EndpointConfig): Decider {
   return {
     id: c.model,
     async decide(state, questions) {
-      const body = (await postJson(c, `${c.baseUrl.replace(/\/+$/, '')}/v1/systemone`, { state, model: c.model, questions })) as { answers?: Record<string, unknown> } | null
+      const body = (await postJson(c, `${c.baseUrl.replace(/\/+$/, '')}/v1/systemone`, { state: redactSecrets(state).text, model: c.model, questions: redactDeep(questions) })) as { answers?: Record<string, unknown> } | null
       if (!body?.answers) throw new Error('the endpoint returned no answers')
       return parseAnswers(body.answers, questions)
     }
@@ -138,7 +139,7 @@ export function systemOneDecider(c: EndpointConfig): Decider {
 export async function llmComplete(c: EndpointConfig, system: string, user: string, maxTokens = 40): Promise<string> {
   const body = (await postJson({ ...c, timeoutMs: c.timeoutMs ?? 30_000 }, `${c.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
     model: c.model, temperature: 0.2, max_tokens: maxTokens,
-    messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
+    messages: [{ role: 'system', content: system }, { role: 'user', content: redactSecrets(user).text }]
   })) as { choices?: { message?: { content?: string } }[] } | null
   const content = body?.choices?.[0]?.message?.content
   if (!content) throw new Error('the model returned no content')
@@ -201,7 +202,7 @@ export function llmDecider(c: EndpointConfig): Decider {
         model: c.model,
         temperature: 0,
         response_format: { type: 'json_object' },
-        messages: [{ role: 'system', content: LLM_SYSTEM }, { role: 'user', content: JSON.stringify({ state, questions }) }]
+        messages: [{ role: 'system', content: LLM_SYSTEM }, { role: 'user', content: JSON.stringify({ state: redactSecrets(state).text, questions: redactDeep(questions) }) }]
       })) as { choices?: { message?: { content?: string } }[] } | null
       const content = body?.choices?.[0]?.message?.content
       if (!content) throw new Error('the model returned no content')

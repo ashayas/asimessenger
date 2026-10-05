@@ -42,7 +42,10 @@ export type AgentEvent =
   | { t: 'open_url'; url: string }
   | { t: 'links'; items: { label: string; detail?: string; target: SearchTarget }[] }
   | { t: 'title'; title: string }
-  | { t: 'usage'; inputTokens: number; outputTokens: number; costUsd?: number }
+  /** Tokens (and cost, when the agent reports one) spent by ONE call or turn. A delta, never a running total: adapters subtract. */
+  | { t: 'usage'; inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number; costUsd?: number; model?: string }
+  /** The agent's own subscription limits for the account, as of now. */
+  | { t: 'limits'; provider: 'claude' | 'codex'; plan?: string | null; windows: { id: string; label: string; usedPercent: number; resetsAt: number | null }[]; status?: string | null; note?: string | null }
   | { t: 'turn_end'; reason: 'done' | 'interrupted' | 'error'; error?: string }
 
 export interface UserTurn {

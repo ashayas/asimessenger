@@ -1,3 +1,4 @@
+import type { LimitsSnapshot } from '@shared/usage'
 import { cleanTitle } from '@shared/title'
 import type { Repo } from './db/repo'
 import type { AgentEvent, Risk } from '@shared/events'
@@ -27,7 +28,7 @@ export interface Attention {
   reqId?: string
 }
 
-export function createIngestor(repo: Repo, notify: (topic: string) => void, onAttention: (a: Attention) => void = () => {}, assessRisk?: (tool: string, summary: string) => Promise<Risk>, onTurnDone: (chatId: string) => void = () => {}) {
+export function createIngestor(repo: Repo, notify: (topic: string) => void, onAttention: (a: Attention) => void = () => {}, assessRisk?: (tool: string, summary: string) => Promise<Risk>, onTurnEnd: (chatId: string, reason: 'done' | 'interrupted' | 'error') => void = () => {}) {
   const states = new Map<string, ChatState>()
   const queues = new Map<string, Promise<void>>()
   const state = (chatId: string): ChatState => {
@@ -130,8 +131,20 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
         if (await repo.chats.setAutoTitle(chatId, cleanTitle(e.title), 'agent')) notify('chats')
         return
       }
-      case 'usage':
+      case 'usage': {
+        // spend is recorded with the names of the chat, agent and workspace as they are now, so totals outlive any of them
+        const chat = await repo.chats.get(chatId)
+        const friend = chat ? await repo.friends.get(chat.friendId) : null
+        const ws = chat ? await repo.workspaces.get(chat.workspaceId) : null
+        await repo.usage.record({ chatId, chatTitle: chat?.title, friendId: friend?.id, friendName: friend?.displayName, workspaceId: ws?.id, workspaceName: ws?.name, harness: friend?.harness, model: e.model, inputTokens: e.inputTokens, outputTokens: e.outputTokens, cacheReadTokens: e.cacheReadTokens, cacheWriteTokens: e.cacheWriteTokens, costUsd: e.costUsd })
+        notify('usage')
         return
+      }
+      case 'limits': {
+        await repo.settings.set(`limits:${e.provider}`, { provider: e.provider, plan: e.plan ?? null, windows: e.windows.map((w) => ({ ...w })), status: e.status ?? null, note: e.note ?? null, asOf: Date.now() } satisfies LimitsSnapshot)
+        notify('usage')
+        return
+      }
       case 'turn_end': {
         await flush(chatId)
         s.byEventId.clear()
@@ -144,8 +157,8 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
         else if (e.reason === 'done') {
           const last = (await repo.messages.list(chatId)).filter((m) => m.role === 'agent' && m.kind === 'text').at(-1)
           if (last?.text) onAttention({ chatId, kind: 'message', text: last.text })
-          onTurnDone(chatId)
         }
+        onTurnEnd(chatId, e.reason)
         return
       }
     }

@@ -16,6 +16,7 @@ export const REPO_METHODS = {
   attachments: ['get', 'add'],
   data: ['exportAll', 'deleteAllChats'],
   drawings: ['upsert', 'get', 'list'],
+  usage: ['record', 'totals', 'grouped', 'daily', 'reset'],
   settings: ['get', 'set'],
   search: ['query']
 } as const

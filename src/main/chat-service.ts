@@ -25,6 +25,13 @@ const NUDGE_COOLDOWN_MS = 3000
 const SHELL_OUTPUT_MAX = 100_000
 const SHELL_TIMEOUT_MS = 120_000
 
+export interface QueuedPrompt {
+  text: string
+  quote?: UserTurn['quote']
+  /** The agent stopped or failed instead of finishing, so nothing was sent; the prompt waits for you. */
+  held: boolean
+}
+
 export interface Opener {
   url(u: string): void
   path(p: string): void
@@ -39,6 +46,8 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
   const lastNudge = new Map<string, number>()
   /** Questions an agent asked through ask_user, waiting for you. */
   const asks = new Map<string, { chatId: string; resolve(answer: string): void }>()
+  /** One follow-up per chat, held while the agent works and sent when it finishes. In memory only, like the turn it waits on. */
+  const queued = new Map<string, QueuedPrompt>()
   const cancelAsks = (chatId: string, why: string) => {
     for (const [id, a] of asks) if (a.chatId === chatId) { asks.delete(id); a.resolve(why) }
   }
@@ -175,6 +184,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       const chat = await repo.chats.get(chatId)
       if (!chat) return { note: null }
       cancelAsks(chatId, 'The chat was deleted.')
+      queued.delete(chatId)
       await manager.dispose(chatId)
       let note: string | null = null
       if (chat.worktreePath && chat.branch && deps.worktrees) {
@@ -282,6 +292,62 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
         await manager.dispose(c.id) // a bypass-permissions process must not keep running
       }
       notify('chats')
+    },
+
+    /**
+     * "Say this next": while the agent works, hold the prompt and send it when the turn ends successfully. Queuing again adds
+     * to the held text, so nothing is lost. If the agent is idle the prompt is simply sent.
+     */
+    async queuePrompt(chatId: string, text: string, quote?: UserTurn['quote']): Promise<{ queued: boolean }> {
+      const clean = text.trim()
+      if (!clean) return { queued: false }
+      const chat = await repo.chats.get(chatId)
+      if (!chat) throw new Error(`unknown chat ${chatId}`)
+      if (chat.status !== 'busy' && chat.status !== 'away') {
+        await this.send(chatId, clean, quote)
+        return { queued: false }
+      }
+      const cur = queued.get(chatId)
+      queued.set(chatId, { text: cur ? `${cur.text}\n\n${clean}` : clean, quote: cur?.quote ?? quote, held: false })
+      notify('queue')
+      return { queued: true }
+    },
+
+    getQueued(chatId: string): QueuedPrompt | null {
+      return queued.get(chatId) ?? null
+    },
+
+    /** Take the held prompt back (to edit it, or drop it). Returns its text. */
+    takeQueued(chatId: string): string | null {
+      const q = queued.get(chatId)
+      if (!q) return null
+      queued.delete(chatId)
+      notify('queue')
+      return q.text
+    },
+
+    /** Stop the agent now and send the held prompt. */
+    async sendQueuedNow(chatId: string): Promise<void> {
+      const q = queued.get(chatId)
+      if (!q) return
+      queued.delete(chatId)
+      notify('queue')
+      await this.interrupt(chatId)
+      await this.send(chatId, q.text, q.quote)
+    },
+
+    /** The ingestor calls this when a turn ends: success sends the held prompt, anything else holds it for you. */
+    async onTurnEnd(chatId: string, reason: 'done' | 'interrupted' | 'error'): Promise<void> {
+      const q = queued.get(chatId)
+      if (!q) return
+      if (reason === 'done') {
+        queued.delete(chatId)
+        notify('queue')
+        await this.send(chatId, q.text, q.quote)
+      } else {
+        q.held = true
+        notify('queue')
+      }
     },
 
     /** Plain stop. */

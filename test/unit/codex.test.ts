@@ -20,7 +20,7 @@ test('streams message deltas once and completes with usage', async () => {
   s!.send({ text: 'hello' })
   await c.turnEnd()
   expect(text(c.events)).toBe('PONG: hello')
-  expect(c.events.find((e) => e.t === 'usage')).toMatchObject({ inputTokens: 4, outputTokens: 2 })
+  expect(c.events.find((e) => e.t === 'usage')).toMatchObject({ inputTokens: 40, cacheReadTokens: 60, outputTokens: 20 })
   expect(s!.resumeId).toBe('thread-mock-1')
 })
 

@@ -38,6 +38,11 @@ export function useGlobalShortcuts(): void {
         void window.asi.safety.openOptions()
         return
       }
+      if (e.key.toLowerCase() === 'u') {
+        e.preventDefault()
+        void window.asi.usage.open()
+        return
+      }
       if (/^[1-9]$/.test(e.key)) {
         const { workspaces, setActiveWorkspace } = useData.getState()
         const ws = workspaces.find((w) => w.slot === Number(e.key))

@@ -1,3 +1,4 @@
+import { codexUsageDelta, mapCodexRateLimits } from './limits'
 import { spawn } from 'node:child_process'
 import { EventHub } from '../emitter'
 import { RpcFailure, RpcPeer } from '../acp/rpc'
@@ -46,6 +47,8 @@ export class CodexSession implements AgentSession {
   private pending = new Map<string, { resolve(v: unknown): void; kind: 'command' | 'file' | 'question' | 'permissions'; params: Obj }>()
   private active = false
   private interrupting = false
+  /** Codex reports cumulative per-thread counters; we publish what each update added. */
+  private prevTotal: Obj | null = null
 
   private constructor(private peer: RpcPeer, private o: CodexOptions) {
     this.mode = o.mode
@@ -75,6 +78,8 @@ export class CodexSession implements AgentSession {
       }
       if (!res) res = await peer.request<Obj>('thread/start', params)
       s.threadId = String((res['thread'] as Obj)['id'])
+      // seed the subscription limits without waiting for the first turn (best effort)
+      void peer.request<Obj>('account/rateLimits/read', null).then((r) => { const ev = mapCodexRateLimits(r['rateLimits'] as Obj); if (ev) s.hub.emit(ev) }).catch(() => {})
       return s
     } catch (err) {
       peer.kill()
@@ -198,8 +203,17 @@ export class CodexSession implements AgentSession {
         if (p['delta']) this.hub.emit({ t: 'thinking', id: String(p['itemId']), delta: String(p['delta']) })
         return
       case 'thread/tokenUsage/updated': {
-        const u = ((p['tokenUsage'] as Obj)?.['total'] ?? {}) as Obj
-        this.hub.emit({ t: 'usage', inputTokens: Number(u['inputTokens'] ?? 0), outputTokens: Number(u['outputTokens'] ?? 0) })
+        const tu = (p['tokenUsage'] ?? {}) as Obj
+        const total = (tu['total'] ?? null) as Obj | null
+        // the first update of a session may include earlier turns of a resumed thread: use the "last turn" breakdown then
+        const d = codexUsageDelta(this.prevTotal ? (total ?? {}) : ((tu['last'] ?? total ?? {}) as Obj), this.prevTotal)
+        this.prevTotal = total
+        if (d.inputTokens + d.outputTokens + d.cacheReadTokens + d.cacheWriteTokens > 0) this.hub.emit({ t: 'usage', ...d })
+        return
+      }
+      case 'account/rateLimits/updated': {
+        const ev = mapCodexRateLimits(p['rateLimits'] as Obj)
+        if (ev) this.hub.emit(ev)
         return
       }
       case 'thread/name/updated':

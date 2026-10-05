@@ -3,6 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Chat, Friend, Message } from '@shared/models'
 import { avatarFor } from '@shared/harness-meta'
 import { isBuiltin, liveFor } from '@shared/grouping'
+import { useQueued } from './queue-hooks'
+import { useChatUsage } from './usage-hooks'
+import { spendLine } from './UsageParts'
+import { fmtTokens } from '@shared/usage'
 import { Avatar, Btn, StatusDot, ToolButton, WindowFrame } from './ui/kit'
 import { useData } from './store'
 import { useSetting } from './hooks'
@@ -44,6 +48,10 @@ const drafts = new Map<string, string>()
 
 export function ChatWindow({ chatId, embedded = false }: { chatId: string; embedded?: boolean }) {
   const { chat, friend, messages } = useChat(chatId)
+  const chatUsage = useChatUsage(chatId)
+  const queued = useQueued(chatId)
+  /** While on, Enter holds your message until the agent finishes instead of sending it straight away. */
+  const [autoQueue, setAutoQueue] = useState(false)
   const profile = useData((s) => s.profile)
   const allChats = useData((s) => s.chats)
   const [draft, setDraftState] = useState(() => drafts.get(chatId) ?? '')
@@ -62,6 +70,7 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === '`') { e.preventDefault(); setDrawer((v) => !v) }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'j') { e.preventDefault(); setAutoQueue((v) => !v) }
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'l') { e.preventDefault(); setEditingLabels((v) => !v) }
     }
     window.addEventListener('keydown', onKey)
@@ -170,6 +179,9 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
     }
     if (!text) return
     setDraft('')
+    const slash = /^\/queue\s+([\s\S]+)$/.exec(text)
+    if (slash) return void window.asi.chat.queue(chatId, slash[1]!)
+    if (autoQueue && (presence === 'busy' || presence === 'away')) return void window.asi.chat.queue(chatId, text)
     void window.asi.chat.send(chatId, text)
   }
 
@@ -197,6 +209,7 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
         <b>To:</b> {friend.displayName} <StatusDot presence={presence} />
         {live?.message ? <span className={friend.letteringStyle === 'plain' ? '' : 'funky'}> — {live.message}</span> : null}
         <span className="grow" />
+        {chatUsage && chatUsage.calls > 0 ? <span className="chat-usage" data-testid="chat-usage" title={`input ${fmtTokens(chatUsage.inputTokens)} · output ${fmtTokens(chatUsage.outputTokens)} · cached ${fmtTokens(chatUsage.cacheReadTokens + chatUsage.cacheWriteTokens)}${chatUsage.pricedCalls === 0 ? ` · this agent does not report cost` : ''}`}>{spendLine(chatUsage)}</span> : null}
         {chat.branch ? <span className="branch" data-testid="branch" title={`Works in its own worktree: ${chat.worktreePath}`}>⎇ {chat.branch}</span> : null}
         <LabelChips ids={chatLabelIds} />
         <button className="linkish" onClick={() => setEditingLabels((v) => !v)} title="Label this chat (⌘L)">🏷 Label</button>
@@ -279,6 +292,16 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
           {attachNote ? <span className="tray-note" role="status">{attachNote}</span> : null}
         </div>
       ) : null}
+      {queued ? (
+        <div className="queued" data-testid="queued" data-held={queued.held}>
+          <span className="q-badge">Queued</span>
+          <span className="q-text" title={queued.text}>{queued.text}</span>
+          <span className="q-note">{queued.held ? 'The agent stopped, so this was not sent.' : 'Sends when the agent finishes.'}</span>
+          <Btn onClick={() => void window.asi.chat.sendQueuedNow(chatId)} title={queued.held ? 'Send it now' : 'Stop the agent and send it now'}>Send now</Btn>
+          <Btn onClick={() => void window.asi.chat.takeQueued(chatId).then((t) => { if (t) setDraft((d) => (d.trim() ? `${t}\n\n${d}` : t)) })}>Edit</Btn>
+          <button className="linkish" aria-label="Remove queued prompt" title="Remove queued prompt" onClick={() => void window.asi.chat.takeQueued(chatId)}>✕</button>
+        </div>
+      ) : null}
       <div className={`composer${dropping ? ' dropping' : ''}`} {...dropProps}>
         <textarea
           ref={composerRef}
@@ -299,6 +322,9 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
           }}
           autoFocus
         />
+        {presence === 'busy' || presence === 'away' || autoQueue ? (
+          <button className={`btn queue-toggle${autoQueue ? ' on' : ''}`} aria-pressed={autoQueue} onClick={() => setAutoQueue((v) => !v)} title="While on, Enter holds your message until the agent finishes (⌘⇧J). You can also type /queue …">⏳ Queue next</button>
+        ) : null}
         <button className="btn primary" onClick={send} disabled={!draft.trim() && pending.length === 0}>Send</button>
       </div>
     </Frame>

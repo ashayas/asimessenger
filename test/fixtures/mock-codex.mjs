@@ -6,6 +6,8 @@ const out = (m) => process.stdout.write(JSON.stringify(m) + '\n')
 const waiting = new Map()
 let reqId = 0
 let interrupted = false
+let turns = 0
+const RATE = { limitId: 'codex', primary: { usedPercent: 12, windowDurationMins: 300, resetsAt: 4102444800 }, secondary: { usedPercent: 40, windowDurationMins: 10080, resetsAt: 4102876800 }, credits: { hasCredits: true, unlimited: false, balance: '25' }, planType: 'plus', rateLimitReachedType: null, spendControlReached: false }
 const THREAD = 'thread-mock-1'
 const note = (method, params) => out({ method, params })
 const ask = (method, params) => new Promise((resolve) => { const id = reqId++; waiting.set(id, resolve); out({ id, method, params }) })
@@ -16,6 +18,8 @@ rl.on('line', async (line) => {
   if (m.id != null && !m.method) { waiting.get(m.id)?.(m.result); waiting.delete(m.id); return }
   if (m.method === 'initialize') return out({ id: m.id, result: { userAgent: 'mock', codexHome: '/tmp' } })
   if (m.method === 'initialized') return
+  if (m.method === 'account/rateLimits/read') return out({ id: m.id, result: { rateLimits: RATE } })
+  if (m.method === 'account/usage/read') return out({ id: m.id, result: { summary: { lifetimeTokens: 761086938, peakDailyTokens: 164959675 }, dailyUsageBuckets: [{ startDate: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })(), tokens: 5000 }] } })
   if (m.method === 'thread/start') return out({ id: m.id, result: { thread: { id: THREAD }, approvalPolicy: m.params.approvalPolicy } })
   if (m.method === 'thread/resume') return out({ id: m.id, result: { thread: { id: m.params.threadId } } })
   if (m.method === 'turn/interrupt') { interrupted = true; return out({ id: m.id, result: {} }) }
@@ -58,6 +62,8 @@ rl.on('line', async (line) => {
   note('item/agentMessage/delta', { itemId: 'a0', delta: 'PO' })
   note('item/agentMessage/delta', { itemId: 'a0', delta: `NG: ${text}` })
   note('item/completed', { item: item('agentMessage', 'a0', { text: `PONG: ${text}` }) })
-  note('thread/tokenUsage/updated', { tokenUsage: { total: { inputTokens: 4, outputTokens: 2 } } })
+  turns++
+  note('thread/tokenUsage/updated', { tokenUsage: { total: { inputTokens: 100 * turns, cachedInputTokens: 60 * turns, cacheWriteInputTokens: 0, outputTokens: 20 * turns, totalTokens: 120 * turns }, last: { inputTokens: 100, cachedInputTokens: 60, cacheWriteInputTokens: 0, outputTokens: 20, totalTokens: 120 } } })
+  note('account/rateLimits/updated', { rateLimits: { ...RATE, primary: { ...RATE.primary, usedPercent: 12 + turns } } })
   finish()
 })

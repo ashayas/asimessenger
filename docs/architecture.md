@@ -36,6 +36,17 @@ options · onboarding · toast        MCP bridge  (127.0.0.1, token)  ←── 
 | Voice | `src/main/{voice,cohere-engine,model-manager,voice-runtime,voice-setup}.ts`, `native/` |
 | Release | `scripts/`, `build/entitlements.mac.plist`, `docs/releasing.md` |
 
+## Usage and limits
+
+Two kinds of numbers, kept apart. **Spend** is a log (`usage_log`) with one row per call or turn, written from `{ t: 'usage' }` events; each
+adapter publishes a delta (Claude's `total_cost_usd` and Codex's cumulative counters are differenced; ACP uses the prompt result, not the
+context-size update). Cost is stored only when an agent reports it, so totals count how many calls were priced and the UI says
+"not reported" instead of $0. Rows copy the chat, agent and workspace names, so totals survive deleting any of them. **Limits** are the
+agents' own subscription windows: Claude Code sends `rate_limit_event` with each turn (5-hour and weekly utilisation), Codex answers
+`account/rateLimits/read` and `account/usage/read` (including usage outside the app). They are stored as settings (`limits:<provider>`) with
+the time we learned them; a window whose reset time has passed renders as reset. Codex is probed for free on Refresh; Claude only reports
+while answering, so its Refresh sends one tiny request. Everything sent to a model first goes through `src/shared/redact.ts`.
+
 ## Isolated chats (git worktrees)
 
 "New chat in its own worktree" (`src/main/worktrees.ts`) runs `git worktree add -b asi/<name>` from the repo's current HEAD into

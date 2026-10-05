@@ -55,7 +55,7 @@ export class AcpSession implements AgentSession {
       .then((r) => {
         const stop = String(r?.['stopReason'] ?? 'end_turn')
         const usage = r?.['usage'] as Obj | undefined
-        if (usage) this.hub.emit({ t: 'usage', inputTokens: Number(usage['inputTokens'] ?? 0), outputTokens: Number(usage['outputTokens'] ?? 0) })
+        if (usage) this.hub.emit({ t: 'usage', inputTokens: Number(usage['inputTokens'] ?? 0), outputTokens: Number(usage['outputTokens'] ?? 0), cacheReadTokens: Number(usage['cachedReadTokens'] ?? usage['cacheReadTokens'] ?? 0) || undefined, cacheWriteTokens: Number(usage['cachedWriteTokens'] ?? usage['cacheWriteTokens'] ?? 0) || undefined })
         this.hub.emit({ t: 'turn_end', reason: stop === 'cancelled' ? 'interrupted' : stop === 'refusal' ? 'error' : 'done', ...(stop === 'refusal' ? { error: 'the agent refused' } : {}) })
       })
       .catch((err: unknown) => {
@@ -147,8 +147,7 @@ export class AcpSession implements AgentSession {
         if (typeof u['title'] === 'string' && u['title'].trim()) this.hub.emit({ t: 'title', title: u['title'] })
         return
       case 'usage_update':
-        this.hub.emit({ t: 'usage', inputTokens: Number(u['used'] ?? 0), outputTokens: 0 })
-        return
+        return // how full the context window is, not tokens spent: spend comes from the prompt result
       default:
         return // available_commands_update, current_mode_update, ...
     }

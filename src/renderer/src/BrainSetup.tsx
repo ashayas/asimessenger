@@ -77,7 +77,7 @@ export function BrainSetup() {
               </div>
             </>
           )}
-          <div className="meta">The key is stored in your macOS keychain, never in the database. Decisions send only short descriptions of the action being judged.</div>
+          <div className="meta">The key is stored in your macOS keychain, never in the database. Decisions send only short descriptions of the action being judged. A general chat model also writes chat titles from the first exchange.</div>
         </>
       ) : null}
       {msg ? <div className={msg.ok ? 'note ok' : 'note bad'} role="status">{msg.text}</div> : null}

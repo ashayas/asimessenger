@@ -11,7 +11,7 @@ export const REPO_METHODS = {
   workspaces: ['create', 'list', 'get', 'rename', 'setPath', 'remove'],
   friends: ['create', 'list', 'get', 'rename', 'setLettering', 'setDangerousAllowed', 'remove'],
   labels: ['create', 'list', 'setForFriend', 'setForChat', 'forFriend', 'forChat', 'assignments', 'rename', 'remove'],
-  chats: ['create', 'get', 'list', 'rename', 'setMode', 'setSession', 'setStatus', 'markRead', 'remove'],
+  chats: ['create', 'get', 'list', 'rename', 'setAutoTitle', 'setMode', 'setSession', 'setStatus', 'markRead', 'remove'],
   messages: ['append', 'update', 'get', 'list'],
   attachments: ['get', 'add'],
   data: ['exportAll', 'deleteAllChats'],

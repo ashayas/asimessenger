@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Db } from './db'
+import { canReplaceTitle, type TitleSource } from '@shared/title'
 import type { Chat, Friend, HarnessKind, Label, Message, MessageRole, Mode, SearchHit, Workspace } from '@shared/models'
 import type { Presence } from '@shared/status'
 
@@ -20,7 +21,7 @@ const toFriend = (r: Row): Friend => ({
 })
 const toChat = (r: Row): Chat => ({
   id: String(r['id']), workspaceId: String(r['workspace_id']), friendId: String(r['friend_id']),
-  title: String(r['title']), harnessSessionId: (r['harness_session_id'] as string | null) ?? null,
+  title: String(r['title']), titleSource: ((r['title_source'] as string | null) ?? 'user') as TitleSource, harnessSessionId: (r['harness_session_id'] as string | null) ?? null,
   status: r['status'] as Presence, statusText: (r['status_text'] as string | null) ?? null, mode: (r['mode'] as Mode) ?? 'ask', unreadCount: Number(r['unread_count']),
   createdAt: Number(r['created_at']), lastActivityAt: Number(r['last_activity_at'])
 })
@@ -145,8 +146,8 @@ export function createRepo(db: Db) {
         const t = now()
         const mode = c.mode ?? (await all('SELECT default_mode FROM friends WHERE id = ?', [c.friendId]))[0]?.['default_mode'] ?? 'ask'
         await run(
-          'INSERT INTO chats(id,workspace_id,friend_id,title,mode,created_at,last_activity_at) VALUES (?,?,?,?,?,?,?)',
-          [id, c.workspaceId, c.friendId, c.title ?? 'New chat', mode as string, t, t]
+          'INSERT INTO chats(id,workspace_id,friend_id,title,title_source,mode,created_at,last_activity_at) VALUES (?,?,?,?,?,?,?,?)',
+          [id, c.workspaceId, c.friendId, c.title ?? 'New chat', c.title ? 'user' : 'default', mode as string, t, t]
         )
         return (await this.get(id))!
       },
@@ -162,8 +163,16 @@ export function createRepo(db: Db) {
         const sql = `SELECT * FROM chats ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY last_activity_at DESC`
         return (await all(sql, args)).map(toChat)
       },
+      /** You renamed it: from now on no automatic title replaces it. */
       async rename(id: string, title: string): Promise<void> {
-        await run('UPDATE chats SET title = ? WHERE id = ?', [title, id])
+        await run("UPDATE chats SET title = ?, title_source = 'user' WHERE id = ?", [title, id])
+      },
+      /** An automatic title (first-message rule, the agent's own, or a model's). Ignored when it may not replace the current one. */
+      async setAutoTitle(id: string, title: string, source: TitleSource): Promise<boolean> {
+        const cur = (await all('SELECT title_source FROM chats WHERE id = ?', [id]))[0]
+        if (!cur || !title.trim() || !canReplaceTitle(String(cur['title_source']) as TitleSource, source)) return false
+        await run('UPDATE chats SET title = ?, title_source = ? WHERE id = ?', [title.trim(), source, id])
+        return true
       },
       async setMode(id: string, mode: Mode): Promise<void> {
         await run('UPDATE chats SET mode = ? WHERE id = ?', [mode, id])

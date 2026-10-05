@@ -9,6 +9,7 @@ import type { Message } from '@shared/models'
 import type { PermDecision, UserTurn } from '@shared/events'
 import type { Mode } from '@shared/models'
 import { canUseMode, lockedReason } from '@shared/safety'
+import { ruleTitle } from '@shared/title'
 import type { HarnessManager } from '../harness/manager'
 import { attachmentPrompt, imageMime, imagePrompt, MAX_IMAGE_BYTES, safeImageName } from '@shared/attachments'
 import { copyFile, mkdir, stat, writeFile } from 'node:fs/promises'
@@ -16,11 +17,6 @@ import { basename, join, sep } from 'node:path'
 import { readPickedFile } from './attachments'
 import type { Ingestor } from './ingest'
 
-const TITLE_MAX = 42
-const autoTitle = (text: string) => {
-  const one = text.replace(/\s+/g, ' ').trim()
-  return one.length > TITLE_MAX ? one.slice(0, TITLE_MAX - 1) + '…' : one
-}
 
 const NUDGE_COOLDOWN_MS = 3000
 
@@ -79,7 +75,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       if (!friend) throw new Error(`unknown friend ${chat.friendId}`)
       const ws = await repo.workspaces.get(chat.workspaceId)
       const shown = opts.silentUser ? null : await repo.messages.append({ chatId, role: 'user', kind: 'text', body: { text: clean, quote }, text: clean })
-      if (chat.title === 'New chat') await repo.chats.rename(chatId, autoTitle(opts.silentUser ? (await repo.messages.list(chatId)).find((m) => m.kind === 'attachment')?.text ?? clean : clean))
+      if (chat.titleSource === 'default') await repo.chats.setAutoTitle(chatId, opts.silentUser ? (await repo.messages.list(chatId)).find((m) => m.kind === 'attachment')?.text ?? ruleTitle(clean) : ruleTitle(clean), 'rule')
       notify('messages')
       try {
         await manager.send(chat, friend, ws?.path ?? process.cwd(), { text: clean, quote, images: opts.images })

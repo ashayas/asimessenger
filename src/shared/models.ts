@@ -1,3 +1,4 @@
+import type { TitleSource } from './title'
 import type { Presence } from './status'
 
 export type HarnessKind = 'claude' | 'codex' | 'pi' | 'acp' | 'pty' | 'http' | 'asi' | 'echo' | 'fake'
@@ -31,6 +32,7 @@ export interface Chat {
   workspaceId: string
   friendId: string
   title: string
+  titleSource: TitleSource
   harnessSessionId: string | null
   status: Presence
   statusText: string | null

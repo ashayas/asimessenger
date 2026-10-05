@@ -41,6 +41,7 @@ export type AgentEvent =
   | { t: 'attachment'; id: string; kind: AttachmentKind; name: string; path?: string; body?: string }
   | { t: 'open_url'; url: string }
   | { t: 'links'; items: { label: string; detail?: string; target: SearchTarget }[] }
+  | { t: 'title'; title: string }
   | { t: 'usage'; inputTokens: number; outputTokens: number; costUsd?: number }
   | { t: 'turn_end'; reason: 'done' | 'interrupted' | 'error'; error?: string }
 

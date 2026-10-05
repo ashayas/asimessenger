@@ -118,5 +118,7 @@ export const MIGRATIONS: string[] = [
   END;
   `,
   /* 5: per-chat permission mode */
-  `ALTER TABLE chats ADD COLUMN mode TEXT NOT NULL DEFAULT 'ask';`
+  `ALTER TABLE chats ADD COLUMN mode TEXT NOT NULL DEFAULT 'ask';`,
+  /* 6: where a chat's title came from, so a title you typed is never rewritten (existing chats count as yours) */
+  `ALTER TABLE chats ADD COLUMN title_source TEXT NOT NULL DEFAULT 'user';`
 ]

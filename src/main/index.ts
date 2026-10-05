@@ -18,6 +18,7 @@ import { createMcpBridge } from './mcp-bridge'
 import { createBrowserManager } from './browser'
 import { AsiAgent } from '../asi/agent'
 import { createBrain } from '../asi/brain'
+import { createTitler } from '../asi/titler'
 import { assessRisk } from '../asi/decider'
 import { discoverSessions } from '../asi/discovery'
 import { adoptSession } from './adopt'
@@ -67,7 +68,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('asi:brain-connect', async (_e, input) => { const r = await brain.connect(input); broadcastChanged('settings'); return r })
   ipcMain.handle('asi:brain-disconnect', async () => { await brain.disconnect(); broadcastChanged('settings') })
   const attention = createAttentionHandler(repo)
-  const ingestor = createIngestor(repo, broadcastChanged, (a) => void attention(a), async (tool, summary) => (await assessRisk(await brain.decider(), tool, summary)).risk)
+  const titler = createTitler(repo, () => brain.titleModel())
+  const ingestor = createIngestor(repo, broadcastChanged, (a) => void attention(a), async (tool, summary) => (await assessRisk(await brain.decider(), tool, summary)).risk, (chatId) => void titler.maybeRetitle(chatId).then((changed) => { if (changed) broadcastChanged('chats') }))
   let badgeTimer: ReturnType<typeof setTimeout> | null = null
   onChanged((topic) => {
     if (topic !== 'chats' && topic !== 'messages') return

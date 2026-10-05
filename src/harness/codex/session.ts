@@ -202,6 +202,9 @@ export class CodexSession implements AgentSession {
         this.hub.emit({ t: 'usage', inputTokens: Number(u['inputTokens'] ?? 0), outputTokens: Number(u['outputTokens'] ?? 0) })
         return
       }
+      case 'thread/name/updated':
+        if (typeof p['threadName'] === 'string' && p['threadName'].trim()) this.hub.emit({ t: 'title', title: p['threadName'] })
+        return
       case 'turn/completed': return this.onTurnCompleted((p['turn'] ?? {}) as Obj)
       default: return
     }

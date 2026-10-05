@@ -36,6 +36,18 @@ options · onboarding · toast        MCP bridge  (127.0.0.1, token)  ←── 
 | Voice | `src/main/{voice,cohere-engine,model-manager,voice-runtime,voice-setup}.ts`, `native/` |
 | Release | `scripts/`, `build/entitlements.mac.plist`, `docs/releasing.md` |
 
+## Chat titles
+
+A chat's title has a source (`chats.title_source`), and a better source may replace a worse one: `default` ("New chat") →
+`rule` (your first message, filler words dropped, `src/shared/title.ts`) → `model` → `agent`. A title you typed (or a chat created
+with one) is `user` and is never replaced.
+
+- **Agent**: harnesses emit `{ t: 'title' }` when the agent names its own session (ACP `session_info_update`, Codex
+  `thread/name/updated`). Claude Code and Pi do not announce titles in their headless modes.
+- **Model**: after the first exchange, a connected general chat model (`llm` brain) writes a 2–6 word title
+  (`src/asi/titler.ts`). Clef and Jev classify and cannot write text, so they never title. It tries at most twice per chat and a
+  failure keeps the rule title.
+
 ## ASI's decision model
 
 ASI asks typed questions (yes/no, pick-one, score) and gets probabilities back (`src/asi/decider.ts`). Anything that

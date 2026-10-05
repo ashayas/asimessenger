@@ -143,6 +143,9 @@ export class AcpSession implements AgentSession {
         this.hub.emit({ t: 'attachment', id: `plan-${this.turn}`, kind: 'plan', name: 'Plan', body })
         return
       }
+      case 'session_info_update':
+        if (typeof u['title'] === 'string' && u['title'].trim()) this.hub.emit({ t: 'title', title: u['title'] })
+        return
       case 'usage_update':
         this.hub.emit({ t: 'usage', inputTokens: Number(u['used'] ?? 0), outputTokens: 0 })
         return

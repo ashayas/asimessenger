@@ -38,6 +38,14 @@ export function createBrain(repo: Repo, secrets: Secrets, fetchImpl?: typeof fet
       if (needsToken(cfg) && !tok) return null
       return build(cfg, tok)
     },
+    /** The endpoint to write chat titles with. Only a general chat model can write text; Clef and Jev are classifiers. */
+    async titleModel(): Promise<{ baseUrl: string; model: string; token: string | null; fetchImpl?: typeof fetch } | null> {
+      const cfg = await repo.settings.get<BrainConfig | null>('asi.brain', null)
+      if (!cfg || cfg.provider !== 'llm') return null
+      const tok = await token(cfg)
+      if (needsToken(cfg) && !tok) return null
+      return { baseUrl: cfg.baseUrl, model: cfg.model, token: tok, fetchImpl }
+    },
     /** Validates with one real decision, then stores. Nothing is saved on failure. */
     async connect(input: BrainInput): Promise<{ latencyMs: number; costPerDecisionUsd: number | null }> {
       let cfg: BrainConfig

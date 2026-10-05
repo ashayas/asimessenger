@@ -27,6 +27,7 @@ rl.on('line', async (line) => {
     const imgs = m.params.prompt.filter((b) => b.type === 'image' && b.mimeType === 'image/png' && b.data).length
     const text = m.params.prompt.map((b) => b.text).join('') + (imgs ? ` [img:${imgs}]` : '')
     const end = (stopReason = 'end_turn') => out({ id: m.id, result: { stopReason, usage: { inputTokens: 5, outputTokens: 2 } } })
+    if (text.includes('retitle')) upd(sid, { sessionUpdate: 'session_info_update', title: 'Fix the flaky session test' })
     if (text.includes('slow')) {
       upd(sid, { sessionUpdate: 'tool_call', toolCallId: 'c1', title: 'sleep', kind: 'execute', status: 'in_progress', rawInput: { command: 'sleep 30' } })
       for (let i = 0; i < 300 && !cancelled; i++) await new Promise((r) => setTimeout(r, 100))

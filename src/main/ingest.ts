@@ -1,3 +1,4 @@
+import { cleanTitle } from '@shared/title'
 import type { Repo } from './db/repo'
 import type { AgentEvent, Risk } from '@shared/events'
 import type { Presence } from '@shared/status'
@@ -26,7 +27,7 @@ export interface Attention {
   reqId?: string
 }
 
-export function createIngestor(repo: Repo, notify: (topic: string) => void, onAttention: (a: Attention) => void = () => {}, assessRisk?: (tool: string, summary: string) => Promise<Risk>) {
+export function createIngestor(repo: Repo, notify: (topic: string) => void, onAttention: (a: Attention) => void = () => {}, assessRisk?: (tool: string, summary: string) => Promise<Risk>, onTurnDone: (chatId: string) => void = () => {}) {
   const states = new Map<string, ChatState>()
   const queues = new Map<string, Promise<void>>()
   const state = (chatId: string): ChatState => {
@@ -125,6 +126,10 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
         notify('chats')
         return
       }
+      case 'title': {
+        if (await repo.chats.setAutoTitle(chatId, cleanTitle(e.title), 'agent')) notify('chats')
+        return
+      }
       case 'usage':
         return
       case 'turn_end': {
@@ -139,6 +144,7 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
         else if (e.reason === 'done') {
           const last = (await repo.messages.list(chatId)).filter((m) => m.role === 'agent' && m.kind === 'text').at(-1)
           if (last?.text) onAttention({ chatId, kind: 'message', text: last.text })
+          onTurnDone(chatId)
         }
         return
       }

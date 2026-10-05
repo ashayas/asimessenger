@@ -1,5 +1,6 @@
 import type { Risk } from '@shared/events'
 import { heuristicRisk } from '@shared/safety'
+import { cleanTitle } from '@shared/title'
 
 /** Typed questions in, probabilities out. Clef (Cloudflare) and Jev answer this shape; the heuristic one runs offline. */
 export type Question =
@@ -131,6 +132,25 @@ export function systemOneDecider(c: EndpointConfig): Decider {
       return parseAnswers(body.answers, questions)
     }
   }
+}
+
+/** One plain completion from an OpenAI-compatible chat model. */
+export async function llmComplete(c: EndpointConfig, system: string, user: string, maxTokens = 40): Promise<string> {
+  const body = (await postJson({ ...c, timeoutMs: c.timeoutMs ?? 30_000 }, `${c.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
+    model: c.model, temperature: 0.2, max_tokens: maxTokens,
+    messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
+  })) as { choices?: { message?: { content?: string } }[] } | null
+  const content = body?.choices?.[0]?.message?.content
+  if (!content) throw new Error('the model returned no content')
+  return content
+}
+
+const TITLE_SYSTEM = 'You name chat conversations between a person and a coding agent. Reply with a title only: 2 to 6 words, lower case unless a name needs capitals, no quotes, no trailing punctuation. Say what the work is about, not that it is a conversation.'
+
+/** A short title for a chat from its first exchange. */
+export async function llmTitle(c: EndpointConfig, userText: string, agentText: string): Promise<string> {
+  const clip = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, 400)
+  return cleanTitle(await llmComplete(c, TITLE_SYSTEM, `The person said: ${clip(userText)}\nThe agent replied: ${clip(agentText)}`))
 }
 
 const LLM_SYSTEM = `You are a decision engine. You receive a STATE and a set of QUESTIONS and answer every question with calibrated probabilities. Reply with one JSON object only, no prose, shaped {"answers": {<question id>: <answer>}} where:

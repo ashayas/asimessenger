@@ -27,6 +27,7 @@ rl.on('line', async (line) => {
   const imgs = m.params.input.filter((i) => i.type === 'localImage' && i.path).length
   const text = m.params.input.map((i) => i.text).join('') + (imgs ? ` [img:${imgs}]` : '')
   const finish = (status = 'completed', error = null) => note('turn/completed', { threadId: THREAD, turn: { ...turn, status, error } })
+  if (text.includes('retitle')) note('thread/name/updated', { threadId: THREAD, threadName: 'Tidy the build script' })
   if (text.includes('slow')) {
     note('item/started', { item: item('commandExecution', 'c1', { command: 'sleep 30', cwd: '/tmp', status: 'inProgress', aggregatedOutput: null, exitCode: null, durationMs: null }) })
     for (let i = 0; i < 300 && !interrupted; i++) await new Promise((r) => setTimeout(r, 50))

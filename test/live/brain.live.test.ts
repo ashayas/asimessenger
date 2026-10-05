@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { assessRisk, llmDecider, systemOneDecider } from '../../src/asi/decider'
+import { assessRisk, llmDecider, llmTitle, systemOneDecider } from '../../src/asi/decider'
 
 // Needs an OpenRouter key in ASI_LIVE_OPENROUTER_KEY. Each decision costs a fraction of a cent.
 const live = !!process.env['ASI_LIVE']
@@ -18,4 +18,13 @@ describe.skipIf(!live || !key)('decision models, for real', () => {
       expect(fine.risk).toBe('low')
     }, 120_000)
   }
+
+  test('a general chat model writes a short, sensible chat title', async () => {
+    const t = await llmTitle({ baseUrl: 'https://openrouter.ai/api/v1', model: 'anthropic/claude-haiku-4.5', token: key, timeoutMs: 60_000 }, 'hey can you fix the flaky session refresh test? it fails on CI about one run in five', 'Reproducing it first, then I will look at the refresh lock.')
+    console.log('TITLE:', t)
+    expect(t.length).toBeGreaterThan(3)
+    expect(t.length).toBeLessThanOrEqual(60)
+    expect(t.split(/\s+/).length).toBeLessThanOrEqual(8)
+    expect(t).not.toMatch(/["\n]/)
+  }, 120_000)
 })

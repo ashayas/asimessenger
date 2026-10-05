@@ -12,6 +12,8 @@ const OPTION_MAP: Record<string, PermDecision> = { allow_once: 'allow-once', all
 export interface AcpSessionOptions {
   /** ACP modeId for each of our modes, when the agent exposes modes. */
   modeMap?: Partial<Record<Mode, string>>
+  /** The permission policy is set at launch (env or arguments), so a mode change needs a fresh process. */
+  restartOnModeChange?: boolean
   /** The agent advertised promptCapabilities.image, so pictures can go as image blocks. */
   images?: boolean
 }
@@ -39,6 +41,8 @@ export class AcpSession implements AgentSession {
   }
 
   get resumeId(): string { return this.sessionId }
+  get restartOnModeChange(): boolean { return !!this.opts.restartOnModeChange }
+  get busy(): boolean { return this.prompting !== null }
 
   /** Used while replaying history during session/load. */
   setSuppress(v: boolean): void { this.suppress = v }

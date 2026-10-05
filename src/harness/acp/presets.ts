@@ -14,12 +14,6 @@ export const OPENCODE: AcpPreset = {
   })
 }
 
-export const GEMINI: AcpPreset = {
-  command: 'gemini',
-  args: ['--experimental-acp'],
-  modeArgs: (mode) => (mode === 'dangerous' ? ['--approval-mode', 'yolo'] : mode === 'plan' ? ['--approval-mode', 'plan'] : mode === 'auto-edit' ? ['--approval-mode', 'auto_edit'] : [])
-}
-
 /** Hermes and Pi both ship ACP adapters; commands come from the friend's registration. */
 export const HERMES: AcpPreset = { command: 'hermes', args: ['acp'] }
 export const GENERIC_ACP: AcpPreset = { command: 'acp-agent', args: [] }

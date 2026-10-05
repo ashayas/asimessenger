@@ -33,6 +33,7 @@ rl.on('line', async (line) => {
       for (let i = 0; i < 300 && !cancelled; i++) await new Promise((r) => setTimeout(r, 100))
       return end(cancelled ? 'cancelled' : 'end_turn')
     }
+    if (text.includes('whatmode')) { upd(sid, { sessionUpdate: 'agent_message_chunk', messageId: 'mm', content: { type: 'text', text: `policy=${process.env.MOCK_MODE ?? 'none'} pid=${process.pid}` } }); return end() }
     if (text.includes('plan')) {
       upd(sid, { sessionUpdate: 'plan', entries: [{ content: 'step one', status: 'completed', priority: 'high' }, { content: 'step two', status: 'pending', priority: 'low' }] })
       return end()

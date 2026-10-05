@@ -34,7 +34,7 @@ export function acpFactory(preset: AcpPreset): HarnessFactory {
         clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }
       })
       let sessionId: string
-      const sessionOpts = { ...preset.session, images: !!init.agentCapabilities?.promptCapabilities?.image }
+      const sessionOpts = { ...preset.session, images: !!init.agentCapabilities?.promptCapabilities?.image, restartOnModeChange: !!(preset.env || preset.modeArgs) && !preset.session?.modeMap }
       const mcpHttp = (init.agentCapabilities as { mcpCapabilities?: { http?: boolean } } | undefined)?.mcpCapabilities?.http
       const mcpServers = ctx.mcp && mcpHttp ? [{ type: 'http', name: 'asi', url: ctx.mcp.url, headers: [{ name: 'Authorization', value: `Bearer ${ctx.mcp.token}` }] }] : []
       let session: AcpSession | null = null

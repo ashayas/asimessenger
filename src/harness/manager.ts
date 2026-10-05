@@ -14,7 +14,9 @@ export interface ManagerHooks {
 /** Owns one live AgentSession per chat; sessions start lazily on the first message. */
 export class HarnessManager {
   private factories = new Map<HarnessKind, HarnessFactory>()
-  private sessions = new Map<string, { session: AgentSession; unsub: () => void }>()
+  private sessions = new Map<string, { session: AgentSession; unsub: () => void; mode: Mode }>()
+  /** Chats whose agent must start over in a new mode once its current turn ends. */
+  private restartAfterTurn = new Set<string>()
   private starting = new Map<string, Promise<AgentSession>>()
 
   constructor(private hooks: ManagerHooks) {}
@@ -45,8 +47,11 @@ export class HarnessManager {
     if (!factory) throw new Error(`no harness registered for "${friend.harness}"`)
     const p = (async () => {
       const session = await factory({ friend, chatId: chat.id, cwd, mode, resumeId: chat.harnessSessionId, mcp: this.hooks.mcpFor?.(chat.id) })
-      const unsub = session.subscribe((e) => this.hooks.onEvent(chat.id, e))
-      this.sessions.set(chat.id, { session, unsub })
+      const unsub = session.subscribe((e) => {
+        this.hooks.onEvent(chat.id, e)
+        if (e.t === 'turn_end' && this.restartAfterTurn.delete(chat.id)) void this.dispose(chat.id) // the next message starts a fresh session in the new mode
+      })
+      this.sessions.set(chat.id, { session, unsub, mode })
       if (session.resumeId && session.resumeId !== chat.harnessSessionId) this.hooks.onResumeId?.(chat.id, session.resumeId)
       return session
     })()
@@ -72,13 +77,21 @@ export class HarnessManager {
   }
 
   setMode(chatId: string, mode: Mode): void {
-    this.sessions.get(chatId)?.session.setMode(mode)
+    const s = this.sessions.get(chatId)
+    if (!s) return
+    s.session.setMode(mode)
+    // some agents only read their permission policy at launch: a new mode means a new process, never a silent no-op
+    if (s.session.restartOnModeChange && s.mode !== mode) {
+      if (s.session.busy) this.restartAfterTurn.add(chatId)
+      else void this.dispose(chatId)
+    }
   }
 
   async dispose(chatId: string): Promise<void> {
     const s = this.sessions.get(chatId)
     if (!s) return
     this.sessions.delete(chatId)
+    this.restartAfterTurn.delete(chatId)
     s.unsub()
     await s.session.dispose()
   }

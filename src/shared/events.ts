@@ -68,5 +68,12 @@ export interface AgentSession {
   setMode(mode: Mode): void
   /** Opaque id the adapter can resume later (stored on the chat). */
   readonly resumeId?: string
+  /**
+   * True when the agent's permission policy is fixed when it starts (OpenCode's config, Antigravity's --dangerously-skip-permissions), so a mode change
+   * only takes effect in a new session. The manager then starts a fresh one (resuming the same conversation) after the current turn.
+   */
+  readonly restartOnModeChange?: boolean
+  /** True while a turn is running. */
+  readonly busy?: boolean
   dispose(): Promise<void>
 }

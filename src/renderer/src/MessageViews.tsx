@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Message } from '@shared/models'
 import type { AgentEvent } from '@shared/events'
 import { Btn } from './ui/kit'
@@ -135,8 +135,16 @@ function QuestionCard({ chatId, q }: { chatId: string; q: Quest }) {
 }
 
 function AttachmentCard({ a, messageId }: { a: Attach; messageId: string }) {
+  const [thumb, setThumb] = useState<string | null>(null)
+  useEffect(() => {
+    if (a.kind !== 'image') return
+    let live = true
+    void window.asi.attachments.load(messageId).then((l) => { if (live) setThumb(l.text) }).catch(() => {})
+    return () => { live = false }
+  }, [a.kind, messageId])
   return (
     <div className="card" data-kind="attachment">
+      {thumb ? <img className="thumb" src={thumb} alt={a.name} data-testid="thumb" onClick={() => void window.asi.attachments.open(messageId)} /> : null}
       <div className="file">
         <div className="ic">{badgeFor(a.kind)}</div>
         <div className="grow"><b>{a.name}</b><div className="says">{a.kind} · sent as attachment</div></div>

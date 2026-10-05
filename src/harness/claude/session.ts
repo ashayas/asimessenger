@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { EventHub } from '../emitter'
 import type { AgentEvent, AgentSession, FileChange, PermDecision, ToolKind, UserTurn } from '@shared/events'
 import type { Mode } from '@shared/models'
+import { loadImages } from '../images'
 
 type Obj = Record<string, unknown>
 
@@ -94,7 +95,7 @@ export class ClaudeSession implements AgentSession {
     this.active = true
     this.interrupting = false
     this.hub.emit({ t: 'status', phase: 'thinking' })
-    this.write({ type: 'user', message: { role: 'user', content: [{ type: 'text', text }] } })
+    this.write({ type: 'user', message: { role: 'user', content: [...loadImages(turn).map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mimeType, data: i.data } })), { type: 'text', text }] } })
   }
 
   async interrupt(): Promise<void> {

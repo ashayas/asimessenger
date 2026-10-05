@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { CHANGED_CHANNEL, REPO_CHANNEL_PREFIX, REPO_METHODS } from '../shared/api'
 
 const api: Record<string, Record<string, (...args: unknown[]) => Promise<unknown>>> = {}
@@ -50,7 +50,10 @@ const attachments = {
   load: (messageId: string): Promise<unknown> => ipcRenderer.invoke('attachments:load', messageId),
   open: (messageId: string): Promise<void> => ipcRenderer.invoke('attachments:open', messageId),
   pickFiles: (): Promise<string[]> => ipcRenderer.invoke('dialog:pick-files'),
-  sendFiles: (chatId: string, paths: string[], note?: string): Promise<void> => ipcRenderer.invoke('chat:send-files', chatId, paths, note)
+  sendFiles: (chatId: string, paths: string[], note?: string): Promise<void> => ipcRenderer.invoke('chat:send-files', chatId, paths, note),
+  saveImage: (chatId: string, name: string, bytes: Uint8Array): Promise<string> => ipcRenderer.invoke('chat:save-image', chatId, name, bytes),
+  /** The real path of a file dragged in from Finder. */
+  pathFor: (file: File): string => webUtils.getPathForFile(file)
 }
 
 const search = {

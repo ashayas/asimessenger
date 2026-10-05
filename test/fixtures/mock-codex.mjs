@@ -24,7 +24,8 @@ rl.on('line', async (line) => {
   const turn = { id: 'turn-1', items: [], status: 'inProgress' }
   out({ id: m.id, result: { turn } })
   note('turn/started', { threadId: THREAD, turn })
-  const text = m.params.input.map((i) => i.text).join('')
+  const imgs = m.params.input.filter((i) => i.type === 'localImage' && i.path).length
+  const text = m.params.input.map((i) => i.text).join('') + (imgs ? ` [img:${imgs}]` : '')
   const finish = (status = 'completed', error = null) => note('turn/completed', { threadId: THREAD, turn: { ...turn, status, error } })
   if (text.includes('slow')) {
     note('item/started', { item: item('commandExecution', 'c1', { command: 'sleep 30', cwd: '/tmp', status: 'inProgress', aggregatedOutput: null, exitCode: null, durationMs: null }) })

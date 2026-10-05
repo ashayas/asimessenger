@@ -15,7 +15,8 @@ rl.on('line', async (line) => {
   if (m.type === 'control_response') { waiting.get(m.response.request_id)?.(m.response.response); return }
   if (m.type !== 'user') return
   interrupted = false
-  const text = m.message.content.map((b) => b.text).join('')
+  const imgs = m.message.content.filter((b) => b.type === 'image' && b.source?.type === 'base64' && b.source.media_type === 'image/png').length
+  const text = m.message.content.map((b) => b.text).join('') + (imgs ? ` [img:${imgs}]` : '')
   out({ type: 'system', subtype: 'init', session_id: sid })
   const result = (extra = {}) => out({ type: 'result', subtype: 'success', is_error: false, result: 'ok', session_id: sid, usage: { input_tokens: 3, output_tokens: 2 }, total_cost_usd: 0.001, ...extra })
   if (text.includes('slow')) {

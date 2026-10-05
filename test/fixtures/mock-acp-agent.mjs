@@ -11,7 +11,7 @@ let loadedSessions = new Set()
 
 rl.on('line', async (line) => {
   const m = JSON.parse(line)
-  if (m.method === 'initialize') return out({ id: m.id, result: { protocolVersion: 1, agentCapabilities: { loadSession: true }, authMethods: [] } })
+  if (m.method === 'initialize') return out({ id: m.id, result: { protocolVersion: 1, agentCapabilities: { loadSession: true, promptCapabilities: { image: !process.argv.includes('--no-images') } }, authMethods: [] } })
   if (m.method === 'session/new') return out({ id: m.id, result: { sessionId: 'mock-session-1' } })
   if (m.method === 'session/load') {
     loadedSessions.add(m.params.sessionId)
@@ -24,7 +24,8 @@ rl.on('line', async (line) => {
   if (m.method === 'session/prompt') {
     cancelled = false
     const sid = m.params.sessionId
-    const text = m.params.prompt.map((b) => b.text).join('')
+    const imgs = m.params.prompt.filter((b) => b.type === 'image' && b.mimeType === 'image/png' && b.data).length
+    const text = m.params.prompt.map((b) => b.text).join('') + (imgs ? ` [img:${imgs}]` : '')
     const end = (stopReason = 'end_turn') => out({ id: m.id, result: { stopReason, usage: { inputTokens: 5, outputTokens: 2 } } })
     if (text.includes('slow')) {
       upd(sid, { sessionUpdate: 'tool_call', toolCallId: 'c1', title: 'sleep', kind: 'execute', status: 'in_progress', rawInput: { command: 'sleep 30' } })

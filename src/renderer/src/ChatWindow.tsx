@@ -1,3 +1,4 @@
+import { imageMime } from '@shared/attachments'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Chat, Friend, Message } from '@shared/models'
 import { avatarFor } from '@shared/harness-meta'
@@ -51,6 +52,10 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
   const [modeNote, setModeNote] = useState<string | null>(null)
   const [editingLabels, setEditingLabels] = useState(false)
   const [drawer, setDrawer] = useState(false)
+  /** Pictures and files waiting to go out with the next message (dropped, pasted). */
+  const [pending, setPending] = useState<{ id: string; name: string; path: string; preview?: string }[]>([])
+  const [dropping, setDropping] = useState(false)
+  const [attachNote, setAttachNote] = useState<string | null>(null)
   const chatLabelIds = useData((s) => s.chatLabels[chatId] ?? NO_LABELS)
 
   useEffect(() => {
@@ -103,6 +108,29 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
       setVoiceNote(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : String(e))
     } finally { setVoice('idle') }
   }, [])
+  const addFiles = useCallback(async (files: File[]) => {
+    setAttachNote(null)
+    for (const f of files) {
+      try {
+        const name = f.name || 'image.png'
+        const isImage = imageMime(name) !== null || f.type.startsWith('image/')
+        const real = window.asi.attachments.pathFor(f)
+        const preview = isImage ? await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsDataURL(f) }) : undefined
+        // a pasted picture has no file on disk: save it into the workspace first
+        const path = real || (isImage ? await window.asi.attachments.saveImage(chatId, name, new Uint8Array(await f.arrayBuffer())) : '')
+        if (!path) throw new Error(`could not read ${name}`)
+        setPending((p) => [...p, { id: `${Date.now()}-${Math.random()}`, name, path, preview }])
+      } catch (e) {
+        setAttachNote(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : String(e))
+      }
+    }
+    composerRef.current?.focus()
+  }, [chatId])
+  const dropProps = {
+    onDragOver: (e: React.DragEvent) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDropping(true) } },
+    onDragLeave: (e: React.DragEvent) => { if (e.currentTarget === e.target) setDropping(false) },
+    onDrop: (e: React.DragEvent) => { e.preventDefault(); setDropping(false); void addFiles(Array.from(e.dataTransfer.files)) }
+  }
   const toggleVoice = () => void (rec.current ? stopVoice() : startVoice())
 
   // hold ⌥Space to talk
@@ -132,6 +160,13 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
 
   const send = () => {
     const text = draft.trim()
+    if (pending.length) {
+      const paths = pending.map((p) => p.path)
+      setPending([])
+      setDraft('')
+      void window.asi.attachments.sendFiles(chatId, paths, text).catch((e: unknown) => setAttachNote(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : String(e)))
+      return
+    }
     if (!text) return
     setDraft('')
     void window.asi.chat.send(chatId, text)
@@ -165,7 +200,7 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
         <button className="linkish" onClick={() => setEditingLabels((v) => !v)} title="Label this chat (⌘L)">🏷 Label</button>
       </div>
       {editingLabels ? <LabelEditor target={{ kind: 'chat', id: chatId }} onClose={() => setEditingLabels(false)} /> : null}
-      <div className="convo">
+      <div className={`convo${dropping ? ' dropping' : ''}`} {...dropProps}>
         <div className="transcript" data-testid="transcript">
           {blocks.length === 0 && <div className="empty">Say something to {friend.displayName}.</div>}
           {blocks.map((b, i) => (
@@ -217,14 +252,30 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
         })}
       </div>
       )}
-      <div className="composer">
+      {pending.length || attachNote ? (
+        <div className="tray" data-testid="tray" {...dropProps}>
+          {pending.map((p) => (
+            <span key={p.id} className="chip-file" data-testid="pending-file">
+              {p.preview ? <img src={p.preview} alt="" /> : <span className="ic">FILE</span>}
+              <span className="nm">{p.name}</span>
+              <button aria-label={`Remove ${p.name}`} onClick={() => setPending((l) => l.filter((x) => x.id !== p.id))}>×</button>
+            </span>
+          ))}
+          {attachNote ? <span className="tray-note" role="status">{attachNote}</span> : null}
+        </div>
+      ) : null}
+      <div className={`composer${dropping ? ' dropping' : ''}`} {...dropProps}>
         <textarea
           ref={composerRef}
           className="field"
           aria-label="Message"
-          placeholder={`Reply to ${friend.displayName}… (! runs a shell command, /open opens a URL or file)`}
+          placeholder={`Reply to ${friend.displayName}… (drop or paste a picture, ! runs a shell command, /open opens a URL or file)`}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onPaste={(e) => {
+            const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'))
+            if (files.length) { e.preventDefault(); void addFiles(files) }
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault()
@@ -233,7 +284,7 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
           }}
           autoFocus
         />
-        <button className="btn primary" onClick={send} disabled={!draft.trim()}>Send</button>
+        <button className="btn primary" onClick={send} disabled={!draft.trim() && pending.length === 0}>Send</button>
       </div>
     </Frame>
   )

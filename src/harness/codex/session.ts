@@ -92,7 +92,7 @@ export class CodexSession implements AgentSession {
     this.peer
       .request<Obj>('turn/start', {
         threadId: this.threadId,
-        input: [{ type: 'text', text, text_elements: [] }],
+        input: [{ type: 'text', text, text_elements: [] }, ...(turn.images ?? []).map((i) => ({ type: 'localImage', path: i.path }))],
         approvalPolicy: pol.approvalPolicy,
         sandboxPolicy: pol.sandboxPolicy
       })

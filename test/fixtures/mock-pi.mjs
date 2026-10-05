@@ -33,7 +33,8 @@ function handle(m) {
   out({ type: 'agent_start' })
   out({ type: 'message_start', message: asst() })
   out({ type: 'message_update', assistantMessageEvent: { type: 'thinking_delta', contentIndex: 0, delta: 'hmm' } })
-  out({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 1, delta: 'echo: ' + m.message } })
+  const imgs = (m.images ?? []).filter((i) => i.type === 'image' && i.mimeType === 'image/png' && i.data).length
+  out({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 1, delta: 'echo: ' + m.message + (imgs ? ` [img:${imgs}]` : '') } })
   if (m.message.includes('FAIL')) return finish(asst({ stopReason: 'error', errorMessage: 'rate limited\nretry later' }))
   if (m.message.includes('BASH')) {
     out({ type: 'tool_execution_start', toolCallId: 't1', toolName: 'bash', args: { command: 'echo hi' } })

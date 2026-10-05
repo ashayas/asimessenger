@@ -10,7 +10,9 @@ import type { PermDecision, UserTurn } from '@shared/events'
 import type { Mode } from '@shared/models'
 import { canUseMode, lockedReason } from '@shared/safety'
 import type { HarnessManager } from '../harness/manager'
-import { attachmentPrompt } from '@shared/attachments'
+import { attachmentPrompt, imageMime, imagePrompt, MAX_IMAGE_BYTES, safeImageName } from '@shared/attachments'
+import { copyFile, mkdir, stat, writeFile } from 'node:fs/promises'
+import { basename, join, sep } from 'node:path'
 import { readPickedFile } from './attachments'
 import type { Ingestor } from './ingest'
 
@@ -41,8 +43,31 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
     for (const [id, a] of asks) if (a.chatId === chatId) { asks.delete(id); a.resolve(why) }
   }
 
+  /** `<workspace>/.attachments`, created on demand. Pictures live in the workspace so the agent's own file tools can open them. */
+  async function attachmentsDir(chatId: string): Promise<string> {
+    const chat = await repo.chats.get(chatId)
+    if (!chat) throw new Error(`unknown chat ${chatId}`)
+    const ws = await repo.workspaces.get(chat.workspaceId)
+    const dir = join(ws?.path ?? process.cwd(), '.attachments')
+    await mkdir(dir, { recursive: true })
+    return dir
+  }
+
+  /** A picture from anywhere on disk is copied into the workspace unless it is already inside it. */
+  async function inWorkspace(chatId: string, path: string): Promise<string> {
+    const st = await stat(path)
+    if (st.size > MAX_IMAGE_BYTES) throw new Error(`${basename(path)} is larger than 10 MB`)
+    const chat = await repo.chats.get(chatId)
+    const ws = chat ? await repo.workspaces.get(chat.workspaceId) : null
+    const root = ws?.path ?? process.cwd()
+    if (path === root || path.startsWith(root + sep)) return path
+    const dest = join(await attachmentsDir(chatId), safeImageName(basename(path)))
+    await copyFile(path, dest)
+    return dest
+  }
+
   return {
-    async send(chatId: string, text: string, quote?: UserTurn['quote'], opts: { silentUser?: boolean } = {}): Promise<Message | null> {
+    async send(chatId: string, text: string, quote?: UserTurn['quote'], opts: { silentUser?: boolean; images?: UserTurn['images'] } = {}): Promise<Message | null> {
       const clean = text.trim()
       if (!clean) return null
       const chat = await repo.chats.get(chatId)
@@ -57,7 +82,7 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       if (chat.title === 'New chat') await repo.chats.rename(chatId, autoTitle(opts.silentUser ? (await repo.messages.list(chatId)).find((m) => m.kind === 'attachment')?.text ?? clean : clean))
       notify('messages')
       try {
-        await manager.send(chat, friend, ws?.path ?? process.cwd(), { text: clean, quote })
+        await manager.send(chat, friend, ws?.path ?? process.cwd(), { text: clean, quote, images: opts.images })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         await repo.messages.append({ chatId, role: 'system', kind: 'error', body: { error: message }, text: message })
@@ -124,17 +149,41 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       return manager.session(chat, friend, ws?.path ?? process.cwd(), chat.mode)
     },
 
-    /** Send files to the agent; they appear in the transcript as attachments you can reopen. */
+    /** Save a pasted or dropped picture into the chat's workspace (`.attachments/`) and return where it went. */
+    async saveImage(chatId: string, name: string, bytes: Uint8Array): Promise<string> {
+      if (!imageMime(name)) throw new Error('only png, jpg, gif and webp pictures can be attached')
+      if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error('that picture is larger than 10 MB')
+      const dir = await attachmentsDir(chatId)
+      const path = join(dir, safeImageName(name))
+      await writeFile(path, bytes)
+      return path
+    },
+
+    /** Send files to the agent; they appear in the transcript as attachments you can reopen. Pictures go as images. */
     async sendFiles(chatId: string, paths: string[], note = ''): Promise<void> {
       const parts: string[] = []
-      for (const [i, p] of paths.entries()) {
-        const f = await readPickedFile(p)
-        const m = await repo.messages.append({ chatId, role: 'user', kind: 'attachment', body: { t: 'attachment', id: `u-${Date.now()}-${i}`, kind: f.kind, name: f.name, path: p, body: f.text }, text: f.name })
-        await repo.attachments.add({ messageId: m.id, kind: f.kind, name: f.name, path: p, body: f.text })
-        parts.push(attachmentPrompt(f.name, f.text, i === 0 ? note : ''))
+      const images: NonNullable<UserTurn['images']> = []
+      for (const [i, p0] of paths.entries()) {
+        const lead = parts.length === 0 ? note : ''
+        const mime = imageMime(p0)
+        if (mime) {
+          const path = await inWorkspace(chatId, p0)
+          const name = basename(path)
+          const m = await repo.messages.append({ chatId, role: 'user', kind: 'attachment', body: { t: 'attachment', id: `u-${Date.now()}-${i}`, kind: 'image', name, path }, text: name })
+          await repo.attachments.add({ messageId: m.id, kind: 'image', name, path })
+          images.push({ path, mimeType: mime, name })
+          parts.push(imagePrompt(name, path, lead))
+          continue
+        }
+        const f = await readPickedFile(p0)
+        const m = await repo.messages.append({ chatId, role: 'user', kind: 'attachment', body: { t: 'attachment', id: `u-${Date.now()}-${i}`, kind: f.kind, name: f.name, path: p0, body: f.text }, text: f.name })
+        await repo.attachments.add({ messageId: m.id, kind: f.kind, name: f.name, path: p0, body: f.text })
+        parts.push(attachmentPrompt(f.name, f.text, lead))
       }
+      // your own words belong in the transcript too, not only in the prompt the agent receives
+      if (note.trim() && parts.length) await repo.messages.append({ chatId, role: 'user', kind: 'text', body: { text: note.trim() }, text: note.trim() })
       notify('messages')
-      if (parts.length) await this.send(chatId, parts.join('\n\n'), undefined, { silentUser: true })
+      if (parts.length) await this.send(chatId, parts.join('\n\n'), undefined, { silentUser: true, images })
     },
 
     /** Send a drawing: shows as an image attachment and tells the agent where the PNG and editable source are. */

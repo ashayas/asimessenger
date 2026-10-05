@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { EventHub } from '../emitter'
 import type { AgentEvent, AgentSession, FileChange, PermDecision, ToolKind, UserTurn } from '@shared/events'
 import type { Mode } from '@shared/models'
+import { loadImages } from '../images'
 
 type Obj = Record<string, unknown>
 
@@ -99,7 +100,8 @@ export class PiSession implements AgentSession {
     this.interrupting = false
     this.lastError = ''
     this.hub.emit({ t: 'status', phase: 'thinking' })
-    this.write({ type: 'prompt', message: text, ...(wasActive ? { streamingBehavior: 'steer' } : {}) })
+    const images = loadImages(turn).map((i) => ({ type: 'image', data: i.data, mimeType: i.mimeType }))
+    this.write({ type: 'prompt', message: text, ...(images.length ? { images } : {}), ...(wasActive ? { streamingBehavior: 'steer' } : {}) })
   }
 
   async interrupt(): Promise<void> {

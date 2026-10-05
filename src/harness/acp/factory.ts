@@ -29,18 +29,19 @@ export function acpFactory(preset: AcpPreset): HarnessFactory {
     const child = spawn(exe, args, { cwd: ctx.cwd, env, stdio: ['pipe', 'pipe', 'pipe'] })
     const peer = new RpcPeer(child)
     try {
-      const init = await peer.request<{ agentCapabilities?: { loadSession?: boolean; mcpCapabilities?: { http?: boolean } } }>('initialize', {
+      const init = await peer.request<{ agentCapabilities?: { loadSession?: boolean; mcpCapabilities?: { http?: boolean }; promptCapabilities?: { image?: boolean } } }>('initialize', {
         protocolVersion: 1,
         clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }
       })
       let sessionId: string
+      const sessionOpts = { ...preset.session, images: !!init.agentCapabilities?.promptCapabilities?.image }
       const mcpHttp = (init.agentCapabilities as { mcpCapabilities?: { http?: boolean } } | undefined)?.mcpCapabilities?.http
       const mcpServers = ctx.mcp && mcpHttp ? [{ type: 'http', name: 'asi', url: ctx.mcp.url, headers: [{ name: 'Authorization', value: `Bearer ${ctx.mcp.token}` }] }] : []
       let session: AcpSession | null = null
       if (ctx.resumeId && init.agentCapabilities?.loadSession) {
         try {
           sessionId = ctx.resumeId
-          session = new AcpSession(peer, sessionId, preset.session)
+          session = new AcpSession(peer, sessionId, sessionOpts)
           session.setSuppress(true) // history is replayed as updates; we already have it
           await peer.request('session/load', { sessionId, cwd: ctx.cwd, mcpServers })
           session.setSuppress(false)
@@ -51,7 +52,7 @@ export function acpFactory(preset: AcpPreset): HarnessFactory {
       if (!session) {
         const r = await peer.request<{ sessionId: string }>('session/new', { cwd: ctx.cwd, mcpServers })
         sessionId = r.sessionId
-        session = new AcpSession(peer, sessionId, preset.session)
+        session = new AcpSession(peer, sessionId, sessionOpts)
       }
       session.setMode(ctx.mode)
       return session

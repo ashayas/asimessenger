@@ -128,6 +128,7 @@ app.whenReady().then(async () => {
     const r = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] })
     return r.canceled ? [] : r.filePaths
   })
+  ipcMain.handle('chat:save-image', (_e, chatId: string, name: string, bytes: Uint8Array) => chat.saveImage(chatId, name, bytes))
   ipcMain.handle('chat:send-files', (_e, chatId: string, paths: string[], note?: string) => chat.sendFiles(chatId, paths, note))
   ipcMain.handle('window:open-search', () => { openSearchWindow() })
   ipcMain.handle('search:all', (_e, q: string) => searchAll(repo, q))

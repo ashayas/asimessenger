@@ -2,6 +2,7 @@ import { EventHub } from '../emitter'
 import { RpcFailure, type RpcPeer } from './rpc'
 import type { AgentEvent, AgentSession, PermDecision, PermOption, ToolKind, UserTurn } from '@shared/events'
 import type { Mode } from '@shared/models'
+import { loadImages } from '../images'
 
 type Obj = Record<string, unknown>
 
@@ -11,6 +12,8 @@ const OPTION_MAP: Record<string, PermDecision> = { allow_once: 'allow-once', all
 export interface AcpSessionOptions {
   /** ACP modeId for each of our modes, when the agent exposes modes. */
   modeMap?: Partial<Record<Mode, string>>
+  /** The agent advertised promptCapabilities.image, so pictures can go as image blocks. */
+  images?: boolean
 }
 
 /** Maps one ACP session onto the normalized AgentSession. */
@@ -44,6 +47,7 @@ export class AcpSession implements AgentSession {
     const prompt: Obj[] = []
     if (turn.quote) prompt.push({ type: 'text', text: `Quoting ${turn.quote.name}:\n${turn.quote.text.split('\n').map((l) => `> ${l}`).join('\n')}\n\n` })
     prompt.push({ type: 'text', text: turn.text })
+    if (this.opts.images) for (const i of loadImages(turn)) prompt.push({ type: 'image', data: i.data, mimeType: i.mimeType })
     const n = ++this.turn
     this.hub.emit({ t: 'status', phase: 'thinking' })
     this.prompting = this.peer

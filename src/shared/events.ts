@@ -48,6 +48,8 @@ export interface UserTurn {
   text: string
   /** Quoted lines the user is replying to (from an attachment), if any. */
   quote?: { name: string; text: string }
+  /** Pictures the user attached. Adapters pass them natively when the agent can see images. */
+  images?: { path: string; mimeType: string; name: string }[]
 }
 
 export interface AgentSession {

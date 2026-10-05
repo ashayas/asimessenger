@@ -5,9 +5,14 @@ import { PRESENCE_LABEL, type Presence } from '@shared/status'
 import { Avatar, Banner, Btn, StatusDot, WindowFrame } from './ui/kit'
 import { useData } from './store'
 import { LabelChips, LabelEditor } from './LabelEditor'
+import type { Chat } from '@shared/models'
 
 type Tab = 'friends' | 'chats' | 'labels'
 const SELECTABLE: Presence[] = ['online', 'busy', 'away', 'offline']
+
+/** Waiting-on-you first, then working, then the rest by most recent activity. */
+const RANK: Record<string, number> = { away: 0, busy: 1 }
+const byUrgency = (a: Chat, b: Chat): number => (RANK[a.status] ?? 2) - (RANK[b.status] ?? 2) || b.lastActivityAt - a.lastActivityAt
 
 export function ContactList() {
   const { friends, chats, availability, labels, friendLabels, chatLabels, profile, setProfile, workspaces, activeWorkspaceId, setActiveWorkspace, addWorkspaceFromFolder, openFriend, newChatWith, openChat } = useData()
@@ -17,9 +22,18 @@ export function ContactList() {
   const [labeling, setLabeling] = useState(false)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
-  const { groups, live } = useMemo(() => groupFriends(friends, chats, availability, filter), [friends, chats, availability, filter])
   const friendById = useMemo(() => new Map(friends.map((f) => [f.id, f])), [friends])
   const wsChats = useMemo(() => chats.filter((c) => c.workspaceId === activeWorkspaceId), [chats, activeWorkspaceId])
+  // a friend's row reflects the chats in this workspace, so five Claudes in one folder read as one friend with five sessions
+  const { groups, live } = useMemo(() => groupFriends(friends, wsChats, availability, filter), [friends, wsChats, availability, filter])
+  const [closed, setClosed] = useState<Record<string, boolean>>({})
+  const chatsByFriend = useMemo(() => {
+    const m = new Map<string, Chat[]>()
+    for (const c of wsChats) m.set(c.friendId, [...(m.get(c.friendId) ?? []), c])
+    for (const [k, v] of m) m.set(k, v.sort(byUrgency))
+    return m
+  }, [wsChats])
+  const orderedChats = useMemo(() => [...wsChats].sort(byUrgency), [wsChats])
   const unreadTotal = wsChats.reduce((n, c) => n + c.unreadCount, 0)
 
   return (
@@ -101,9 +115,11 @@ export function ContactList() {
                   const f = friendById.get(id)!
                   const l = live[id]!
                   const a = avatarFor(f)
+                  const mine = chatsByFriend.get(id) ?? []
+                  const nested = mine.length > 1 && !closed[id]
                   return (
+                    <div key={id} className="friend-block">
                     <div
-                      key={id}
                       className={`contact${selected === id ? ' sel' : ''}`}
                       data-friend={f.displayName}
                       data-presence={l.presence}
@@ -115,12 +131,27 @@ export function ContactList() {
                         <div className="nm">
                           <StatusDot presence={l.presence} />
                           {f.displayName}
+                          {mine.length > 1 ? (
+                            <button className="count" aria-expanded={nested} title={nested ? 'Hide this friend’s chats' : 'Show this friend’s chats'} onClick={(e) => { e.stopPropagation(); setClosed((c) => ({ ...c, [id]: nested })) }}>
+                              {nested ? '▾' : '▸'} ×{mine.length}
+                            </button>
+                          ) : null}
                           <LabelChips ids={friendLabels[id] ?? []} />
-                          {chats.some((c) => c.friendId === id && c.mode === 'dangerous') ? <span className="danger-badge" title="A chat with this friend is in dangerous mode">⚠</span> : null}
+                          {mine.some((c) => c.mode === 'dangerous') ? <span className="danger-badge" title="A chat with this friend is in dangerous mode">⚠</span> : null}
                           {l.unread > 0 ? <span className="badge">{l.unread}</span> : null}
                         </div>
                         <div className={`st${f.letteringStyle === 'plain' ? '' : ' funky'}`} title={l.message ?? undefined}>{l.message ?? (l.presence === 'offline' ? 'not available' : '')}</div>
                       </div>
+                    </div>
+                    {nested ? mine.map((c) => (
+                      <div key={c.id} className="subchat" data-subchat={c.title} data-presence={c.status} onDoubleClick={() => void openChat(c.id)} title="Double-click to open this chat">
+                        <StatusDot presence={c.status as Presence} />
+                        <div className="who">
+                          <div className="nm">{c.title}{c.mode === 'dangerous' ? <span className="danger-badge" title="Dangerous mode">⚠</span> : null}{c.unreadCount > 0 ? <span className="badge">{c.unreadCount}</span> : null}</div>
+                          <div className={`st${f.letteringStyle === 'plain' ? '' : ' funky'}`} title={c.statusText ?? undefined}>{c.statusText ?? PRESENCE_LABEL[c.status as Presence]}</div>
+                        </div>
+                      </div>
+                    )) : null}
                     </div>
                   )
                 })}
@@ -131,14 +162,27 @@ export function ContactList() {
           (wsChats.length === 0 ? (
             <div className="empty">No chats in this workspace yet. Double-click a friend to start one.</div>
           ) : (
-            wsChats.map((c) => (
-              <div key={c.id} className="contact" data-chat={c.title} onDoubleClick={() => void openChat(c.id)}>
-                <div className="who">
-                  <div className="nm">{c.title}{c.unreadCount > 0 ? <span className="badge">{c.unreadCount}</span> : null}</div>
-                  <div className="st">{friendById.get(c.friendId)?.displayName}</div>
+            orderedChats.map((c) => {
+              const f = friendById.get(c.friendId)
+              const a = f ? avatarFor(f) : { label: '?', gradient: ['#6b7a99', '#a4b0c8'] as [string, string] }
+              const pres = c.status as Presence
+              return (
+                <div key={c.id} className="contact chatrow" data-chat={c.title} data-presence={pres} onDoubleClick={() => void openChat(c.id)} title="Double-click to open">
+                  <Avatar label={a.label} gradient={a.gradient} presence={pres} size="sm" working={pres === 'busy'} waiting={pres === 'away'} />
+                  <div className="who">
+                    <div className="nm">
+                      {c.title}
+                      <LabelChips ids={chatLabels[c.id] ?? []} />
+                      {c.mode === 'dangerous' ? <span className="danger-badge" title="Dangerous mode">⚠</span> : null}
+                      {c.unreadCount > 0 ? <span className="badge">{c.unreadCount}</span> : null}
+                    </div>
+                    <div className={`st${f?.letteringStyle === 'plain' ? '' : ' funky'}`} title={c.statusText ?? undefined}>
+                      <span className="who-tag">{f?.displayName}</span> {c.statusText ?? PRESENCE_LABEL[pres]}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           ))}
 
         {tab === 'labels' && labels.length === 0 && <div className="empty">Labels you add to friends and chats will group them here.</div>}

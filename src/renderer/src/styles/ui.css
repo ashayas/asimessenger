@@ -372,3 +372,13 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .chip-file button { border: 0; background: transparent; cursor: pointer; font-size: 15px; line-height: 1; color: var(--muted, inherit); }
 .tray-note { font-size: 11px; color: var(--danger, #b3261e); }
 .card .thumb { max-width: 100%; max-height: 220px; align-self: flex-start; border: 1px solid var(--rule); border-radius: 3px; cursor: zoom-in; }
+
+/* several chats with one friend: nested rows and a per-chat list */
+.contact .count { border: 0; background: transparent; padding: 0 2px; font: bold 10px var(--font-mono); color: var(--link); cursor: pointer; }
+.subchat { display: flex; gap: 8px; align-items: center; padding: 3px 10px 3px 44px; }
+.subchat:hover { background: var(--pane-tint); }
+.subchat .who { flex: 1; min-width: 0; }
+.subchat .nm { display: flex; gap: 6px; align-items: center; font-weight: 600; }
+.subchat .st { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+.chatrow .who-tag { font-weight: bold; color: var(--accent-deep); }
+.chatrow .who-tag::after { content: ' ·'; font-weight: normal; }

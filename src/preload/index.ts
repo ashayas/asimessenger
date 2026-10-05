@@ -127,6 +127,7 @@ const data = {
 
 const tabs = {
   setActive: (workspaceId: string, chatId: string | null): Promise<void> => ipcRenderer.invoke('tabs:active', workspaceId, chatId),
+  takePending: (workspaceId: string): Promise<string[]> => ipcRenderer.invoke('tabs:take-pending', workspaceId),
   popOut: (chatId: string): Promise<void> => ipcRenderer.invoke('tabs:pop-out', chatId),
   onOpen: (cb: (a: { chatId: string }) => void): (() => void) => { const h = (_e: unknown, a: { chatId: string }) => cb(a); ipcRenderer.on('asi:tabs-open', h); return () => ipcRenderer.removeListener('asi:tabs-open', h) }
 }

@@ -197,6 +197,17 @@ export function showChat(chatId: string): void { if (router) router(chatId); els
 
 const tabsWindows = new Map<string, BrowserWindow>()
 const tabsActive = new Map<string, string | null>()
+/** Chats opened while a tabs window is still loading: its page cannot hear a message yet, so they wait here until it asks. */
+const tabsQueue = new Map<string, string[]>()
+const tabsReady = new Set<string>()
+
+/** The tabs page is up: hand over everything queued while it loaded, and deliver later opens live. */
+export function takePendingTabs(workspaceId: string): string[] {
+  tabsReady.add(workspaceId)
+  const q = tabsQueue.get(workspaceId) ?? []
+  tabsQueue.delete(workspaceId)
+  return q
+}
 
 /** One tabbed window per workspace. */
 export function openTabsWindow(workspaceId: string, chatId: string): BrowserWindow {
@@ -204,13 +215,14 @@ export function openTabsWindow(workspaceId: string, chatId: string): BrowserWind
   if (existing && !existing.isDestroyed()) {
     existing.show()
     existing.focus()
-    existing.webContents.send('asi:tabs-open', { chatId })
+    if (tabsReady.has(workspaceId)) existing.webContents.send('asi:tabs-open', { chatId })
+    else tabsQueue.set(workspaceId, [...(tabsQueue.get(workspaceId) ?? []), chatId])
     return existing
   }
   const win = new BrowserWindow(baseOptions({ width: 760, height: 620, minWidth: 520, minHeight: 400, title: 'Chats' }))
   tabsWindows.set(workspaceId, win)
   win.once('ready-to-show', () => win.show())
-  win.on('closed', () => { tabsWindows.delete(workspaceId); tabsActive.delete(workspaceId) })
+  win.on('closed', () => { tabsWindows.delete(workspaceId); tabsActive.delete(workspaceId); tabsQueue.delete(workspaceId); tabsReady.delete(workspaceId) })
   loadRoute(win, `/tabs/${workspaceId}?chat=${chatId}`)
   return win
 }

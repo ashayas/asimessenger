@@ -83,3 +83,26 @@ test('windows mode is unchanged and the setting is respected live', async () => 
     await h.cleanup()
   }
 })
+
+test('tabs mode: chats opened in quick succession, before the window has loaded, all get a tab', async () => {
+  const h = await launchApp()
+  try {
+    const ids = await h.win.evaluate(async () => {
+      const api = window.asi.api
+      await api.settings.set('chatWindows', 'tabs')
+      const ws = await api.workspaces.create({ name: 'burst', path: '/tmp' })
+      const f = await api.friends.create({ harness: 'fake', displayName: 'Fake' })
+      const out: string[] = []
+      for (const t of ['one', 'two', 'three', 'four', 'five']) out.push((await api.chats.create({ workspaceId: ws.id, friendId: f.id, title: t })).id)
+      return out
+    })
+    // fire them all without waiting for the window
+    await h.win.evaluate((list) => { for (const id of list) void window.asi.chat.openWindow(id) }, ids)
+    await expect.poll(() => h.app.windows().filter((w) => w.url().includes('#/tabs/')).length).toBe(1)
+    const tabs = h.app.windows().find((w) => w.url().includes('#/tabs/'))!
+    await expect(tabs.getByRole('tab')).toHaveCount(5)
+    await expect(tabs.getByRole('tab', { name: /five/ })).toHaveAttribute('aria-selected', 'true') // the last one opened is in front
+  } finally {
+    await h.cleanup()
+  }
+})

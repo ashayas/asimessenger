@@ -382,3 +382,7 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 .subchat .st { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
 .chatrow .who-tag { font-weight: bold; color: var(--accent-deep); }
 .chatrow .who-tag::after { content: ' ·'; font-weight: normal; }
+
+/* large and full-screen windows: keep the conversation a readable column instead of stretching it edge to edge */
+.transcript { padding-inline: max(12px, calc((100% - 1040px) / 2)); }
+.composer { padding-inline: max(8px, calc((100% - 1040px) / 2 + 4px)); }

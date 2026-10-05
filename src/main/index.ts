@@ -8,7 +8,7 @@ import { closeToastsFor, createAttentionHandler, openNextUnread, refreshBadge } 
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
-import { openOnboardingWindow, createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow, openTabsWindow, setChatRouter, setTabsActive, showChat } from './windows'
+import { openOnboardingWindow, createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow, openTabsWindow, setChatRouter, setTabsActive, takePendingTabs, showChat } from './windows'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from './friends-service'
 import { createChatService } from './chat-service'
 import { loadAttachment } from './attachments'
@@ -184,6 +184,7 @@ app.whenReady().then(async () => {
     else openChatWindow(chatId)
   })())
   ipcMain.handle('tabs:active', (_e, workspaceId: string, chatId: string | null) => { setTabsActive(workspaceId, chatId) })
+  ipcMain.handle('tabs:take-pending', (_e, workspaceId: string) => takePendingTabs(workspaceId))
   ipcMain.handle('tabs:pop-out', (_e, chatId: string) => { openChatWindow(chatId) })
   ipcMain.handle('window:open-add-friend', () => { openAddFriendWindow() })
   ipcMain.handle('friends:detect', () => detectPresets())

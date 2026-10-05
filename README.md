@@ -34,6 +34,21 @@ Every agent CLI you register is a **friend**. The contact list groups them by wh
 </tr>
 </table>
 
+## Five repos, a dozen chats, one window
+
+Run as many agents as you like, in as many repos as you like. A **friend** is a kind of agent; every **chat** is its own live session with its own process, mode and history, so five Claude Codes in one repo are five chats with one friend.
+
+<table>
+<tr>
+<td width="28%" valign="top"><img src="docs/images/chats.png" alt="Chats tab: every chat in the workspace with its agent, status and unread count"><br><sub><b>Chats tab.</b> Waiting-on-you first, then working. Each row shows which agent it is.</sub></td>
+<td valign="top"><img src="docs/images/tabs.png" alt="Tabs mode: seven chats of one repo in a single window, status dots and unread badges on each tab"><br><sub><b>Tabs mode</b> (one window per repo) at a large size. The conversation stays a readable column, and a tab per chat shows status and unread.</sub></td>
+</tr>
+</table>
+
+The Friends tab nests a friend's chats under it (`×5`, collapsible) and scopes its status to the active workspace. Chats are titled from your first message, then by the agent's own title or a model if you connect one, and never over a title you typed. Windows are resizable from a compact messenger (about 460 px) up to full screen:
+
+<p align="center"><img src="docs/images/compact.png" alt="The same chat window at messenger size" width="34%"></p>
+
 ## A conversation, not a terminal
 
 <table>

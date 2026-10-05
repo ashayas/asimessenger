@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, expect, type Page } from '@playwright/test'
 import { launchApp } from '../e2e/helpers'
+import { buildScene } from './scene'
 
 const OUT = 'docs/images'
 const size = (h: { app: import('@playwright/test').ElectronApplication }, match: string, w: number, ht: number, x = 380, y = 60) =>
@@ -11,47 +12,19 @@ const shot = async (p: Page, name: string) => { await p.waitForTimeout(400); awa
 
 test('capture the README screenshots from a demo scene', async () => {
   const bin = mkdtempSync(join(tmpdir(), 'asi-demo-bin-'))
-  for (const [c, v] of [['claude', '2.1.289 (Claude Code)'], ['codex', 'codex-cli 0.160.0'], ['opencode', '1.18.30']]) { writeFileSync(join(bin, c!), `#!/bin/sh\necho "${v}"\n`); chmodSync(join(bin, c!), 0o755) }
+  for (const [c, v] of [['claude', '2.1.289 (Claude Code)'], ['codex', 'codex-cli 0.160.0'], ['opencode', '1.18.30'], ['gemini', '0.29.7'], ['pi', '0.74.2']]) { writeFileSync(join(bin, c!), `#!/bin/sh\necho "${v}"\n`); chmodSync(join(bin, c!), 0o755) }
   const ws = mkdtempSync(join(tmpdir(), 'honeycomb-'))
   mkdirSync(ws, { recursive: true })
   const h = await launchApp({ seed: true, toasts: true, env: { ASI_TEST_PATH: `${bin}:/usr/bin:/bin`, ASI_VOICE_FAKE: 'x' } })
   try {
-    const ids = await h.win.evaluate(async (path) => {
-      const api = window.asi.api
-      await api.settings.set('profile', { name: 'Ashaya', personalMessage: '<shipping asi messenger>', presence: 'online' })
-      const home = (await api.workspaces.list())[0]!
-      await api.workspaces.setPath(home.id, path); await api.workspaces.rename(home.id, 'honeycomb')
-      const w2 = await api.workspaces.create({ name: 'fantasy', path: '/tmp/fantasy' })
-      await api.workspaces.create({ name: 'ghostty+', path: '/tmp/ghostty' })
-      void w2
-      const mk = (harness: 'claude' | 'codex' | 'acp', displayName: string, avatar: string, extra: Record<string, unknown> = {}) => api.friends.create({ harness, displayName, avatar, command: avatar, ...extra })
-      const claude = await mk('claude', 'Claude Code', 'claude')
-      const codex = await mk('codex', 'Codex', 'codex')
-      const oc = await mk('acp', 'OpenCode', 'opencode', { transport: 'opencode' })
-      await api.friends.create({ harness: 'acp', displayName: 'Gemini CLI', avatar: 'gemini', command: 'gemini', transport: 'gemini' })
-      await api.friends.create({ harness: 'acp', displayName: 'Pi', avatar: 'pi', command: 'pi-acp', transport: 'generic' })
-      const c1 = await api.chats.create({ workspaceId: home.id, friendId: claude.id, title: 'auth refactor' })
-      const c2 = await api.chats.create({ workspaceId: home.id, friendId: codex.id, title: 'build fix' })
-      const c3 = await api.chats.create({ workspaceId: home.id, friendId: oc.id, title: 'api routes' })
-      await api.chats.setStatus(c1.id, 'busy', '✧ ʀᴜɴɴɪɴɢ ᴛᴇsᴛs ✧ session.test.ts')
-      await api.chats.setStatus(c2.id, 'away', '(⊙_⊙) waiting on u: rm -rf dist')
-      await api.chats.setStatus(c3.id, 'busy', '~*~ editing api/routes.ts ~*~')
-      const lab = await api.labels.create('infra', '#6b3fa0'); await api.labels.setForChat(c1.id, [lab.id])
-      const ap = (chatId: string, role: 'user' | 'agent', kind: string, body: unknown, text: string) => api.messages.append({ chatId, role, kind, body, text })
-      await ap(c1.id, 'user', 'text', { text: 'the session refresh test is flaky. find out why and fix it' }, 'the session refresh test is flaky. find out why and fix it')
-      await ap(c1.id, 'agent', 'text', { text: 'Reproducing first, then I will look at the refresh path.' }, 'Reproducing first, then I will look at the refresh path.')
-      await ap(c1.id, 'agent', 'tool', { t: 'tool', id: 't1', kind: 'exec', title: 'Run tests', command: 'pnpm vitest run src/auth/session.test.ts', output: '✗ refreshes once under concurrent calls\n  expected 1, got 2\n  1 failed | 23 passed', exit: 1, durationMs: 2400, done: true }, 'pnpm vitest run')
-      await ap(c1.id, 'agent', 'attachment', { t: 'attachment', id: 'a1', kind: 'markdown', name: 'refresh-race.md', body: '# Root cause\n\nTwo tabs call `refresh()` at once; the lock is per tab, so both win.\n\n```ts\nawait navigator.locks.request("refresh", () => doRefresh())\n```\n\n- Use a **global** lock (BroadcastChannel)\n- Add a regression test\n' }, 'refresh-race.md')
-      await ap(c1.id, 'agent', 'permission', { t: 'permission', reqId: 'p1', tool: 'Edit', summary: 'src/auth/session.ts', risk: 'low', options: [{ id: 'allow-once', label: 'Allow once' }, { id: 'allow-chat', label: 'Allow for this chat' }, { id: 'deny', label: 'Deny' }], decision: null }, 'Edit src/auth/session.ts')
-      await ap(c1.id, 'agent', 'question', { t: 'question', reqId: 'q1', prompt: 'Should the refresh lock be per tab or global (BroadcastChannel)?', choices: ['Per tab', 'Global'], answer: null }, 'lock question')
-      const ev = await api.messages.list(c1.id)
-      await api.chats.markRead(c1.id)
-      return { c1: c1.id, c2: c2.id, att: ev.find((m) => m.kind === 'attachment')!.id, ws: home.id, claude: claude.id }
-    }, ws)
+    const ids = await buildScene(h.win, ws)
     await expect(h.win.locator('[data-friend="Claude Code"]')).toBeVisible()
-    await size(h, '#/contacts', 330, 760, 40, 50)
+    await size(h, '#/contacts', 400, 1000, 40, 25)
     await h.win.waitForTimeout(600)
     await shot(h.win, 'contacts.png')
+    await h.win.getByRole('tab', { name: /^Chats/ }).click()
+    await shot(h.win, 'chats.png')
+    await h.win.getByRole('tab', { name: /^Friends/ }).click()
 
     // conversation
     let p = h.app.waitForEvent('window')
@@ -115,6 +88,19 @@ test('capture the README screenshots from a demo scene', async () => {
     const opts = await p
     await size(h, '#/options', 620, 860, 440, 20)
     await shot(opts, 'options.png')
+    await opts.close().catch(() => {})
+
+    // tabs mode with a busy repo: all seven honeycomb chats in one window, then the same window at messenger size
+    await h.win.evaluate(() => window.asi.api.settings.set('chatWindows', 'tabs'))
+    for (const id of ids.homeChats) await h.win.evaluate((i) => window.asi.chat.openWindow(i), id)
+    await expect.poll(() => h.app.windows().filter((w) => w.url().includes('#/tabs/')).length).toBe(1)
+    const tabs = h.app.windows().find((w) => w.url().includes('#/tabs/'))!
+    await expect(tabs.getByRole('tab')).toHaveCount(7)
+    await tabs.getByRole('tab', { name: /auth refactor/ }).click()
+    await size(h, '#/tabs/', 1280, 820, 20, 30)
+    await shot(tabs, 'tabs.png')
+    await size(h, '#/tabs/', 460, 620, 400, 60)
+    await shot(tabs, 'compact.png')
   } finally {
     await h.cleanup()
   }

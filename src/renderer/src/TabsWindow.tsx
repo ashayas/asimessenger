@@ -19,11 +19,14 @@ export function TabsWindow({ workspaceId, firstChat }: { workspaceId: string; fi
 
   // restore the tabs you had open, then make sure the requested chat is one of them
   useEffect(() => {
-    void window.asi.api.settings.get<TabsState>(key, EMPTY_TABS).then((saved) => {
-      setTabs(firstChat ? openTab(saved, firstChat) : saved)
+    void window.asi.api.settings.get<TabsState>(key, EMPTY_TABS).then(async (saved) => {
+      // chats opened while this window was loading arrive here, in the order they were opened
+      const queued = await window.asi.tabs.takePending(workspaceId)
+      const base = firstChat ? openTab(saved, firstChat) : saved
+      setTabs(queued.reduce(openTab, base))
       setReady(true)
     })
-  }, [key, firstChat])
+  }, [key, firstChat, workspaceId])
   useEffect(() => window.asi.tabs.onOpen(({ chatId }) => setTabs((t) => openTab(t, chatId))), [])
 
   useEffect(() => {

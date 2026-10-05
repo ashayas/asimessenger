@@ -26,7 +26,7 @@ Every agent CLI you register is a **friend**. The contact list groups them by wh
 ### The buddy list
 - **Needs you · Working · Online · Offline** are computed live from real agent events.
 - Display pictures glow with presence: a dashed ring spins while an agent works, a pulse means it is waiting on you.
-- **⌘1–9** switch workspaces. **⌘K** finds anything. Labels group friends and chats your way.
+- **⌘1–9** switch workspaces. **×** on a workspace tab closes it: its agents stop, its chats are kept, and the ⌄ list (or adding the folder again) brings it all back. Delete is separate and asks. **⌘K** finds anything. Labels group friends and chats your way.
 - **Add a friend** detects installed CLIs on your PATH. Bring your own harness over ACP, a raw terminal, or HTTP.
 - **ASI**, the always-online friend, tells you who needs you and finds sessions running outside the app.
 

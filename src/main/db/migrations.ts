@@ -136,5 +136,7 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX usage_log_ts ON usage_log(ts);
   CREATE INDEX usage_log_chat ON usage_log(chat_id);
-  `
+  `,
+  /* 9: closing a workspace hides its tab and keeps its chats, so it can come back */
+  `ALTER TABLE workspaces ADD COLUMN closed_at INTEGER; ALTER TABLE workspaces ADD COLUMN closed_slot INTEGER;`
 ]

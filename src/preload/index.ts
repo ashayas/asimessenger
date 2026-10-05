@@ -52,6 +52,13 @@ const safety = {
   openOptions: (): Promise<void> => ipcRenderer.invoke('window:open-options')
 }
 
+const workspace = {
+  working: (id: string): Promise<number> => ipcRenderer.invoke('workspace:working', id),
+  close: (id: string): Promise<void> => ipcRenderer.invoke('workspace:close', id),
+  reopen: (id: string): Promise<void> => ipcRenderer.invoke('workspace:reopen', id),
+  delete: (id: string): Promise<{ chats: number; notes: string[] }> => ipcRenderer.invoke('workspace:delete', id)
+}
+
 const usage = {
   overview: (range?: string): Promise<unknown> => ipcRenderer.invoke('usage:overview', range),
   refresh: (provider: 'claude' | 'codex'): Promise<void> => ipcRenderer.invoke('usage:refresh', provider),
@@ -150,4 +157,4 @@ const tabs = {
   onOpen: (cb: (a: { chatId: string }) => void): (() => void) => { const h = (_e: unknown, a: { chatId: string }) => cb(a); ipcRenderer.on('asi:tabs-open', h); return () => ipcRenderer.removeListener('asi:tabs-open', h) }
 }
 
-contextBridge.exposeInMainWorld('asi', { usage, tabs, data, brain, voice, onboarding, browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })
+contextBridge.exposeInMainWorld('asi', { workspace, usage, tabs, data, brain, voice, onboarding, browser, pty, doodle, search, attachments, platform: process.platform, windowFocused, api, onChanged, pickFolder, chat, friends, safety })

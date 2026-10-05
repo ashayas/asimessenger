@@ -8,7 +8,7 @@ export const CHANGED_CHANNEL = 'asi:changed'
 
 /** Explicit list (contextBridge cannot clone Proxies). test/unit/api.test.ts keeps it in sync with the repo. */
 export const REPO_METHODS = {
-  workspaces: ['create', 'list', 'get', 'rename', 'setPath', 'remove'],
+  workspaces: ['create', 'list', 'listClosed', 'close', 'reopen', 'findByPath', 'get', 'rename', 'setPath', 'remove'],
   friends: ['create', 'list', 'get', 'rename', 'setLettering', 'setDangerousAllowed', 'remove'],
   labels: ['create', 'list', 'setForFriend', 'setForChat', 'forFriend', 'forChat', 'assignments', 'rename', 'remove'],
   chats: ['create', 'get', 'list', 'rename', 'setAutoTitle', 'setMode', 'setSession', 'setStatus', 'markRead', 'remove'],

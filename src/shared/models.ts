@@ -10,6 +10,8 @@ export interface Workspace {
   path: string
   slot: number | null
   color: string | null
+  /** Set when you closed it: hidden from the tabs, chats kept. */
+  closedAt: number | null
 }
 
 export interface Friend {

@@ -16,7 +16,7 @@ const RANK: Record<string, number> = { away: 0, busy: 1 }
 const byUrgency = (a: Chat, b: Chat): number => (RANK[a.status] ?? 2) - (RANK[b.status] ?? 2) || b.lastActivityAt - a.lastActivityAt
 
 export function ContactList() {
-  const { friends, chats, availability, labels, friendLabels, chatLabels, profile, setProfile, workspaces, activeWorkspaceId, setActiveWorkspace, addWorkspaceFromFolder, openFriend, newChatWith, newIsolatedChatWith, openChat } = useData()
+  const { friends, chats, availability, labels, friendLabels, chatLabels, profile, setProfile, workspaces, activeWorkspaceId, setActiveWorkspace, addWorkspaceFromFolder, openFriend, newChatWith, newIsolatedChatWith, openChat, closedWorkspaces, closeWorkspace, reopenWorkspace } = useData()
   const [tab, setTab] = useState<Tab>('friends')
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
@@ -28,6 +28,15 @@ export function ContactList() {
   // a friend's row reflects the chats in this workspace, so five Claudes in one folder read as one friend with five sessions
   const { groups, live } = useMemo(() => groupFriends(friends, wsChats, availability, filter), [friends, wsChats, availability, filter])
   const [note, setNote] = useState<string | null>(null)
+  /** Closing a workspace that has agents working asks first, since closing stops them. */
+  const [closing, setClosing] = useState<{ id: string; name: string; working: number } | null>(null)
+  const [closedOpen, setClosedOpen] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const askClose = async (id: string, name: string) => {
+    const working = await window.asi.workspace.working(id)
+    if (working > 0) setClosing({ id, name, working })
+    else await closeWorkspace(id)
+  }
   const [closed, setClosed] = useState<Record<string, boolean>>({})
   const chatsByFriend = useMemo(() => {
     const m = new Map<string, Chat[]>()
@@ -72,20 +81,53 @@ export function ContactList() {
 
       <div className="ws" role="tablist" aria-label="Workspaces">
         {workspaces.map((w) => (
-          <button
-            key={w.id}
-            role="tab"
-            aria-selected={w.id === activeWorkspaceId}
-            className={w.id === activeWorkspaceId ? 'sel' : ''}
-            title={w.path}
-            data-workspace={w.name}
-            onClick={() => void setActiveWorkspace(w.id)}
-          >
-            {w.slot ? <span className="slot">⌘{w.slot}</span> : null} {w.name}
-          </button>
+          <span key={w.id} className={`wtab${w.id === activeWorkspaceId ? ' sel' : ''}`}>
+            <button
+              role="tab"
+              aria-selected={w.id === activeWorkspaceId}
+              className={w.id === activeWorkspaceId ? 'sel' : ''}
+              title={w.path}
+              data-workspace={w.name}
+              onClick={() => void setActiveWorkspace(w.id)}
+            >
+              {w.slot ? <span className="slot">⌘{w.slot}</span> : null} {w.name}
+            </button>
+            <button className="wclose" aria-label={`Close workspace ${w.name}`} title={`Close ${w.name}: its agents stop, its chats are kept`} onClick={() => void askClose(w.id, w.name)}>×</button>
+          </span>
         ))}
         <button className="add" aria-label="Add workspace" title="Add a workspace folder" onClick={() => void addWorkspaceFromFolder()}>＋</button>
+        {closedWorkspaces.length > 0 ? (
+          <button className="add" aria-label="Closed workspaces" aria-expanded={closedOpen} title="Closed workspaces: reopen one, chats and all" onClick={() => setClosedOpen((v) => !v)}>⌄ {closedWorkspaces.length}</button>
+        ) : null}
       </div>
+      {closing ? (
+        <div className="ws-note" role="alert" data-testid="close-confirm">
+          <span className="grow">{closing.working} agent{closing.working === 1 ? ' is' : 's are'} working in {closing.name}. Closing stops {closing.working === 1 ? 'it' : 'them'}; the chats and history are kept.</span>
+          <Btn kind="danger" onClick={() => { const id = closing.id; setClosing(null); void closeWorkspace(id) }}>Close and stop</Btn>
+          <Btn onClick={() => setClosing(null)}>Cancel</Btn>
+        </div>
+      ) : null}
+      {closedOpen && closedWorkspaces.length > 0 ? (
+        <div className="ws-closed" data-testid="closed-workspaces">
+          {closedWorkspaces.map((w) => (
+            <div className="row" key={w.id} data-closed={w.name}>
+              <span className="grow" title={w.path}><b>{w.name}</b> <span className="path">{w.path}</span></span>
+              {deleting === w.id ? (
+                <>
+                  <span className="danger-text">Delete it and all its chats?</span>
+                  <Btn kind="danger" onClick={() => { setDeleting(null); void window.asi.workspace.delete(w.id) }}>Delete</Btn>
+                  <Btn onClick={() => setDeleting(null)}>Keep</Btn>
+                </>
+              ) : (
+                <>
+                  <Btn onClick={() => { setClosedOpen(closedWorkspaces.length > 1); void reopenWorkspace(w.id) }}>Reopen</Btn>
+                  <button className="linkish" onClick={() => setDeleting(w.id)} title="Delete this workspace and its chats for good">Delete…</button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div className="searchbar">
         <input

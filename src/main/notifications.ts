@@ -11,16 +11,21 @@ export function totalUnread(chats: { unreadCount: number }[]): number {
   return chats.reduce((n, c) => n + c.unreadCount, 0)
 }
 
-/** Dock badge = total unread across every chat. */
+/** Dock badge = total unread across every chat in an open workspace. */
+async function openChats(repo: Repo) {
+  const closed = new Set((await repo.workspaces.listClosed()).map((w) => w.id))
+  return (await repo.chats.list()).filter((c) => !closed.has(c.workspaceId))
+}
+
 export async function refreshBadge(repo: Repo): Promise<number> {
-  const n = totalUnread(await repo.chats.list())
+  const n = totalUnread(await openChats(repo))
   if (process.platform === 'darwin') app.dock?.setBadge(n > 0 ? String(n) : '')
   return n
 }
 
 /** Opens the chat with the oldest unread activity (⌘⇧U). */
 export async function openNextUnread(repo: Repo): Promise<string | null> {
-  const next = (await repo.chats.list()).filter((c) => c.unreadCount > 0).sort((a, b) => a.lastActivityAt - b.lastActivityAt)[0]
+  const next = (await openChats(repo)).filter((c) => c.unreadCount > 0).sort((a, b) => a.lastActivityAt - b.lastActivityAt)[0]
   if (!next) return null
   showChat(next.id)
   return next.id

@@ -8,7 +8,7 @@ import { closeToastsFor, createAttentionHandler, openNextUnread, refreshBadge } 
 import { HarnessManager } from '../harness/manager'
 import { registerHarnesses } from '../harness/registry'
 import { createIngestor } from './ingest'
-import { openOnboardingWindow, createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow, openUsageWindow, openTabsWindow, setChatRouter, setTabsActive, takePendingTabs, showChat, windowFor } from './windows'
+import { openOnboardingWindow, createBrowserWindow, openDoodleWindow, closeSearchWindow, openSearchWindow, openAttachmentWindow, shakeWindow, openAddFriendWindow, openChatWindow, openContactsWindow, openOptionsWindow, openUsageWindow, openTabsWindow, setChatRouter, setTabsActive, takePendingTabs, showChat, windowFor, closeWorkspaceWindows } from './windows'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from './friends-service'
 import { createChatService } from './chat-service'
 import { createWorktrees } from './worktrees'
@@ -203,6 +203,17 @@ app.whenReady().then(async () => {
   ipcMain.handle('chat:queued', (_e, chatId: string) => chat.getQueued(chatId))
   ipcMain.handle('chat:queue-take', (_e, chatId: string) => chat.takeQueued(chatId))
   ipcMain.handle('chat:queue-send-now', (_e, chatId: string) => chat.sendQueuedNow(chatId))
+  ipcMain.handle('workspace:working', (_e, id: string) => chat.workingIn(id))
+  ipcMain.handle('workspace:close', async (_e, id: string) => { const ids = await chat.closeWorkspace(id); closeWorkspaceWindows(id, ids); broadcastChanged('workspaces'); void refreshBadge(repo) })
+  ipcMain.handle('workspace:reopen', async (_e, id: string) => { await chat.reopenWorkspace(id); broadcastChanged('workspaces'); void refreshBadge(repo) })
+  ipcMain.handle('workspace:delete', async (_e, id: string) => {
+    const ids = (await repo.chats.list({ workspaceId: id })).map((c) => c.id)
+    const r = await chat.deleteWorkspace(id)
+    closeWorkspaceWindows(id, ids)
+    broadcastChanged('workspaces'); void refreshBadge(repo)
+    if (r.notes.length && Notification.isSupported()) new Notification({ title: 'Workspace deleted', body: r.notes.join('\n') }).show()
+    return r
+  })
   ipcMain.handle('chat:worktree-info', (_e, chatId: string) => chat.worktreeInfo(chatId))
   ipcMain.handle('chat:delete', async (_e, chatId: string) => {
     const win = windowFor(chatId)

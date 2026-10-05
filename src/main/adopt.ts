@@ -10,6 +10,11 @@ export async function adoptSession(repo: Repo, t: Extract<SearchTarget, { type: 
   if (!friend) throw new Error(`add ${t.harness === 'claude' ? 'Claude Code' : 'Codex'} as a friend first (Add a friend), then bring this session in`)
   const workspaces = await repo.workspaces.list()
   let ws = workspaces.filter((w) => t.cwd === w.path || t.cwd.startsWith(w.path.replace(/\/$/, '') + '/')).sort((a, b) => b.path.length - a.path.length)[0]
+  if (!ws) {
+    // the folder may be a workspace you closed: bring that one back rather than starting a second
+    const closed = (await repo.workspaces.listClosed()).filter((w) => t.cwd === w.path || t.cwd.startsWith(w.path.replace(/\/$/, '') + '/')).sort((a, b) => b.path.length - a.path.length)[0]
+    if (closed) { await repo.workspaces.reopen(closed.id); ws = (await repo.workspaces.get(closed.id)) ?? undefined }
+  }
   if (!ws) ws = await repo.workspaces.create({ name: basename(t.cwd) || 'Workspace', path: t.cwd })
   const chat = await repo.chats.create({ workspaceId: ws.id, friendId: friend.id, title: t.title })
   await repo.chats.setSession(chat.id, t.sessionId)

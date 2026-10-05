@@ -242,6 +242,13 @@ export function openTabsWindow(workspaceId: string, chatId: string): BrowserWind
   return win
 }
 
+/** Close every window that shows this workspace's chats: their own windows and the workspace's tabs window. */
+export function closeWorkspaceWindows(workspaceId: string, chatIds: string[]): void {
+  for (const id of chatIds) { const w = windowFor(id); if (w && !w.isDestroyed()) w.close() }
+  const tabs = tabsWindows.get(workspaceId)
+  if (tabs && !tabs.isDestroyed()) tabs.close()
+}
+
 export function setTabsActive(workspaceId: string, chatId: string | null): void { tabsActive.set(workspaceId, chatId) }
 
 /** True when you are looking at this chat right now: its own window, or the active tab of a focused tabs window. */

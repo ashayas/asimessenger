@@ -11,6 +11,8 @@ export interface Profile {
 interface DataState {
   loaded: boolean
   workspaces: Workspace[]
+  /** Workspaces you closed: hidden, chats kept. */
+  closedWorkspaces: Workspace[]
   friends: Friend[]
   chats: Chat[]
   profile: Profile
@@ -23,6 +25,9 @@ interface DataState {
   setProfile(patch: Partial<Profile>): Promise<void>
   setActiveWorkspace(id: string): Promise<void>
   addWorkspaceFromFolder(): Promise<void>
+  /** Hide a workspace (its agents stop, its chats stay) and move to another one. */
+  closeWorkspace(id: string): Promise<void>
+  reopenWorkspace(id: string): Promise<void>
   /** Open the most recent chat with this friend in the active workspace (creating one if none), in its own window. */
   openFriend(friendId: string): Promise<void>
   newChatWith(friendId: string): Promise<void>
@@ -36,6 +41,7 @@ const DEFAULT_PROFILE: Profile = { name: 'You', personalMessage: '', presence: '
 export const useData = create<DataState>((set, get) => ({
   loaded: false,
   workspaces: [],
+  closedWorkspaces: [],
   friends: [],
   chats: [],
   profile: DEFAULT_PROFILE,
@@ -46,8 +52,9 @@ export const useData = create<DataState>((set, get) => ({
   chatLabels: {},
   async refresh() {
     const api = window.asi.api
-    const [workspaces, friends, chats, profile, stored, availability, labels, assigned] = await Promise.all([
+    const [workspaces, closedWorkspaces, friends, chats, profile, stored, availability, labels, assigned] = await Promise.all([
       api.workspaces.list(),
+      api.workspaces.listClosed(),
       api.friends.list(),
       api.chats.list(),
       api.settings.get<Profile>('profile', DEFAULT_PROFILE),
@@ -60,7 +67,7 @@ export const useData = create<DataState>((set, get) => ({
     const friendLabels = group(assigned.friends, 'friendId')
     const chatLabels = group(assigned.chats, 'chatId')
     const activeWorkspaceId = workspaces.some((w) => w.id === stored) ? stored : (workspaces[0]?.id ?? null)
-    set({ workspaces, friends, chats, profile, activeWorkspaceId, availability, labels, friendLabels, chatLabels, loaded: true })
+    set({ workspaces, closedWorkspaces, friends, chats, profile, activeWorkspaceId, availability, labels, friendLabels, chatLabels, loaded: true })
   },
   async setProfile(patch) {
     const next = { ...get().profile, ...patch }
@@ -74,11 +81,28 @@ export const useData = create<DataState>((set, get) => ({
   async addWorkspaceFromFolder() {
     const path = await window.asi.pickFolder()
     if (!path) return
+    // the same folder again brings back the workspace (and chats) you had, closed or not
+    const existing = await window.asi.api.workspaces.findByPath(path)
+    if (existing) {
+      if (existing.closedAt !== null) await window.asi.workspace.reopen(existing.id)
+      await get().setActiveWorkspace(existing.id)
+      return
+    }
     const name = path.split('/').filter(Boolean).pop() ?? path
     const ws = await window.asi.api.workspaces.create({ name, path })
     await get().setActiveWorkspace(ws.id)
-  }
-  ,
+  },
+  async closeWorkspace(id) {
+    await window.asi.workspace.close(id)
+    const rest = get().workspaces.filter((w) => w.id !== id)
+    if (get().activeWorkspaceId === id) await get().setActiveWorkspace(rest[0]?.id ?? '')
+    await get().refresh()
+  },
+  async reopenWorkspace(id) {
+    await window.asi.workspace.reopen(id)
+    await get().setActiveWorkspace(id)
+    await get().refresh()
+  },
   async openFriend(friendId) {
     const { chats, activeWorkspaceId } = get()
     const existing = chats.find((c) => c.friendId === friendId && c.workspaceId === activeWorkspaceId)

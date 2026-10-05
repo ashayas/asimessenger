@@ -10,7 +10,8 @@ const now = () => Date.now()
 
 const toWorkspace = (r: Row): Workspace => ({
   id: String(r['id']), name: String(r['name']), path: String(r['path']),
-  slot: r['slot'] == null ? null : Number(r['slot']), color: (r['color'] as string | null) ?? null
+  slot: r['slot'] == null ? null : Number(r['slot']), color: (r['color'] as string | null) ?? null,
+  closedAt: r['closed_at'] == null ? null : Number(r['closed_at'])
 })
 const toFriend = (r: Row): Friend => ({
   id: String(r['id']), harness: r['harness'] as HarnessKind, displayName: String(r['display_name']),
@@ -47,7 +48,7 @@ export function createRepo(db: Db) {
           slot = [1, 2, 3, 4, 5, 6, 7, 8, 9].find((n) => !used.has(n)) ?? null
         }
         await run('INSERT INTO workspaces(id,name,path,slot,color) VALUES (?,?,?,?,?)', [id, w.name, w.path, slot, w.color ?? null])
-        return { id, name: w.name, path: w.path, slot, color: w.color ?? null }
+        return { id, name: w.name, path: w.path, slot, color: w.color ?? null, closedAt: null }
       },
       async rename(id: string, name: string): Promise<void> {
         await run('UPDATE workspaces SET name = ? WHERE id = ?', [name, id])
@@ -58,8 +59,30 @@ export function createRepo(db: Db) {
       async remove(id: string): Promise<void> {
         await run('DELETE FROM workspaces WHERE id = ?', [id])
       },
+      /** Open workspaces only. Closed ones are hidden until reopened (see listClosed). */
       async list(): Promise<Workspace[]> {
-        return (await all('SELECT * FROM workspaces ORDER BY COALESCE(slot, 999), name')).map(toWorkspace)
+        return (await all('SELECT * FROM workspaces WHERE closed_at IS NULL ORDER BY COALESCE(slot, 999), name')).map(toWorkspace)
+      },
+      async listClosed(): Promise<Workspace[]> {
+        return (await all('SELECT * FROM workspaces WHERE closed_at IS NOT NULL ORDER BY closed_at DESC')).map(toWorkspace)
+      },
+      /** Hide a workspace's tab. Its chats and history stay. */
+      async close(id: string): Promise<void> {
+        // the ⌘ slot is unique, so a closed workspace lets go of it (and remembers it for when it comes back)
+        await run('UPDATE workspaces SET closed_at = ?, closed_slot = slot, slot = NULL WHERE id = ?', [now(), id])
+      },
+      /** Bring it back. It keeps its ⌘ slot unless another workspace took it meanwhile. */
+      async reopen(id: string): Promise<void> {
+        const w = (await all('SELECT closed_slot FROM workspaces WHERE id = ?', [id]))[0]
+        let slot = w?.['closed_slot'] == null ? null : Number(w['closed_slot'])
+        const used = new Set((await all('SELECT slot FROM workspaces WHERE slot IS NOT NULL AND id <> ?', [id])).map((r) => Number(r['slot'])))
+        if (slot === null || used.has(slot)) slot = [1, 2, 3, 4, 5, 6, 7, 8, 9].find((n) => !used.has(n)) ?? null
+        await run('UPDATE workspaces SET closed_at = NULL, closed_slot = NULL, slot = ? WHERE id = ?', [slot, id])
+      },
+      /** A workspace for this exact folder, open or closed. */
+      async findByPath(path: string): Promise<Workspace | null> {
+        const r = (await all('SELECT * FROM workspaces WHERE path = ? ORDER BY closed_at IS NOT NULL LIMIT 1', [path]))[0]
+        return r ? toWorkspace(r) : null
       },
       async get(id: string): Promise<Workspace | null> {
         const r = (await all('SELECT * FROM workspaces WHERE id = ?', [id]))[0]

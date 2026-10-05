@@ -6,9 +6,11 @@ import { KIND_ORDER, type PaletteResult, type SearchTarget } from '@shared/searc
 export async function searchAll(repo: Repo, query: string, limit = 40): Promise<PaletteResult[]> {
   const hits = await repo.search.query(query, { limit })
   const workspaces = new Map((await repo.workspaces.list()).map((w) => [w.id, w]))
+  const closed = new Set((await repo.workspaces.listClosed()).map((w) => w.id))
   const out: PaletteResult[] = []
   const seenChats = new Set<string>()
   for (const h of hits) {
+    if (h.workspaceId && closed.has(h.workspaceId)) continue // a closed workspace is out of sight, and so are its chats
     let target: SearchTarget | null = null
     if (h.kind === 'chat') target = { type: 'chat', chatId: h.refId, workspaceId: h.workspaceId }
     else if (h.kind === 'friend') target = { type: 'friend', friendId: h.refId }

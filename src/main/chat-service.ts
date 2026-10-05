@@ -216,6 +216,40 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       return { isolated: true, branch: chat.branch, path: chat.worktreePath, dirty: await deps.worktrees.dirtyCount(chat.worktreePath) }
     },
 
+    /** How many agents are working or waiting on you in this workspace (closing it stops them). */
+    async workingIn(workspaceId: string): Promise<number> {
+      return (await repo.chats.list({ workspaceId })).filter((c) => c.status === 'busy' || c.status === 'away').length
+    },
+
+    /** Close a workspace: its agents stop and its tab goes, but every chat and its history stays, ready to reopen. */
+    async closeWorkspace(workspaceId: string): Promise<string[]> {
+      const chats = await repo.chats.list({ workspaceId })
+      for (const c of chats) {
+        cancelAsks(c.id, NO_ANSWER)
+        queued.delete(c.id)
+        await manager.dispose(c.id)
+        await repo.chats.setStatus(c.id, 'online', null)
+      }
+      await repo.workspaces.close(workspaceId)
+      notify('chats'); notify('queue')
+      return chats.map((c) => c.id)
+    },
+
+    async reopenWorkspace(workspaceId: string): Promise<void> {
+      await repo.workspaces.reopen(workspaceId)
+      notify('chats')
+    },
+
+    /** Delete a workspace and all its chats. Worktrees go only when nothing would be lost; the notes say what stayed. */
+    async deleteWorkspace(workspaceId: string): Promise<{ chats: number; notes: string[] }> {
+      const chats = await repo.chats.list({ workspaceId })
+      const notes: string[] = []
+      for (const c of chats) { const r = await this.deleteChat(c.id); if (r.note) notes.push(r.note) }
+      await repo.workspaces.remove(workspaceId)
+      notify('chats')
+      return { chats: chats.length, notes }
+    },
+
     /** Delete a chat. Its worktree goes with it only when nothing would be lost; otherwise the folder or branch stays and the note says so. */
     async deleteChat(chatId: string): Promise<{ note: string | null }> {
       const chat = await repo.chats.get(chatId)

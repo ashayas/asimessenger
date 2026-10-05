@@ -453,3 +453,16 @@ kbd { font: 10.5px var(--font-mono); padding: 0 4px; border: 1px solid var(--rul
 
 .chip-file .sz { color: var(--ink-soft); }
 .card .file .btn + .btn { margin-left: 4px; }
+
+/* workspace tabs: close button, close confirmation, closed list */
+.wtab { position: relative; display: inline-flex; align-items: stretch; }
+.wtab .wclose { position: absolute; right: 2px; top: 2px; width: 16px; height: 16px; line-height: 14px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-faint); font-size: 13px; cursor: pointer; opacity: 0; }
+.wtab:hover .wclose, .wtab.sel .wclose, .wtab .wclose:focus-visible { opacity: 1; }
+.wtab .wclose:hover { background: var(--rule); color: var(--ink); }
+.wtab button[role="tab"] { padding-right: 20px; }
+.ws-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 10px; background: var(--warn-wash, #fdf0d8); border-bottom: 1px solid var(--rule); font-size: 12px; flex: none; }
+.ws-closed { padding: 4px 10px; border-bottom: 1px solid var(--rule); background: var(--pane-tint); flex: none; max-height: 160px; overflow-y: auto; }
+.ws-closed .row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
+.ws-closed .path { color: var(--ink-faint); font-size: 11px; }
+.danger-text { color: var(--danger-ink); font-size: 11.5px; }
+.ws { overflow-y: hidden; }

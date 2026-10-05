@@ -9,7 +9,7 @@ knows those events, so a new harness never needs UI work.
 | `claude` | `claude -p` stream-json + `--permission-prompt-tool stdio` | Claude Code |
 | `codex` | `codex app-server` JSON-RPC | Codex |
 | `pi` | `pi --mode rpc` (JSONL) + a bundled gate extension | Pi |
-| `acp` | Agent Client Protocol over stdio | OpenCode, Gemini CLI, Hermes, anything ACP |
+| `acp` | Agent Client Protocol over stdio | OpenCode, Hermes, anything ACP |
 | `pty` | a real pseudo-terminal | any CLI with no protocol |
 | `http` | manifest-driven HTTP (SSE / NDJSON / JSON) | hosted agents |
 | `asi`, `echo`, `fake` | in-process | ASI, a smoke-test friend, tests |

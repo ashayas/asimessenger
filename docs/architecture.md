@@ -7,7 +7,7 @@ renderer windows (React)           main process                         child pr
 ─────────────────────────          ─────────────────────────────        ────────────────────────
 contacts · chat · tabs · ⌘K   ←IPC→ ChatService ─ HarnessManager ──────→ claude -p (stream-json)
 doodle (Excalidraw) · browser       Ingestor (events → messages)         codex app-server
-options · onboarding · toast        MCP bridge  (127.0.0.1, token)  ←──  opencode acp / gemini / hermes (ACP)
+options · onboarding · toast        MCP bridge  (127.0.0.1, token)  ←──  opencode acp / hermes (ACP)
                                     Voice (Apple helper / MLX sidecar)   any CLI in a PTY · HTTP agents
                                     ASI (any decision model) · Discovery      python sidecar (Cohere Transcribe)
                                     libSQL repo (+ FTS5)                 asi-speech (Swift)

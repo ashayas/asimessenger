@@ -12,7 +12,7 @@ const shot = async (p: Page, name: string) => { await p.waitForTimeout(400); awa
 
 test('capture the README screenshots from a demo scene', async () => {
   const bin = mkdtempSync(join(tmpdir(), 'asi-demo-bin-'))
-  for (const [c, v] of [['claude', '2.1.289 (Claude Code)'], ['codex', 'codex-cli 0.160.0'], ['opencode', '1.18.30'], ['gemini', '0.29.7'], ['pi', '0.74.2']]) { writeFileSync(join(bin, c!), `#!/bin/sh\necho "${v}"\n`); chmodSync(join(bin, c!), 0o755) }
+  for (const [c, v] of [['claude', '2.1.289 (Claude Code)'], ['codex', 'codex-cli 0.160.0'], ['opencode', '1.18.30'], ['agy', '1.2.16'], ['pi', '0.74.2']]) { writeFileSync(join(bin, c!), `#!/bin/sh\necho "${v}"\n`); chmodSync(join(bin, c!), 0o755) }
   const ws = mkdtempSync(join(tmpdir(), 'honeycomb-'))
   mkdirSync(ws, { recursive: true })
   const h = await launchApp({ seed: true, toasts: true, env: { ASI_TEST_PATH: `${bin}:/usr/bin:/bin`, ASI_VOICE_FAKE: 'x' } })
@@ -117,7 +117,7 @@ test('capture the README screenshots from a demo scene', async () => {
 
 test('welcome and tabs screens', async () => {
   const bin = mkdtempSync(join(tmpdir(), 'asi-demo-bin-'))
-  for (const [c, v] of [['claude', '2.1.289 (Claude Code)'], ['codex', 'codex-cli 0.160.0'], ['opencode', '1.18.30'], ['gemini', '0.29.7']]) { writeFileSync(join(bin, c!), `#!/bin/sh\necho "${v}"\n`); chmodSync(join(bin, c!), 0o755) }
+  for (const [c, v] of [['claude', '2.1.289 (Claude Code)'], ['codex', 'codex-cli 0.160.0'], ['opencode', '1.18.30'], ['agy', '1.2.16']]) { writeFileSync(join(bin, c!), `#!/bin/sh\necho "${v}"\n`); chmodSync(join(bin, c!), 0o755) }
   const h = await launchApp({ onboarding: true, seed: true, env: { ASI_TEST_PATH: `${bin}:/usr/bin:/bin` } })
   try {
     await expect(h.win.getByRole('heading', { name: 'ASI Messenger' })).toBeVisible()

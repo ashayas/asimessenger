@@ -11,7 +11,8 @@ test('claude and codex resume by session id inside the workspace', () => {
 
 test('opencode via ACP uses --session; unknown harnesses return null', () => {
   expect(resumeCommand(f({ harness: 'acp', transport: 'opencode' }), { harnessSessionId: 'ses_1' }, '/x')).toBe("cd '/x' && opencode --session 'ses_1'")
-  expect(resumeCommand(f({ harness: 'acp', transport: 'gemini' }), { harnessSessionId: 's' }, '/x')).toBeNull()
+  expect(resumeCommand(f({ harness: 'agy' }), { harnessSessionId: 'c1' }, '/x')).toBe("cd '/x' && agy --conversation 'c1'")
+  expect(resumeCommand(f({ harness: 'acp', transport: 'hermes' }), { harnessSessionId: 's' }, '/x')).toBeNull()
   expect(resumeCommand(f({ harness: 'echo' }), { harnessSessionId: null }, '/x')).toBeNull()
 })
 

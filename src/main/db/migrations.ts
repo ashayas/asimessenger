@@ -138,5 +138,12 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX usage_log_chat ON usage_log(chat_id);
   `,
   /* 9: closing a workspace hides its tab and keeps its chats, so it can come back */
-  `ALTER TABLE workspaces ADD COLUMN closed_at INTEGER; ALTER TABLE workspaces ADD COLUMN closed_slot INTEGER;`
+  `ALTER TABLE workspaces ADD COLUMN closed_at INTEGER; ALTER TABLE workspaces ADD COLUMN closed_slot INTEGER;`,
+  /* 10: Gemini CLI is replaced by Antigravity. Existing Gemini friends become Antigravity (their transcripts stay; the old session ids belong to another agent, so each chat starts a fresh conversation) */
+  `
+  UPDATE chats SET harness_session_id = NULL WHERE friend_id IN (SELECT id FROM friends WHERE harness = 'acp' AND transport = 'gemini');
+  UPDATE friends SET harness = 'agy', transport = NULL, command = 'agy', args_json = '[]', avatar = 'agy',
+    display_name = CASE WHEN display_name IN ('Gemini CLI', 'Gemini') THEN 'Antigravity' ELSE display_name END
+    WHERE harness = 'acp' AND transport = 'gemini';
+  `
 ]

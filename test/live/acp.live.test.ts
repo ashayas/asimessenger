@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { acpFactory } from '../../src/harness/acp/factory'
-import { GEMINI, OPENCODE } from '../../src/harness/acp/presets'
+import { OPENCODE } from '../../src/harness/acp/presets'
 import { loginEnv, which } from '../../src/harness/env'
 import type { AgentEvent, AgentSession } from '../../src/shared/events'
 import { collect, friendFor } from '../unit/helpers'
@@ -59,24 +59,5 @@ describe.skipIf(!live)('opencode (ACP)', async () => {
     await session.interrupt()
     const end = (await c.until((e) => e.t === 'turn_end', 30_000)) as Extract<AgentEvent, { t: 'turn_end' }>
     expect(end.reason).toBe('interrupted')
-  })
-})
-
-describe.skipIf(!live)('gemini (ACP)', async () => {
-  const env = await loginEnv()
-  const installed = !!which('gemini', env)
-  const run = installed ? test : test.skip
-
-  run('either answers, or reports a clear sign-in message (needs interactive login)', async () => {
-    try {
-      session = await acpFactory(GEMINI)({ friend: friendFor() as never, chatId: 'c', cwd: ws.dir, mode: 'ask' })
-    } catch (err) {
-      expect(String(err)).toMatch(/sign in|not found/i)
-      return
-    }
-    const c = collect(session)
-    session.send({ text: 'Reply with exactly: PONG' })
-    await c.until((e) => e.t === 'turn_end', 120_000)
-    expect(text(c.events)).toContain('PONG')
   })
 })

@@ -9,7 +9,7 @@ const KNOWN: Record<string, AvatarStyle> = {
   claude: { label: 'C', gradient: ['#d97757', '#b85a3c'] },
   codex: { label: 'Cx', gradient: ['#2b2b2b', '#5a5a5a'] },
   opencode: { label: 'oc', gradient: ['#3d3d52', '#6a6a8c'] },
-  gemini: { label: 'G', gradient: ['#4285f4', '#9b72cb'] },
+  agy: { label: 'Ag', gradient: ['#1a73e8', '#34a853'] },
   hermes: { label: 'H', gradient: ['#7b5ea7', '#b39ddb'] },
   pi: { label: 'π', gradient: ['#7b8794', '#a9b3be'] },
   asi: { label: '✦', gradient: ['#1a43b8', '#4f9ee8'] },

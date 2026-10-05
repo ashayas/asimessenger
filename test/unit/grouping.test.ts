@@ -11,7 +11,7 @@ const chat = (id: string, friendId: string, status: Chat['status'], statusText: 
 })
 
 test('groups by what each agent is doing; waiting beats working beats idle', () => {
-  const friends = [friend('a', 'ASI', 'asi'), friend('c', 'Claude'), friend('x', 'Codex'), friend('g', 'Gemini'), friend('p', 'Pi')]
+  const friends = [friend('a', 'ASI', 'asi'), friend('c', 'Claude'), friend('x', 'Codex'), friend('g', 'Antigravity'), friend('p', 'Pi')]
   const chats = [
     chat('1', 'c', 'busy', 'running tests'),
     chat('2', 'c', 'away', 'waiting on u', 2),

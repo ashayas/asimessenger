@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>Bring back the buddy list, for your coding agents.</b><br>
-  Claude Code · Codex · OpenCode · Gemini · any CLI · any HTTP agent, in one Messenger-style app for macOS.
+  Claude Code · Codex · OpenCode · Antigravity · Pi · any CLI · any HTTP agent, in one Messenger-style app for macOS.
 </p>
 
 <p align="center">
@@ -149,7 +149,7 @@ Anything that speaks [ACP](https://agentclientprotocol.com), runs in a terminal,
 | `pnpm test` | unit tests: data, harness adapters against mock agents, status engine, tool server, safety policy |
 | `pnpm test:e2e` | Playwright drives the Electron app end to end |
 | `pnpm test:packaged` | smoke test of the packaged `.app` |
-| `pnpm test:live` | with `ASI_LIVE=1`: contract tests against your installed **Claude Code, Codex, OpenCode, Gemini and Pi** in a throwaway git repo |
+| `pnpm test:live` | with `ASI_LIVE=1`: contract tests against your installed **Claude Code, Codex, OpenCode, Antigravity and Pi** in a throwaway git repo |
 | `pnpm shots` | regenerates the images above from a scripted demo scene |
 
 ## More

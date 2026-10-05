@@ -1,5 +1,6 @@
 import { acpFactory } from './acp/factory'
-import { GENERIC_ACP, GEMINI, HERMES, OPENCODE } from './acp/presets'
+import { GENERIC_ACP, HERMES, OPENCODE } from './acp/presets'
+import { agyFactory } from './agy/factory'
 import { claudeFactory } from './claude/factory'
 import { codexFactory } from './codex/factory'
 import { piFactory } from './pi/factory'
@@ -9,7 +10,7 @@ import { FakeAgent } from './fake-agent'
 import type { HarnessManager } from './manager'
 import type { HarnessFactory } from './types'
 
-const ACP_PRESETS = { opencode: OPENCODE, gemini: GEMINI, hermes: HERMES, generic: GENERIC_ACP } as const
+const ACP_PRESETS = { opencode: OPENCODE, hermes: HERMES, generic: GENERIC_ACP } as const
 
 /** Wires every built-in harness kind into the manager. ACP friends pick a preset by `transport`. */
 export function registerHarnesses(manager: HarnessManager, extra: { asi?: HarnessFactory; http?: HarnessFactory } = {}): void {
@@ -19,6 +20,7 @@ export function registerHarnesses(manager: HarnessManager, extra: { asi?: Harnes
   manager.register('claude', claudeFactory)
   manager.register('codex', codexFactory)
   manager.register('pi', piFactory)
+  manager.register('agy', agyFactory)
   manager.register('pty', ptyFactory)
   manager.register('fake', async () => new FakeAgent())
   manager.register('acp', (ctx) => {

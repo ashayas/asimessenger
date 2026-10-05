@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test } from 'vitest'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from '../../src/main/friends-service'
 import { openDb, type Db } from '../../src/main/db/db'
 import { createRepo, type Repo } from '../../src/main/db/repo'
+import { PRESETS } from '../../src/shared/presets'
 
 let bin: string
 let db: Db
@@ -39,8 +40,10 @@ test('adding a preset is idempotent and uses the resolved path', async () => {
   const b = await addPreset(repo, 'codex')
   expect(b.id).toBe(a.id)
   expect(a).toMatchObject({ harness: 'codex', displayName: 'Codex', command: join(bin, 'codex'), avatar: 'codex' })
-  const gem = await addPreset(repo, 'gemini')
-  expect(gem).toMatchObject({ harness: 'acp', transport: 'gemini', args: ['--experimental-acp'] })
+  fakeCli('agy', '1.2.16')
+  const agy = await addPreset(repo, 'agy')
+  expect(agy).toMatchObject({ harness: 'agy', displayName: 'Antigravity', avatar: 'agy', args: [] })
+  expect(PRESETS.some((p) => /gemini/i.test(p.id + p.name + p.command))).toBe(false) // Gemini CLI is gone
 })
 
 test('availability follows the PATH; built-ins are skipped', async () => {

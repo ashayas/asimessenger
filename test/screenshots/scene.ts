@@ -20,7 +20,7 @@ export async function buildScene(win: Page, homePath: string): Promise<{ c1: str
     const claude = await mk('claude', 'Claude Code', 'claude')
     const codex = await mk('codex', 'Codex', 'codex')
     const oc = await mk('acp', 'OpenCode', 'opencode', { transport: 'opencode' })
-    const gemini = await api.friends.create({ harness: 'acp', displayName: 'Gemini CLI', avatar: 'gemini', command: 'gemini', transport: 'gemini' })
+    const agy = await api.friends.create({ harness: 'agy', displayName: 'Antigravity', avatar: 'agy', command: 'agy' })
     await api.friends.create({ harness: 'pi', displayName: 'Pi', avatar: 'pi', command: 'pi' })
 
     const chat = async (ws: string, friend: string, title: string, status: 'busy' | 'away' | 'online', text: string | null, unread = 0, mode?: 'dangerous', branch?: string) => {
@@ -47,7 +47,7 @@ export async function buildScene(win: Page, homePath: string): Promise<{ c1: str
     await chat(fantasy.id, claude.id, 'character bible', 'busy', '~*~ writing characters.md ~*~')
     await chat(fantasy.id, codex.id, 'fix epub export', 'online', 'all done ★', 1)
     await chat(ghostty.id, claude.id, 'fix tab drag', 'away', '(⊙_⊙) waiting on u: Edit Tab.swift')
-    await chat(ghostty.id, gemini.id, 'review PR 214', 'online', null)
+    await chat(ghostty.id, agy.id, 'review PR 214', 'online', null)
     await chat(rent.id, claude.id, 'stripe webhook retries', 'busy', '✧ ʀᴜɴɴɪɴɢ ᴛᴇsᴛs ✧ webhooks.test.ts')
     await chat(rent.id, codex.id, 'migration dry run', 'away', '(⊙_⊙) waiting on u: psql -f 0042.sql', 1)
     await chat(rent.id, oc.id, 'seed data', 'online', 'all done ★')

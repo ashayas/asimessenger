@@ -1,7 +1,7 @@
 import type { TitleSource } from './title'
 import type { Presence } from './status'
 
-export type HarnessKind = 'claude' | 'codex' | 'pi' | 'acp' | 'pty' | 'http' | 'asi' | 'echo' | 'fake'
+export type HarnessKind = 'claude' | 'codex' | 'pi' | 'agy' | 'acp' | 'pty' | 'http' | 'asi' | 'echo' | 'fake'
 export type Mode = 'ask' | 'auto-edit' | 'plan' | 'dangerous'
 
 export interface Workspace {

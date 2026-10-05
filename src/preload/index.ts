@@ -115,8 +115,8 @@ const voice = {
 }
 
 const brain = {
-  status: (): Promise<{ connected: boolean; model?: string; accountId?: string }> => ipcRenderer.invoke('asi:brain-status'),
-  connect: (input: { accountId: string; token: string; model: string }): Promise<{ latencyMs: number; costPerDecisionUsd: number }> => ipcRenderer.invoke('asi:brain-connect', input),
+  status: (): Promise<unknown> => ipcRenderer.invoke('asi:brain-status'),
+  connect: (input: unknown): Promise<unknown> => ipcRenderer.invoke('asi:brain-connect', input),
   disconnect: (): Promise<void> => ipcRenderer.invoke('asi:brain-disconnect')
 }
 

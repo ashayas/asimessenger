@@ -9,7 +9,7 @@ contacts · chat · tabs · ⌘K   ←IPC→ ChatService ─ HarnessManager ─�
 doodle (Excalidraw) · browser       Ingestor (events → messages)         codex app-server
 options · onboarding · toast        MCP bridge  (127.0.0.1, token)  ←──  opencode acp / gemini / hermes (ACP)
                                     Voice (Apple helper / MLX sidecar)   any CLI in a PTY · HTTP agents
-                                    ASI (decider: Clef) · Discovery      python sidecar (Cohere Transcribe)
+                                    ASI (any decision model) · Discovery      python sidecar (Cohere Transcribe)
                                     libSQL repo (+ FTS5)                 asi-speech (Swift)
 ```
 
@@ -20,7 +20,7 @@ options · onboarding · toast        MCP bridge  (127.0.0.1, token)  ←── 
 * **Safety lives in main.** Modes, the dangerous gate (global switch AND per-friend opt-in), permission decisions, path
   checks (`readInsideWorkspace`), URL rules (`isAllowedNavigation`, http/https only) and secrets (keychain via
   `safeStorage`) are enforced in the main process, not the UI.
-* **Local only.** Voice never leaves the Mac; the optional Clef brain is the only network call ASI makes, and only when
+* **Local only.** Voice never leaves the Mac; the optional decision model is the only network call ASI makes (a local model makes none), and only when
   you connect it. The in-app browser has its own session, no preload, no permissions.
 
 ## Map
@@ -35,6 +35,21 @@ options · onboarding · toast        MCP bridge  (127.0.0.1, token)  ←── 
 | Windows | `src/main/windows.ts`, `src/renderer/src/*.tsx` |
 | Voice | `src/main/{voice,cohere-engine,model-manager,voice-runtime,voice-setup}.ts`, `native/` |
 | Release | `scripts/`, `build/entitlements.mac.plist`, `docs/releasing.md` |
+
+## ASI's decision model
+
+ASI asks typed questions (yes/no, pick-one, score) and gets probabilities back (`src/asi/decider.ts`). Anything that
+answers that shape can be the brain, set up in Add a friend › ASI brain:
+
+| Provider | Talks to | Notes |
+|---|---|---|
+| `clef` | Cloudflare Workers AI `@cf/cloudflare/clef`, `clef-flash` | purpose-built, ~40 ms |
+| `systemone` | `POST {endpoint}/v1/systemone` | Jev, via its own API or OpenRouter (`typesafe/jev-1.13`), or any server with the same shape |
+| `llm` | `POST {endpoint}/chat/completions` | any OpenAI-compatible chat model, including local Ollama / LM Studio. Its JSON answers are validated and normalized |
+
+Local rules (`heuristicRisk`) are always a floor: a model can raise a risk label, never lower it, and any failure falls back
+to the rules alone. Keys live in the keychain; endpoints must be https unless they are on this Mac. To add another
+provider, write a `Decider` (`decide(state, questions) -> answers`) and a case in `src/asi/brain.ts`.
 
 ## Testing seams
 

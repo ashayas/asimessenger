@@ -73,7 +73,7 @@ Warp-style **command blocks**, **permission cards** with a risk label, **questio
 </td>
 <td valign="top">
 <img src="docs/images/asi.png" alt="ASI answering who needs me"><br>
-<b>ASI.</b> "Who needs me?", "what's running outside?", "find the refresh lock". Optional Cloudflare Clef brain.
+<b>ASI.</b> "Who needs me?", "what's running outside?", "find the refresh lock". Optional decision-model brain: Cloudflare Clef, Jev, or any model.
 </td>
 </tr>
 </table>

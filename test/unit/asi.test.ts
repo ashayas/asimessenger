@@ -112,8 +112,8 @@ test('connecting the brain validates with one real decision, stores the token en
   const r = await brain.connect({ accountId: ID, token: 't'.repeat(40), model: 'clef' })
   expect(calls).toBe(1)
   expect(r.costPerDecisionUsd).toBeCloseTo(0.000036, 6)
-  expect(await brain.status()).toEqual({ connected: true, model: 'clef', accountId: 'aaaa…aaaa' })
-  expect(JSON.stringify(await repo.settings.get('secret:cloudflare-token', null))).not.toContain('tttt') // encrypted at rest
+  expect(await brain.status()).toEqual({ connected: true, provider: 'clef', model: 'clef', accountId: 'aaaa…aaaa' })
+  expect(JSON.stringify(await repo.settings.get('secret:brain-token', null))).not.toContain('tttt') // encrypted at rest
   expect((await brain.decider())!.id).toBe('clef')
   await brain.disconnect()
   expect(await brain.status()).toEqual({ connected: false })
@@ -127,4 +127,49 @@ test('connecting the brain validates with one real decision, stores the token en
 test('without a usable keychain nothing is stored', async () => {
   const secrets = createSecrets(repo, { ...crypto, available: () => false })
   await expect(secrets.set('x', 'y')).rejects.toThrow(/keychain/)
+})
+
+test('the brain connects to Jev or any chat model: endpoint rules, optional key for local servers, nothing saved on failure', async () => {
+  const secrets = createSecrets(repo, crypto)
+  const seen: string[] = []
+  const f = (async (url: string) => {
+    seen.push(url)
+    return new Response(JSON.stringify(url.endsWith('/v1/systemone') ? { answers: { ok: { type: 'noul', noul: 0.9 } } } : { choices: [{ message: { content: '{"answers":{"ok":{"noul":0.8}}}' } }] }))
+  }) as unknown as typeof fetch
+  const brain = createBrain(repo, secrets, f)
+
+  await expect(brain.connect({ provider: 'systemone', baseUrl: 'http://evil.example.com', model: 'jev', token: 'k'.repeat(20) })).rejects.toThrow(/https/)
+  await expect(brain.connect({ provider: 'systemone', baseUrl: 'not a url', model: 'jev', token: 'k' })).rejects.toThrow(/full URL/)
+  await expect(brain.connect({ provider: 'llm', baseUrl: 'https://openrouter.ai/api/v1', model: '  ', token: 'k' })).rejects.toThrow(/model name/)
+  await expect(brain.connect({ provider: 'llm', baseUrl: 'https://openrouter.ai/api/v1', model: 'm' })).rejects.toThrow(/API key/)
+  expect(seen).toEqual([])
+
+  const jev = await brain.connect({ provider: 'systemone', baseUrl: 'https://openrouter.ai/api', model: 'typesafe/jev-1.13', token: 'sk-or-secret' })
+  expect(seen).toEqual(['https://openrouter.ai/api/v1/systemone'])
+  expect(jev.costPerDecisionUsd).toBeNull()
+  expect(await brain.status()).toEqual({ connected: true, provider: 'systemone', model: 'typesafe/jev-1.13', host: 'openrouter.ai' })
+  expect(JSON.stringify(await repo.settings.get('secret:brain-token', null))).not.toContain('sk-or-secret')
+  expect((await brain.decider())!.id).toBe('typesafe/jev-1.13')
+
+  // a local server needs no key, and switching provider replaces the old key
+  await brain.connect({ provider: 'llm', baseUrl: 'http://localhost:11434/v1', model: 'llama3.2' })
+  expect(await brain.status()).toEqual({ connected: true, provider: 'llm', model: 'llama3.2', host: 'localhost:11434' })
+  expect(await secrets.has('brain-token')).toBe(false)
+  expect((await brain.decider())!.id).toBe('llama3.2')
+
+  // a failed test leaves the previous connection alone
+  const bad = createBrain(repo, secrets, (async () => new Response('{"error":{"message":"nope"}}', { status: 401 })) as unknown as typeof fetch)
+  await expect(bad.connect({ provider: 'systemone', baseUrl: 'https://api.typesafe.ai', model: 'jev-latest', token: 'k' })).rejects.toThrow(/api\.typesafe\.ai rejected the connection: nope/)
+  expect((await bad.status()).model).toBe('llama3.2')
+})
+
+test('an existing Cloudflare token stored before providers existed keeps working', async () => {
+  const secrets = createSecrets(repo, crypto)
+  await repo.settings.set('asi.brain', { provider: 'clef', accountId: ID, model: 'clef-flash' })
+  await secrets.set('cloudflare-token', 't'.repeat(40))
+  const brain = createBrain(repo, secrets)
+  expect((await brain.status()).connected).toBe(true)
+  expect((await brain.decider())!.id).toBe('clef-flash')
+  await brain.disconnect()
+  expect(await secrets.has('cloudflare-token')).toBe(false)
 })

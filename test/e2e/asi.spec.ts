@@ -93,3 +93,46 @@ test('Add a friend › ASI brain: invalid credentials are rejected clearly; vali
     await h.cleanup()
   }
 })
+
+test('ASI brain: pick Jev or a local chat model instead of Clef; the form follows the choice and the key stays optional locally', async () => {
+  const hits: string[] = []
+  const server = createServer((req, res) => {
+    hits.push(`${req.url} ${req.headers.authorization ?? 'no-auth'}`)
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(req.url === '/v1/systemone' ? { answers: { ok: { type: 'noul', noul: 0.9 } } } : { choices: [{ message: { content: '{"answers":{"ok":{"noul":0.8}}}' } }] }))
+  })
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  const h = await launchApp({ seed: true })
+  try {
+    const opened = h.app.waitForEvent('window')
+    await h.win.getByRole('button', { name: /Add a friend/ }).click()
+    const add = await opened
+    await add.getByRole('button', { name: 'Set up…' }).click()
+
+    await add.getByLabel('Decision model').selectOption({ label: 'Jev via OpenRouter' })
+    await expect(add.getByLabel('Endpoint')).toHaveValue('https://openrouter.ai/api')
+    await expect(add.getByLabel('Model name')).toHaveValue('typesafe/jev-1.13')
+    await add.getByLabel('Endpoint').fill('http://example.com') // not https and not local
+    await add.getByLabel('API key').fill('sk-or-test-key')
+    await add.getByRole('button', { name: 'Test & save' }).click()
+    await expect(add.getByRole('status')).toContainText('must be https')
+
+    await add.getByLabel('Endpoint').fill(base)
+    await add.getByRole('button', { name: 'Test & save' }).click()
+    await expect(add.getByTestId('brain')).toContainText('Connected · typesafe/jev-1.13 · Jev')
+    expect(hits).toEqual(['/v1/systemone Bearer sk-or-test-key'])
+    await add.screenshot({ path: 'test-results/brain-jev.png' })
+
+    await add.getByRole('button', { name: 'Disconnect' }).click()
+    await add.getByRole('button', { name: 'Set up…' }).click()
+    await add.getByLabel('Decision model').selectOption({ label: 'Local model (Ollama)' })
+    await add.getByLabel('Endpoint').fill(base)
+    await add.getByRole('button', { name: 'Test & save' }).click() // no key needed on this Mac
+    await expect(add.getByTestId('brain')).toContainText('Connected · llama3.2 · chat model')
+    expect(hits.at(-1)).toBe('/chat/completions no-auth')
+  } finally {
+    server.close()
+    await h.cleanup()
+  }
+})

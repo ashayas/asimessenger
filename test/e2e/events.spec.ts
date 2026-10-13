@@ -33,10 +33,10 @@ test('every event kind renders and the permission/question round trips work', as
     await chat.getByRole('button', { name: 'Global' }).click()
     await expect(chat.locator('[data-kind="question"]')).toContainText('You answered: Global')
 
-    // Stop interrupts a long turn
+    // Nudge interrupts a long turn
     await say('/script long')
     await expect(chat.locator('[data-running]')).toBeVisible()
-    await chat.getByRole('button', { name: 'Stop' }).click()
+    await chat.getByRole('button', { name: 'Nudge' }).click()
     await expect.poll(() => h.win.evaluate(async (id) => (await window.asi.api.chats.get(id))!.statusText, chatId)).toContain('stopped')
     await chat.screenshot({ path: 'test-results/events.png' })
   } finally {

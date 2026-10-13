@@ -128,6 +128,8 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       if (chat.titleSource === 'default') await repo.chats.setAutoTitle(chatId, opts.silentUser ? (await repo.messages.list(chatId)).find((m) => m.kind === 'attachment')?.text ?? ruleTitle(clean) : ruleTitle(clean), 'rule')
       notify('messages')
       try {
+        const permissionState = { globalDangerous: await repo.settings.get('allowDangerous', false), friendDangerous: friend.dangerousAllowed }
+        if (!canUseMode(chat.mode, permissionState)) throw new Error(lockedReason(permissionState) ?? 'that mode is not allowed')
         await manager.send(chat, friend, rootOf(chat, ws), { text: clean, quote, images: opts.images })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
@@ -478,11 +480,13 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
     async nudge(chatId: string, now = Date.now()): Promise<boolean> {
       if (now - (lastNudge.get(chatId) ?? 0) < NUDGE_COOLDOWN_MS) return false
       lastNudge.set(chatId, now)
-      const running = manager.isLive(chatId) && (await repo.chats.get(chatId))?.status !== 'online'
+      const hasShell = shells.has(chatId)
+      shells.get(chatId)?.kill('SIGINT')
+      const running = hasShell || (manager.isLive(chatId) && (await repo.chats.get(chatId))?.status !== 'online')
       await repo.messages.append({ chatId, role: 'system', kind: 'nudge', body: { interrupted: running }, text: running ? 'You sent a nudge and stopped the agent.' : 'You sent a nudge.' })
       notify('messages')
       cancelAsks(chatId, NO_ANSWER)
-      if (running) await manager.interrupt(chatId)
+      if (manager.isLive(chatId)) void manager.interrupt(chatId).catch(() => {})
       return true
     },
 

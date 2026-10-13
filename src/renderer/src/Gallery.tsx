@@ -16,7 +16,6 @@ export function Gallery() {
         <ToolButton icon="📎" label="Send Files" />
         <ToolButton icon="✏️" label="Doodle" />
         <ToolButton icon="📳" label="Nudge" />
-        <ToolButton icon="⏹" label="Stop" stop />
       </div>
       <div className="gallery" data-testid="gallery">
         <section>

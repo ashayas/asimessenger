@@ -33,7 +33,7 @@ test('a bring-your-own raw terminal friend: transcript gets plain output, the dr
     await chat.getByLabel('Message').fill('sleep 30')
     await chat.getByLabel('Message').press('Enter')
     await expect.poll(() => h.win.evaluate(async (id) => (await window.asi.api.chats.get(id))!.status, chatId)).toBe('busy')
-    await chat.getByRole('button', { name: 'Stop' }).click()
+    await chat.getByRole('button', { name: 'Nudge' }).click()
     await expect.poll(() => h.win.evaluate(async (id) => (await window.asi.api.chats.get(id))!.statusText, chatId)).toContain('stopped')
   } finally {
     await h.cleanup()

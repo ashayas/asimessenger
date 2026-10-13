@@ -36,7 +36,7 @@ test('queue your next prompt while the agent works: held, sent on success, kept 
     await chat.getByRole('button', { name: /Queue next/ }).click()
     await say('after the long task')
     await expect(q).toContainText('after the long task')
-    await chat.getByRole('button', { name: 'Stop' }).click()
+    await chat.getByRole('button', { name: 'Nudge' }).click()
     await expect(q).toHaveAttribute('data-held', 'true')
     await expect(q).toContainText('The agent stopped, so this was not sent')
     await expect(chat.getByText('You said: after the long task')).toHaveCount(0)

@@ -18,13 +18,29 @@ if (typeof window !== 'undefined' && window.asi) {
   window.asi.onChanged((t) => { if (t === 'settings') void loadPrefs() })
 }
 
+const preloaded = new Map<SoundName, HTMLAudioElement>()
+function preloadSounds(): void {
+  if (typeof window === 'undefined') return
+  for (const [key, url] of Object.entries(URLS)) {
+    try {
+      const a = new Audio(url)
+      a.preload = 'auto'
+      preloaded.set(key as SoundName, a)
+    } catch { /* no audio context */ }
+  }
+}
+if (typeof window !== 'undefined') {
+  preloadSounds()
+}
+
 /** Play a bundled sound unless sounds are off. Fails silently (autoplay policy, no output device). Tests can count plays via window.__sounds. */
 export function play(name: SoundName): void {
   if (!prefs.on) return
   const w = window as unknown as { __sounds?: string[] }
   ;(w.__sounds ??= []).push(name)
   try {
-    const a = new Audio(URLS[name])
+    const cached = preloaded.get(name)
+    const a = cached ? (cached.cloneNode() as HTMLAudioElement) : new Audio(URLS[name])
     a.volume = Math.max(0, Math.min(1, prefs.volume))
     void a.play().catch(() => {})
   } catch {

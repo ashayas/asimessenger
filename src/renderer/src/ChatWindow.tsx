@@ -46,6 +46,9 @@ function useChat(chatId: string) {
 /** Unsent text survives switching tabs (only the active tab is mounted). */
 const drafts = new Map<string, string>()
 
+/** Client-side rate-limit so nudge sound and action trigger immediately. */
+const clientLastNudge = new Map<string, number>()
+
 export function ChatWindow({ chatId, embedded = false }: { chatId: string; embedded?: boolean }) {
   const { chat, friend, messages } = useChat(chatId)
   const chatUsage = useChatUsage(chatId)
@@ -157,6 +160,14 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
 
   const live = useMemo(() => (friend ? liveFor(friend, allChats.filter((c) => c.id === chatId), isBuiltin(friend.harness)) : null), [friend, allChats, chatId])
 
+  const onNudge = useCallback(() => {
+    const now = Date.now()
+    if (now - (clientLastNudge.get(chatId) ?? 0) < 3000) return
+    clientLastNudge.set(chatId, now)
+    play('nudge')
+    void window.asi.chat.nudge(chatId)
+  }, [chatId])
+
   const Frame = embedded ? EmbeddedFrame : WindowFrame
   if (!chat || !friend) return <Frame title="ASI Messenger"><div className="empty">Loading…</div></Frame>
 
@@ -205,8 +216,7 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
         <ToolButton icon="🌐" label="Browser" onClick={() => void window.asi.browser.open('about:blank')} />
         <ToolButton icon={voice === 'recording' ? '⏺' : '🎙'} label={voice === 'recording' ? 'Stop & type' : 'Voice Clip'} disabled={voice === 'transcribing'} onClick={toggleVoice} />
         <ToolButton icon="⌨" label="Terminal" disabled={!terminalPossible} onClick={() => (friend.harness === 'pty' ? setDrawer((v) => !v) : void window.asi.pty.openExternal(chatId))} />
-        <ToolButton icon="📳" label="Nudge" onClick={() => void window.asi.chat.nudge(chatId).then((sent) => { if (sent) play('nudge') })} />
-        <ToolButton icon="⏹" label="Stop" stop onClick={() => void window.asi.chat.interrupt(chatId)} />
+        <ToolButton icon="📳" label="Nudge" onClick={onNudge} />
       </div>
       <div className="to">
         <b>To:</b> {friend.displayName} <StatusDot presence={presence} />
@@ -262,6 +272,9 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
           <span className="grow">{modeNote}</span>
           <Btn onClick={() => void window.asi.safety.openOptions()}>Open Options</Btn>
         </div>
+      ) : null}
+      {friend.harness === 'agy' && chat.mode === 'ask' ? (
+        <div className="mode-note">Antigravity applies its CLI permission rules. Workspace files and permitted commands may run without asking.</div>
       ) : null}
       {friend.harness === 'asi' || friend.harness === 'echo' ? null : (
       <div className="modes" role="radiogroup" aria-label="Permission mode">

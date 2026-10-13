@@ -61,7 +61,7 @@ export interface AgentSession {
   /** Subscribe to events; returns an unsubscribe function. */
   subscribe(listener: (e: AgentEvent) => void): () => void
   send(turn: UserTurn): void
-  /** Nudge: stop the current turn. Resolves once the agent has stopped. */
+  /** Stop the current turn. Resolves once the agent has stopped. */
   interrupt(): Promise<void>
   /** Answer a permission request (PermDecision) or a question (free text / chosen option). */
   respond(reqId: string, answer: PermDecision | string, reason?: string): void
@@ -75,5 +75,7 @@ export interface AgentSession {
   readonly restartOnModeChange?: boolean
   /** True while a turn is running. */
   readonly busy?: boolean
+  /** A dead transport must be recreated before the next turn. */
+  readonly closed?: boolean
   dispose(): Promise<void>
 }

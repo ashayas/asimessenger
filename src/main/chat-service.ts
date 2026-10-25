@@ -758,7 +758,10 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       let agentId = 'user'
       let agentName = 'User'
       if (participantId) {
-        const p = await repo.participants.get(participantId)
+        const p =
+          (await repo.participants.get(participantId)) ??
+          (await repo.participants.list(chatId)).find((x) => x.agentId === participantId) ??
+          null
         if (p) {
           agentId = p.agentId
           agentName = p.displayName

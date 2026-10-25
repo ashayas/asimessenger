@@ -16,3 +16,5 @@ src/renderer/public/excalidraw-assets
 resources/bin/
 dist-models/
 .work/
+.boards/
+promo/audio.wav

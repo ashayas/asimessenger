@@ -42,6 +42,26 @@ test('capture the README screenshots from a demo scene', async () => {
     await viewer.getByText('Two tabs call').selectText()
     await shot(viewer, 'attachment.png')
 
+    // multi-agent invite + shared grep board
+    p = h.app.waitForEvent('window')
+    await h.win.evaluate((id) => window.asi.chat.openWindow(id), ids.cMulti)
+    const multiWin = await p
+    await expect(multiWin.getByTestId('transcript')).toBeVisible()
+    await multiWin.getByRole('button', { name: /Invite/ }).click()
+    const invitePanel = multiWin.getByTestId('invite-panel')
+    await expect(invitePanel).toBeVisible()
+    await invitePanel.getByRole('button', { name: /View Log/ }).click()
+    await expect(invitePanel.getByTestId('board-log-pre')).toBeVisible()
+    await size(h, `#/chat/${ids.cMulti}`, 860, 1020, 360, 10)
+    await multiWin.evaluate(() => {
+      const tr = document.querySelector('[data-testid="transcript"]')
+      if (tr) tr.scrollTop = tr.scrollHeight
+      const pre = document.querySelector('[data-testid="board-log-pre"]')
+      if (pre) pre.scrollTop = pre.scrollHeight
+    })
+    await shot(multiWin, 'multi-agent-board.png')
+    await multiWin.close().catch(() => {})
+
     // usage window
     p = h.app.waitForEvent('window')
     await h.win.keyboard.press('Meta+u')

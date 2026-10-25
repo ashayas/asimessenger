@@ -27,14 +27,21 @@ options · onboarding · toast        MCP bridge  (127.0.0.1, token)  ←── 
 
 | Area | Where |
 |---|---|
-| Harnesses | `src/harness/{acp,claude,codex,pty,http}`, `registry.ts`, `manager.ts`, `fake-agent.ts` |
-| Chat pipeline | `src/main/{chat-service,ingest,notifications}.ts` |
+| Harnesses | `src/harness/{acp,claude,codex,pty,http,agy,pi}`, `registry.ts`, `manager.ts`, `fake-agent.ts` |
+| Chat pipeline | `src/main/{chat-service,ingest,notifications}.ts`, `src/shared/board.ts` |
 | Data | `src/main/db/{migrations,repo}.ts` (append-only migrations) |
 | ASI | `src/asi/{agent,decider,brain,discovery}.ts`, `src/main/{adopt,secrets}.ts` |
-| Tools for agents | `src/main/mcp-bridge.ts` |
+| Tools for agents | `src/main/mcp-bridge.ts` (`board_read`, `board_grep`, `board_append`, attachments) |
 | Windows | `src/main/windows.ts`, `src/renderer/src/*.tsx` |
 | Voice | `src/main/{voice,cohere-engine,model-manager,voice-runtime,voice-setup}.ts`, `native/` |
 | Release | `scripts/`, `build/entitlements.mac.plist`, `docs/releasing.md` |
+
+## Multi-agent threads & session boards
+
+Every chat can host multiple agents via the **Invite** flow (`chat_participants` table, `agent_id` slugs such as `claude-1`, `claude-2`, `agy-1`, `codex-1`).
+- **Isolated per-participant sessions:** `HarnessManager` keys active sessions by `chatId::participantId`, so multiple instances of the same harness (e.g. two Claude Code processes) or mixed harnesses run in parallel in the same thread without colliding.
+- **Append-only grep board (`<workspace>/.boards/<chatId>.log`):** Managed by `src/shared/board.ts`. The file header contains `# [GOAL]` and `# [AGENTS]`, and every turn or explicit `board_append` writes a single grep-friendly line (`TIMESTAMP | SEQ=0001 | AGENT=<id> | NAME="..." | ROLE="..." | TYPE=CLAIM|FINDING|QUESTION|HANDOFF|DONE|STATUS | SUMMARY="..."`).
+- **Context & MCP tools:** Before each turn in a multi-agent thread, `ChatService` injects a collaboration preamble with the board file path, overall goal, teammate roster, and recent board tail, plus MCP tools (`board_read`, `board_grep`, `board_append`).
 
 ## Attachments
 

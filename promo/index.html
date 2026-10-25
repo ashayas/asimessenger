@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>ASI Messenger — Launch Promo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-font-smoothing: antialiased; }
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #0b192e;
+    font-family: 'Tahoma', 'Trebuchet MS', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  #stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+  }
+
+  /* Camera world */
+  #world {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    transform-origin: 0 0;
+  }
+
+  /* Windows XP Bliss Wallpaper */
+  .xp-desktop {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, #1b66d1 0%, #3d8af7 38%, #7db9ff 62%, #b9dcff 74%);
+    overflow: hidden;
+  }
+
+  .xp-cloud {
+    position: absolute;
+    border-radius: 999px;
+    background: radial-gradient(closest-side, rgba(255,255,255,0.92), rgba(255,255,255,0.45) 65%, rgba(255,255,255,0));
+    filter: blur(2px);
+  }
+
+  .xp-hill-back {
+    position: absolute;
+    left: -180px;
+    right: -180px;
+    bottom: -140px;
+    height: 520px;
+    border-radius: 55% 45% 0 0 / 100% 100% 0 0;
+    background: linear-gradient(180deg, #74c438 0%, #4ea31e 55%, #2f7c12 100%);
+    box-shadow: inset 0 18px 40px rgba(255, 255, 200, 0.35);
+  }
+
+  .xp-hill-front {
+    position: absolute;
+    left: -260px;
+    right: -120px;
+    bottom: -190px;
+    height: 490px;
+    border-radius: 42% 58% 0 0 / 100% 100% 0 0;
+    background: linear-gradient(176deg, #86d642 0%, #5cb827 48%, #388816 100%);
+    box-shadow: inset 0 14px 36px rgba(255, 255, 210, 0.38);
+  }
+
+  /* Desktop Icons */
+  .xp-icons {
+    position: absolute;
+    left: 34px;
+    top: 34px;
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+    z-index: 2;
+  }
+
+  .xp-icon {
+    width: 112px;
+    padding: 8px 6px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid transparent;
+  }
+
+  .xp-icon.selected {
+    background: rgba(11, 97, 255, 0.38);
+    border-color: rgba(185, 219, 255, 0.85);
+  }
+
+  .xp-icon-label {
+    color: #fff;
+    font-size: 14px;
+    line-height: 1.2;
+    text-align: center;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.92), 0 0 6px rgba(0,0,0,0.65);
+  }
+
+  /* Windows XP Luna Taskbar */
+  .xp-taskbar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 44px;
+    background: linear-gradient(180deg, #3168d5 0%, #245edb 14%, #1f53c4 85%, #163d99 100%);
+    border-top: 1px solid #5a94f7;
+    display: flex;
+    align-items: center;
+    z-index: 20;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.28);
+  }
+
+  .xp-start {
+    height: 44px;
+    padding: 0 26px 0 18px;
+    border-radius: 0 18px 18px 0;
+    background: linear-gradient(180deg, #5fd052 0%, #3ca931 18%, #2e9124 85%, #1f6b18 100%);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.65), 2px 0 6px rgba(0,0,0,0.35);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: #fff;
+    font-weight: 800;
+    font-style: italic;
+    font-size: 20px;
+    letter-spacing: 0.3px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.65);
+  }
+
+  .xp-task-items {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    flex: 1;
+  }
+
+  .xp-task-btn {
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #1b49a8 0%, #163c8f 100%);
+    border: 1px solid #0e2c70;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.35);
+    color: #fff;
+    font-size: 13.5px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .xp-tray {
+    height: 44px;
+    padding: 0 18px;
+    background: linear-gradient(180deg, #1690e8 0%, #0f7cd1 18%, #0c6ab8 100%);
+    border-left: 1px solid #0a4d8c;
+    box-shadow: inset 1px 1px 1px rgba(255,255,255,0.35);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #fff;
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+
+  /* MSN / XP Sign-in Toast */
+  .xp-toast {
+    position: absolute;
+    right: 22px;
+    bottom: 54px;
+    width: 310px;
+    background: linear-gradient(180deg, #f3f8ff 0%, #dcebff 52%, #c3dcff 100%);
+    border: 2px solid #2962c8;
+    border-radius: 8px;
+    box-shadow: 0 12px 28px rgba(8, 28, 68, 0.45);
+    overflow: hidden;
+    z-index: 18;
+  }
+
+  .xp-toast-bar {
+    background: linear-gradient(90deg, #245edb, #4a8cf7);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .xp-toast-body {
+    padding: 11px 12px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    color: #163059;
+    font-size: 13px;
+  }
+
+  /* ASI Messenger Window */
+  .asi-win {
+    position: absolute;
+    background: linear-gradient(180deg, #d7e8fb 0%, #eef5fc 110px, #f7faff 100%);
+    border: 2px solid #245edb;
+    border-radius: 11px;
+    box-shadow: 0 26px 65px rgba(8, 25, 62, 0.52), 0 4px 16px rgba(8, 25, 62, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  .asi-titlebar {
+    height: 36px;
+    background: linear-gradient(180deg, #3c7cf5 0%, #245edb 18%, #1d4fbe 85%, #163d99 100%);
+    color: #fff;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 14px;
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+    border-bottom: 1px solid #133582;
+  }
+
+  .asi-win-btns {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+  }
+
+  .asi-win-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.65);
+    background: linear-gradient(180deg, #5d97ff, #2760d6);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .asi-win-btn.close {
+    background: linear-gradient(180deg, #f37865, #d13824);
+  }
+
+  /* Toolbar */
+  .asi-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: linear-gradient(180deg, #e7f1fd 0%, #cfe2fa 100%);
+    border-bottom: 1px solid #abc5e8;
+  }
+
+  .asi-tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 7px;
+    border: 1px solid #9ab8e2;
+    background: linear-gradient(180deg, #ffffff 0%, #e4effc 100%);
+    color: #193866;
+    font-size: 13px;
+    font-weight: 700;
+    box-shadow: 0 1px 2px rgba(20, 50, 100, 0.08);
+  }
+
+  .asi-tool.active {
+    background: linear-gradient(180deg, #2f73e8 0%, #1d56be 100%);
+    color: #fff;
+    border-color: #154296;
+  }
+
+  /* To Bar */
+  .asi-to {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    background: #eef4fc;
+    border-bottom: 1px solid #bfd3ee;
+    font-size: 13px;
+    color: #1c355c;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #27b648;
+    box-shadow: 0 0 0 2px rgba(39, 182, 72, 0.25);
+    display: inline-block;
+  }
+
+  .chip-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid #b5cce9;
+    font-size: 12px;
+    font-weight: 700;
+    color: #1c3b6b;
+  }
+
+  .code-badge {
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: #e3eefc;
+    color: #1b4ea0;
+    border: 1px solid #bdd3f2;
+  }
+
+  /* Invite & Shared Session Board Drawer */
+  .invite-drawer {
+    background: #e4effc;
+    border-bottom: 1px solid #b3c9e8;
+    padding: 9px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    overflow: hidden;
+  }
+
+  .invite-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    color: #1d3861;
+  }
+
+  .goal-box {
+    flex: 1;
+    background: #fff;
+    border: 1px solid #9db9e0;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-weight: 600;
+    color: #132c52;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .board-Terminal {
+    background: #0f1b2d;
+    border: 1px solid #2b4975;
+    border-radius: 7px;
+    padding: 7px 11px;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 11.5px;
+    line-height: 1.42;
+    color: #d7e7ff;
+  }
+
+  .board-head {
+    display: flex;
+    justify-content: space-between;
+    color: #7ab3ff;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(122, 179, 255, 0.22);
+    padding-bottom: 3px;
+    margin-bottom: 4px;
+  }
+
+  /* Main Conversation Layout */
+  .asi-body {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    padding: 12px 14px;
+    gap: 14px;
+  }
+
+  .asi-transcript {
+    flex: 1;
+    background: #ffffff;
+    border: 1px solid #adc5e6;
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(15, 40, 80, 0.06);
+  }
+
+  .msg-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: #f6f9fe;
+    border-left: 4px solid #3b78e7;
+  }
+
+  .msg-block.user {
+    background: #eef6ff;
+    border-left-color: #e05297;
+  }
+
+  .msg-says {
+    font-size: 12.5px;
+    color: #466085;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .msg-says b {
+    color: #132c52;
+    font-size: 13px;
+  }
+
+  .msg-text {
+    font-size: 13.5px;
+    line-height: 1.38;
+    color: #142642;
+  }
+
+  .tool-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 11.5px;
+    padding: 2px 8px;
+    border-radius: 5px;
+    background: #e6f0ff;
+    border: 1px solid #b8d0f4;
+    color: #184999;
+  }
+
+  /* Right Avatar Column */
+  .asi-side {
+    width: 148px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .agent-card {
+    background: linear-gradient(180deg, #ffffff 0%, #eaf2fd 100%);
+    border: 1px solid #a9c3e6;
+    border-radius: 9px;
+    padding: 7px 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 5px rgba(20, 48, 95, 0.08);
+  }
+
+  .agent-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    color: #fff;
+    font-weight: 800;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    flex: none;
+  }
+
+  .agent-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .agent-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: #163059;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .agent-sub {
+    font-size: 10.5px;
+    color: #4b6994;
+    white-space: nowrap;
+  }
+
+  /* Composer */
+  .asi-composer {
+    padding: 0 14px 12px;
+    display: flex;
+    gap: 9px;
+    align-items: center;
+  }
+
+  .asi-input {
+    flex: 1;
+    height: 40px;
+    background: #fff;
+    border: 1px solid #9ab6de;
+    border-radius: 7px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    font-size: 13.5px;
+    color: #152b4d;
+  }
+
+  .asi-send {
+    height: 40px;
+    padding: 0 20px;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #3c80f7 0%, #2159c9 100%);
+    border: 1px solid #154099;
+    color: #fff;
+    font-weight: 700;
+    font-size: 13.5px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Finale Title Banner */
+  #finale-banner {
+    position: absolute;
+    left: 50%;
+    top: 14px;
+    transform: translateX(-50%);
+    background: rgba(12, 26, 52, 0.90);
+    border: 2px solid rgba(124, 184, 255, 0.80);
+    border-radius: 999px;
+    padding: 9px 28px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 14px 40px rgba(0,0,0,0.42);
+    z-index: 30;
+    white-space: nowrap;
+  }
+
+  /* HUD Cursor & Trail */
+  #trail-canvas {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 40;
+  }
+
+  #cursor {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    z-index: 45;
+    transform-origin: 4px 4px;
+  }
+
+  .cursor-pill {
+    position: absolute;
+    left: 20px;
+    top: 18px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #245edb, #e05297);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  .click-ripple {
+    position: absolute;
+    left: -18px;
+    top: -18px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2.5px solid #fff;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world">
+    <!-- Windows XP Bliss Desktop -->
+    <div class="xp-desktop">
+      <div class="xp-cloud" style="width: 520px; height: 130px; left: 180px; top: 110px;"></div>
+      <div class="xp-cloud" style="width: 680px; height: 165px; left: 820px; top: 80px;"></div>
+      <div class="xp-cloud" style="width: 440px; height: 115px; left: 1380px; top: 210px;"></div>
+      <div class="xp-hill-back"></div>
+      <div class="xp-hill-front"></div>
+
+      <!-- Desktop Icons -->
+      <div class="xp-icons">
+        <div class="xp-icon">
+          <svg width="48" height="48" viewBox="0 0 48 48">
+            <rect x="6" y="8" width="36" height="26" rx="3" fill="#4f86f0" stroke="#183f94" stroke-width="2"/>
+            <rect x="10" y="12" width="28" height="18" fill="#bfe0ff"/>
+            <path d="M16 36h16l4 5H12z" fill="#d0ddf0" stroke="#5b7399" stroke-width="1.5"/>
+          </svg>
+          <div class="xp-icon-label">My Computer</div>
+        </div>
+
+        <div class="xp-icon">
+          <svg width="48" height="48" viewBox="0 0 48 48">
+            <path d="M8 14h13l4 4h15v22a3 3 0 0 1-3 3H11a3 3 0 0 1-3-3z" fill="#f7c948" stroke="#b58312" stroke-width="2"/>
+          </svg>
+          <div class="xp-icon-label">asi-messenger</div>
+        </div>
+
+        <div class="xp-icon" id="asi-desktop-icon">
+          <svg width="54" height="54" viewBox="0 0 64 64">
+            <defs>
+              <linearGradient id="ga" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7fc4f5"/><stop offset="1" stop-color="#2f8fe0"/></linearGradient>
+              <linearGradient id="gb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f86f0"/><stop offset="1" stop-color="#1a43b8"/></linearGradient>
+            </defs>
+            <circle cx="22" cy="22" r="10" fill="url(#ga)"/>
+            <path d="M5 54c0-12 7.5-19.5 17-19.5S39 42 39 54z" fill="url(#ga)"/>
+            <circle cx="37" cy="27" r="12.4" fill="#fff"/>
+            <circle cx="37" cy="27" r="11" fill="url(#gb)"/>
+            <path d="M17.6 60c0-13 8.7-21.6 19.4-21.6S56.4 47 56.4 60z" fill="#fff"/>
+            <path d="M19 60c0-12 8-20 18-20s18 8 18 20z" fill="url(#gb)"/>
+            <path d="M54 2l2.4 6.2L62.6 10.6 56.4 13 54 19.2 51.6 13 45.4 10.6 51.6 8.2z" fill="#f7b500"/>
+          </svg>
+          <div class="xp-icon-label"><b>ASI Messenger</b></div>
+        </div>
+      </div>
+
+      <!-- MSN-style Sign-in Toast -->
+      <div class="xp-toast" id="xp-toast">
+        <div class="xp-toast-bar">
+          <span>ASI Messenger</span>
+          <span>✕</span>
+        </div>
+        <div class="xp-toast-body">
+          <svg width="38" height="38" viewBox="0 0 64 64" style="flex:none">
+            <circle cx="22" cy="22" r="10" fill="#4aa3f0"/>
+            <path d="M5 54c0-12 7.5-19.5 17-19.5S39 42 39 54z" fill="#4aa3f0"/>
+            <circle cx="37" cy="27" r="11" fill="#245edb"/>
+            <path d="M19 60c0-12 8-20 18-20s18 8 18 20z" fill="#245edb"/>
+            <path d="M54 2l2.4 6.2L62.6 10.6 56.4 13 54 19.2 51.6 13 45.4 10.6 51.6 8.2z" fill="#f7b500"/>
+          </svg>
+          <div>
+            <div style="font-weight:700">4 coding agents signed in</div>
+            <div style="font-size:11.5px; color:#395884">Claude #1 · Claude #2 · Antigravity · Codex</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ASI Messenger Main Chat Window -->
+      <div class="asi-win" id="asi-win">
+        <div class="asi-titlebar">
+          <svg width="20" height="20" viewBox="0 0 64 64">
+            <circle cx="22" cy="22" r="10" fill="#7fc4f5"/>
+            <circle cx="37" cy="27" r="11" fill="#fff"/>
+            <path d="M54 2l2.4 6.2L62.6 10.6 56.4 13 54 19.2 51.6 13 45.4 10.6 51.6 8.2z" fill="#f7b500"/>
+          </svg>
+          <span>Auth Refactor · Multi-Agent Thread — ASI Messenger</span>
+          <div class="asi-win-btns">
+            <div class="asi-win-btn">_</div>
+            <div class="asi-win-btn">□</div>
+            <div class="asi-win-btn close">✕</div>
+          </div>
+        </div>
+
+        <div class="asi-toolbar">
+          <div class="asi-tool" id="btn-invite">👥 Invite (4)</div>
+          <div class="asi-tool">📎 Send Files</div>
+          <div class="asi-tool">✏️ Doodle</div>
+          <div class="asi-tool">🌐 Browser</div>
+          <div class="asi-tool" id="btn-nudge">📳 Nudge</div>
+          <div style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+            <span class="chip-pill">📁 asi-messenger</span>
+            <span class="chip-pill">⎇ feat/multi-agent</span>
+          </div>
+        </div>
+
+        <div class="asi-to">
+          <b>To:</b>
+          <span class="chip-pill" id="chip-c1"><span class="dot"></span> Claude Code <span class="code-badge">claude-1</span></span>
+          <span class="chip-pill" id="chip-c2"><span class="dot"></span> Claude Code #2 <span class="code-badge">claude-2</span></span>
+          <span class="chip-pill" id="chip-ag"><span class="dot"></span> Antigravity <span class="code-badge">agy-1</span></span>
+          <span class="chip-pill" id="chip-cx"><span class="dot"></span> Codex <span class="code-badge">codex-1</span></span>
+          <span style="margin-left:auto; font-family:monospace; font-size:11.5px; color:#2756a8; font-weight:700;">📋 .boards/session.log</span>
+        </div>
+
+        <!-- Invite & Shared Session Board Drawer -->
+        <div class="invite-drawer" id="invite-drawer">
+          <div class="invite-row">
+            <b>🎯 Common Goal:</b>
+            <div class="goal-box">
+              <span>Fix token rotation race in src/auth.ts &amp; verify full test suite</span>
+              <span class="code-badge">APPEND-ONLY GREP BOARD</span>
+            </div>
+          </div>
+          <div class="board-Terminal">
+            <div class="board-head">
+              <span># [GOAL] Fix token rotation race in src/auth.ts | # [AGENTS] claude-1, claude-2, agy-1, codex-1</span>
+              <span>grep "AGENT=" .boards/session.log</span>
+            </div>
+            <div id="board-line-1">23:11:02Z | SEQ=0001 | AGENT=claude-1 | TYPE=FINDING | SUMMARY="Unsynchronized refresh rotation at src/auth.ts:84"</div>
+            <div id="board-line-2">23:11:04Z | SEQ=0002 | AGENT=claude-2 | TYPE=CLAIM   | SUMMARY="Patched mutex lock around rotateToken() (+18 -4)"</div>
+            <div id="board-line-3">23:11:06Z | SEQ=0003 | AGENT=agy-1    | TYPE=STATUS  | SUMMARY="Verified IPC &amp; session middleware compatibility"</div>
+            <div id="board-line-4">23:11:08Z | SEQ=0004 | AGENT=codex-1  | TYPE=DONE    | SUMMARY="All 335 unit + e2e tests green (1.4s)"</div>
+          </div>
+        </div>
+
+        <!-- Transcript + Agent Avatars -->
+        <div class="asi-body">
+          <div class="asi-transcript">
+            <div class="msg-block user" id="msg-user">
+              <div class="msg-says"><b>Ashaya</b> says: <span class="code-badge">@all</span></div>
+              <div class="msg-text">Audit <code>src/auth.ts</code>, coordinate on <code>.boards/session.log</code>, fix the token race, and run the tests.</div>
+            </div>
+
+            <div class="msg-block" id="msg-c1">
+              <div class="msg-says"><b>Claude Code [claude-1]</b> says: <span class="code-badge">Lead Auditor</span></div>
+              <div class="tool-pill">🔍 grep "TYPE=FINDING" .boards/session.log · board_append(FINDING)</div>
+              <div class="msg-text">Found concurrent token refresh race at <code>src/auth.ts:84</code>. Posted finding <code>SEQ=0001</code> to the shared board for <code>@claude-2</code>.</div>
+            </div>
+
+            <div class="msg-block" id="msg-c2">
+              <div class="msg-says"><b>Claude Code #2 [claude-2]</b> says: <span class="code-badge">Patch Author</span></div>
+              <div class="tool-pill">✎ Edit src/auth.ts (+18 -4) · board_append(CLAIM)</div>
+              <div class="msg-text">Grepped <code>AGENT=claude-1</code> on the board — wrapped <code>rotateToken()</code> in a per-session mutex so parallel turns never clobber tokens.</div>
+            </div>
+
+            <div class="msg-block" id="msg-ag">
+              <div class="msg-says"><b>Antigravity [agy-1]</b> says: <span class="code-badge">Architecture</span></div>
+              <div class="msg-text">Checked <code>grep "AGENT=claude-2" .boards/session.log</code> — verified IPC bridge and worktree isolation stay lock-free.</div>
+            </div>
+
+            <div class="msg-block" id="msg-cx">
+              <div class="msg-says"><b>Codex [codex-1]</b> says: <span class="code-badge">QA &amp; Tests</span></div>
+              <div class="tool-pill">✓ vitest run &amp;&amp; playwright test — 335 passed (1.4s)</div>
+              <div class="msg-text" id="msg-cx-text">All 335 unit &amp; e2e tests pass! Appended <code>TYPE=DONE</code> to <code>.boards/session.log</code>.</div>
+            </div>
+          </div>
+
+          <div class="asi-side">
+            <div class="agent-card" id="side-c1">
+              <div class="agent-avatar" style="background:linear-gradient(135deg,#d97757,#b85435)">Cc</div>
+              <div class="agent-meta">
+                <div class="agent-name">Claude #1</div>
+                <div class="agent-sub" id="status-c1">★彡 finding posted</div>
+              </div>
+            </div>
+            <div class="agent-card" id="side-c2">
+              <div class="agent-avatar" style="background:linear-gradient(135deg,#e06d53,#9e3d22)">Cc</div>
+              <div class="agent-meta">
+                <div class="agent-name">Claude #2</div>
+                <div class="agent-sub" id="status-c2">★彡 patched auth.ts</div>
+              </div>
+            </div>
+            <div class="agent-card" id="side-ag">
+              <div class="agent-avatar" style="background:linear-gradient(135deg,#1a73e8,#34a853)">Ag</div>
+              <div class="agent-meta">
+                <div class="agent-name">Antigravity</div>
+                <div class="agent-sub" id="status-ag">★彡 verified IPC</div>
+              </div>
+            </div>
+            <div class="agent-card" id="side-cx">
+              <div class="agent-avatar" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)">Cx</div>
+              <div class="agent-meta">
+                <div class="agent-name">Codex</div>
+                <div class="agent-sub" id="status-cx">★彡 335/335 green</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="asi-composer">
+          <div class="asi-input" id="composer-text">Reply to All agents (claude-1, claude-2, agy-1, codex-1)…</div>
+          <div class="asi-send">Send</div>
+        </div>
+      </div>
+
+      <!-- Windows XP Taskbar -->
+      <div class="xp-taskbar">
+        <div class="xp-start">
+          <svg width="20" height="20" viewBox="0 0 24 24">
+            <rect x="2" y="2" width="9" height="9" fill="#ff5722"/>
+            <rect x="13" y="2" width="9" height="9" fill="#4caf50"/>
+            <rect x="2" y="13" width="9" height="9" fill="#2196f3"/>
+            <rect x="13" y="13" width="9" height="9" fill="#ffc107"/>
+          </svg>
+          <span>start</span>
+        </div>
+        <div class="xp-task-items">
+          <div class="xp-task-btn" id="task-asi">
+            <span>💬</span>
+            <span>ASI Messenger — 4 Agents Collaborating</span>
+          </div>
+        </div>
+        <div class="xp-tray">
+          <span>🔊</span>
+          <span>🛡️</span>
+          <span>11:11 PM</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Finale Floating Headline -->
+  <div id="finale-banner">
+    <svg width="34" height="34" viewBox="0 0 64 64">
+      <circle cx="22" cy="22" r="10" fill="#7fc4f5"/>
+      <circle cx="37" cy="27" r="11" fill="#4f86f0"/>
+      <path d="M54 2l2.4 6.2L62.6 10.6 56.4 13 54 19.2 51.6 13 45.4 10.6 51.6 8.2z" fill="#f7b500"/>
+    </svg>
+    <span style="font-size:21px; font-weight:800; letter-spacing:0.2px;">ASI Messenger</span>
+    <span style="color:#8ec0ff; font-size:17px;">· Multiple Claude, Codex &amp; Antigravity agents on one grep-searchable board</span>
+  </div>
+
+  <!-- Screen-space Cursor Trail & Pointer -->
+  <canvas id="trail-canvas" width="1920" height="1080"></canvas>
+  <div id="cursor">
+    <div class="click-ripple" id="ripple"></div>
+    <svg width="28" height="28" viewBox="0 0 28 28">
+      <path d="M3 2L23 12L14 15L11 24L3 2Z" fill="#ffffff" stroke="#102a56" stroke-width="2.2" stroke-linejoin="round"/>
+    </svg>
+    <div class="cursor-pill" id="cursor-pill">You</div>
+  </div>
+</div>
+
+<script>
+  const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
+
+  // Closed-form damped spring step response (0 -> 1)
+  function stepR(tau, { w = 22, z = 0.85 } = {}) {
+    if (tau <= 0) return 0;
+    if (z >= 1) {
+      const x = w * tau;
+      return 1 - Math.exp(-x) * (1 + x);
+    }
+    const wd = w * Math.sqrt(1 - z * z);
+    return 1 - Math.exp(-z * w * tau) * (Math.cos(wd * tau) + ((z * w) / wd) * Math.sin(wd * tau));
+  }
+
+  class Track {
+    constructor(v0) {
+      this.v0 = v0;
+      this.cur = v0;
+      this.ev = [];
+    }
+    to(t, v, sp = { w: 20, z: 0.86 }) {
+      if (v !== this.cur) {
+        this.ev.push([t, v - this.cur, sp]);
+        this.cur = v;
+      }
+      return this;
+    }
+    at(t) {
+      let v = this.v0;
+      for (const [ti, d, sp] of this.ev) v += d * stepR(t - ti, sp);
+      return v;
+    }
+  }
+
+  function enterVis(t, tin) {
+    const e = stepR(t - tin, { w: 26, z: 0.88 });
+    return {
+      opacity: clamp(e),
+      blur: Math.max(0, (1 - clamp(e)) * 8),
+      dy: (1 - e) * 18
+    };
+  }
+
+  function applyVis(el, v) {
+    if (v.opacity <= 0.005) {
+      el.style.opacity = '0';
+      el.style.transform = `translateY(18px)`;
+      return;
+    }
+    el.style.opacity = v.opacity.toFixed(3);
+    el.style.filter = v.blur > 0.15 ? `blur(${v.blur.toFixed(2)}px)` : 'none';
+    el.style.transform = `translateY(${v.dy.toFixed(2)}px)`;
+  }
+
+  // Camera tracks (cx, cy, logZoom) — clamped to viewport bounds so XP desktop is always 100% full-bleed
+  const camX = new Track(960)
+    .to(0.35, 760, { w: 9, z: 1 })
+    .to(1.25, 960, { w: 14, z: 1 })
+    .to(4.8, 960, { w: 8, z: 1 })
+    .to(10.5, 960, { w: 12, z: 1 });
+
+  const camY = new Track(540)
+    .to(0.35, 430, { w: 9, z: 1 })
+    .to(1.25, 540, { w: 14, z: 1 })
+    .to(4.8, 515, { w: 8, z: 1 })
+    .to(10.5, 540, { w: 12, z: 1 });
+
+  const camLogZ = new Track(0)
+    .to(0.35, Math.log(1.18), { w: 9, z: 1 })
+    .to(1.25, Math.log(1.0), { w: 14, z: 1 })
+    .to(4.8, Math.log(1.10), { w: 8, z: 1 })
+    .to(10.5, Math.log(1.0), { w: 12, z: 1 });
+
+  function getCam(t) {
+    const z = Math.exp(camLogZ.at(t));
+    const minX = 960 / z, maxX = 1920 - 960 / z;
+    const minY = 540 / z, maxY = 1080 - 540 / z;
+    const cx = clamp(camX.at(t), minX, maxX);
+    const cy = clamp(camY.at(t), minY, maxY);
+    return { cx, cy, z };
+  }
+
+  // Cursor tracks in world coordinates so clicks hit exact UI elements at any zoom
+  const wCurX = new Track(520)
+    .to(0.25, 92, { w: 16, z: 0.88 })      // ASI Messenger desktop icon
+    .to(2.35, 365, { w: 15, z: 0.88 })     // Invite (4) toolbar button
+    .to(4.20, 680, { w: 14, z: 0.90 })     // Composer input
+    .to(4.92, 1555, { w: 18, z: 0.88 })    // Send button
+    .to(6.10, 940, { w: 11, z: 0.92 })     // Hover shared board / transcript
+    .to(10.05, 702, { w: 16, z: 0.88 })    // Nudge toolbar button
+    .to(11.50, 1490, { w: 12, z: 0.90 });  // Park bottom-right
+
+  const wCurY = new Track(640)
+    .to(0.25, 290, { w: 16, z: 0.88 })     // ASI Messenger desktop icon
+    .to(2.35, 138, { w: 15, z: 0.88 })     // Invite (4) toolbar button
+    .to(4.20, 902, { w: 14, z: 0.90 })     // Composer input
+    .to(4.92, 902, { w: 18, z: 0.88 })     // Send button
+    .to(6.10, 275, { w: 11, z: 0.92 })     // Hover shared board
+    .to(10.05, 138, { w: 16, z: 0.88 })    // Nudge toolbar button
+    .to(11.50, 790, { w: 12, z: 0.90 });
+
+  function screenCursorAt(t) {
+    const { cx, cy, z } = getCam(t);
+    const wx = wCurX.at(t);
+    const wy = wCurY.at(t);
+    return {
+      x: 960 + (wx - cx) * z,
+      y: 540 + (wy - cy) * z
+    };
+  }
+
+  const CLICKS = [1.0, 1.24, 3.0, 5.1, 10.6];
+
+  // Window morph tracks (from desktop icon at t=1.35 to full window)
+  const winX = new Track(88).to(1.35, 310, { w: 18, z: 0.84 });
+  const winY = new Track(230).to(1.35, 76, { w: 18, z: 0.84 });
+  const winW = new Track(120).to(1.35, 1300, { w: 18, z: 0.84 });
+  const winH = new Track(120).to(1.35, 868, { w: 18, z: 0.84 });
+  const winOp = new Track(0).to(1.32, 1, { w: 28, z: 1 });
+
+  const drawerH = new Track(0).to(3.05, 152, { w: 22, z: 0.84 });
+
+  const worldEl = document.getElementById('world');
+  const iconEl = document.getElementById('asi-desktop-icon');
+  const toastEl = document.getElementById('xp-toast');
+  const winEl = document.getElementById('asi-win');
+  const taskAsi = document.getElementById('task-asi');
+  const btnInvite = document.getElementById('btn-invite');
+  const btnNudge = document.getElementById('btn-nudge');
+  const drawerEl = document.getElementById('invite-drawer');
+  const chipC2 = document.getElementById('chip-c2');
+  const chipAg = document.getElementById('chip-ag');
+  const chipCx = document.getElementById('chip-cx');
+  const bLine1 = document.getElementById('board-line-1');
+  const bLine2 = document.getElementById('board-line-2');
+  const bLine3 = document.getElementById('board-line-3');
+  const bLine4 = document.getElementById('board-line-4');
+  const msgUser = document.getElementById('msg-user');
+  const msgC1 = document.getElementById('msg-c1');
+  const msgC2 = document.getElementById('msg-c2');
+  const msgAg = document.getElementById('msg-ag');
+  const msgCx = document.getElementById('msg-cx');
+  const sideC1 = document.getElementById('side-c1');
+  const sideC2 = document.getElementById('side-c2');
+  const sideAg = document.getElementById('side-ag');
+  const sideCx = document.getElementById('side-cx');
+  const composerText = document.getElementById('composer-text');
+  const finaleBanner = document.getElementById('finale-banner');
+  const cursorEl = document.getElementById('cursor');
+  const rippleEl = document.getElementById('ripple');
+  const trailCanvas = document.getElementById('trail-canvas');
+  const ctx = trailCanvas.getContext('2d');
+
+  window.seek = function(t) {
+    // 1. Camera transform (clamped full-bleed)
+    const { cx, cy, z } = getCam(t);
+    worldEl.style.transform = `translate(960px, 540px) scale(${z.toFixed(4)}) translate(${-cx.toFixed(2)}px, ${-cy.toFixed(2)}px)`;
+
+    // 2. Desktop icon selection
+    if (t >= 0.95 && t < 2.2) iconEl.classList.add('selected');
+    else iconEl.classList.remove('selected');
+
+    // 3. Sign-in toast (1.45s -> 4.2s)
+    const toastIn = stepR(t - 1.45, { w: 24, z: 0.84 });
+    const toastOut = clamp((t - 4.1) / 0.25);
+    const toastVis = clamp(toastIn * (1 - toastOut));
+    toastEl.style.opacity = toastVis.toFixed(3);
+    toastEl.style.transform = `translateY(${((1 - toastVis) * 28).toFixed(1)}px)`;
+
+    // 4. ASI Messenger Window morph + Nudge shake at t = 10.6..11.25
+    let wx = winX.at(t);
+    let wy = winY.at(t);
+    if (t >= 10.6 && t <= 11.25) {
+      const dt = t - 10.6;
+      const decay = Math.exp(-dt * 5.5);
+      wx += Math.sin(dt * 95) * 14 * decay;
+      wy += Math.cos(dt * 115) * 9 * decay;
+    }
+    winEl.style.left = `${wx.toFixed(1)}px`;
+    winEl.style.top = `${wy.toFixed(1)}px`;
+    winEl.style.width = `${winW.at(t).toFixed(1)}px`;
+    winEl.style.height = `${winH.at(t).toFixed(1)}px`;
+    winEl.style.opacity = clamp(winOp.at(t)).toFixed(3);
+
+    taskAsi.style.opacity = clamp(stepR(t - 1.4, { w: 20, z: 1 })).toFixed(3);
+
+    // 5. Invite button & drawer
+    if (t >= 3.0) btnInvite.classList.add('active');
+    else btnInvite.classList.remove('active');
+
+    if (t >= 10.55 && t <= 11.2) btnNudge.classList.add('active');
+    else btnNudge.classList.remove('active');
+
+    const dh = drawerH.at(t);
+    drawerEl.style.height = `${Math.max(0, dh).toFixed(1)}px`;
+    drawerEl.style.paddingTop = dh > 4 ? '9px' : '0px';
+    drawerEl.style.paddingBottom = dh > 4 ? '9px' : '0px';
+    drawerEl.style.opacity = clamp(dh / 80).toFixed(3);
+
+    // 6. Invited agent chips & side cards
+    applyVis(chipC2, enterVis(t, 3.35));
+    applyVis(chipAg, enterVis(t, 3.65));
+    applyVis(chipCx, enterVis(t, 3.95));
+
+    applyVis(sideC1, enterVis(t, 1.8));
+    applyVis(sideC2, enterVis(t, 3.35));
+    applyVis(sideAg, enterVis(t, 3.65));
+    applyVis(sideCx, enterVis(t, 3.95));
+
+    // 7. Composer typing (4.3s -> 5.1s)
+    const promptFull = '@all Audit src/auth.ts, fix the token race, and verify tests.';
+    if (t < 4.3) {
+      composerText.textContent = 'Reply to All agents (claude-1, claude-2, agy-1, codex-1)…';
+      composerText.style.color = '#6983a8';
+    } else if (t < 5.15) {
+      const p = clamp((t - 4.3) / 0.72);
+      const chars = Math.floor(p * promptFull.length);
+      composerText.textContent = promptFull.slice(0, chars) + '▋';
+      composerText.style.color = '#132c52';
+    } else {
+      composerText.textContent = 'All 4 agents collaborating via .boards/session.log…';
+      composerText.style.color = '#2b63c9';
+    }
+
+    // 8. Chat Messages & Shared Board Lines
+    applyVis(msgUser, enterVis(t, 5.18));
+
+    applyVis(msgC1, enterVis(t, 5.95));
+    applyVis(bLine1, enterVis(t, 6.25));
+
+    applyVis(msgC2, enterVis(t, 7.20));
+    applyVis(bLine2, enterVis(t, 7.50));
+
+    applyVis(msgAg, enterVis(t, 8.40));
+    applyVis(bLine3, enterVis(t, 8.65));
+
+    applyVis(msgCx, enterVis(t, 9.45));
+    applyVis(bLine4, enterVis(t, 9.75));
+
+    // 9. Finale Banner (11.5s -> 14.0s)
+    applyVis(finaleBanner, enterVis(t, 11.55));
+    finaleBanner.style.transform = `translateX(-50%) translateY(${enterVis(t, 11.55).dy.toFixed(1)}px)`;
+
+    // 10. Cursor position, velocity lean, click scale & trail
+    const { x, y } = screenCursorAt(t);
+    const pPrev = screenCursorAt(t - 0.008);
+    const pNext = screenCursorAt(t + 0.008);
+    const vx = (pNext.x - pPrev.x) / 0.016;
+    const lean = clamp(-vx * 0.0045, -14, 14);
+
+    let pressScale = 1;
+    let rippleOp = 0;
+    let rippleScale = 0.3;
+    for (const tc of CLICKS) {
+      const dt = t - tc;
+      pressScale -= 0.18 * Math.exp(-Math.pow(dt / 0.045, 2));
+      if (dt >= 0 && dt <= 0.38) {
+        const rp = dt / 0.38;
+        rippleOp = Math.max(rippleOp, (1 - rp) * 0.9);
+        rippleScale = 0.35 + rp * 1.45;
+      }
+    }
+
+    cursorEl.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${lean.toFixed(2)}deg) scale(${pressScale.toFixed(3)})`;
+    rippleEl.style.opacity = rippleOp.toFixed(3);
+    rippleEl.style.transform = `scale(${rippleScale.toFixed(3)})`;
+
+    // Draw tapered motion trail on canvas
+    ctx.clearRect(0, 0, 1920, 1080);
+    for (let k = 18; k >= 1; k--) {
+      const t0 = t - k * 0.009;
+      const t1 = t - (k - 1) * 0.009;
+      const p0 = screenCursorAt(t0);
+      const p1 = screenCursorAt(t1);
+      const speed = Math.hypot(p1.x - p0.x, p1.y - p0.y) / 0.009;
+      const alpha = clamp((speed - 180) / 1800, 0, 0.45) * (1 - k / 19);
+      if (alpha <= 0.01) continue;
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.strokeStyle = `rgba(96, 165, 250, ${alpha.toFixed(3)})`;
+      ctx.lineWidth = (1 - k / 20) * 7;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+  };
+
+  window.seek(0);
+  window.READY = true;
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test'
  * A believable day of work: five repos, a dozen-plus chats, several agents, every kind of status.
  * Used by the README screenshots so they show what the app looks like at scale, not with three friends.
  */
-export async function buildScene(win: Page, homePath: string): Promise<{ c1: string; c2: string; att: string; ws: string; homeChats: string[] }> {
+export async function buildScene(win: Page, homePath: string): Promise<{ c1: string; c2: string; cMulti: string; att: string; ws: string; homeChats: string[] }> {
   return win.evaluate(async (path) => {
     const api = window.asi.api
     await api.settings.set('profile', { name: 'Ashaya', personalMessage: '<shipping asi messenger>', presence: 'online' })
@@ -77,6 +77,25 @@ export async function buildScene(win: Page, homePath: string): Promise<{ c1: str
       }
     }
     const att = (await api.messages.list(c1.id)).find((m) => m.kind === 'attachment')!.id
-    return { c1: c1.id, c2: c2.id, att, ws: home.id, homeChats }
+
+    // Multi-agent thread with shared grep-searchable session board (no fake worktree path so .boards/ writes to real tmp workspace)
+    const cMulti = await chat(home.id, claude.id, 'multi-agent auth audit', 'busy', '4 agents collaborating ★', 0)
+    await window.asi.chat.invite(cMulti.id, claude.id, 'Patch Author', 'Claude Code #2')
+    await window.asi.chat.invite(cMulti.id, agy.id, 'Architecture', 'Antigravity')
+    await window.asi.chat.invite(cMulti.id, codex.id, 'QA & Tests', 'Codex')
+    await window.asi.chat.setGoal(cMulti.id, 'Fix token rotation race in src/auth/session.ts & verify full test suite')
+    await window.asi.chat.appendBoard(cMulti.id, 'claude-1', { type: 'FINDING', summary: 'Concurrent refresh race at src/auth/session.ts:84', detail: 'Per-tab lock allows duplicate token rotation across windows' })
+    await window.asi.chat.appendBoard(cMulti.id, 'claude-2', { type: 'CLAIM', summary: 'Patched BroadcastChannel lock around rotateToken() (+18 -4)' })
+    await window.asi.chat.appendBoard(cMulti.id, 'agy-1', { type: 'STATUS', summary: 'Verified IPC session middleware & worktree isolation' })
+    await window.asi.chat.appendBoard(cMulti.id, 'codex-1', { type: 'DONE', summary: 'All 335 unit + e2e tests green (1.4s)' })
+
+    await ap(cMulti.id, 'user', 'text', { text: '@all Audit src/auth/session.ts, coordinate on the shared board, fix the token race, and run the tests.' }, '@all Audit src/auth/session.ts, coordinate on the shared board, fix the token race, and run the tests.')
+    await ap(cMulti.id, 'agent', 'text', { speaker: { speakerName: 'Claude Code [claude-1]', agentId: 'claude-1' } }, 'Found concurrent refresh race at `src/auth/session.ts:84`. Appended `TYPE=FINDING` to `.boards/` for `@claude-2`.')
+    await ap(cMulti.id, 'agent', 'text', { speaker: { speakerName: 'Claude Code #2 [claude-2]', agentId: 'claude-2' } }, 'Grepped `AGENT=claude-1` on the board and wrapped `rotateToken()` in a cross-tab lock.')
+    await ap(cMulti.id, 'agent', 'text', { speaker: { speakerName: 'Antigravity [agy-1]', agentId: 'agy-1' } }, 'Checked `grep "AGENT=claude-2"` on the board — verified IPC bridge and worktree isolation stay lock-free.')
+    await ap(cMulti.id, 'agent', 'text', { speaker: { speakerName: 'Codex [codex-1]', agentId: 'codex-1' } }, 'All 335 unit and e2e tests pass! Appended `TYPE=DONE` to the session board.')
+    await api.chats.markRead(cMulti.id)
+
+    return { c1: c1.id, c2: c2.id, cMulti: cMulti.id, att, ws: home.id, homeChats }
   }, homePath)
 }

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, test } from 'vitest'
 import { addCustom, addPreset, availability, detectPresets, testAcp } from '../../src/main/friends-service'
 import { openDb, type Db } from '../../src/main/db/db'
 import { createRepo, type Repo } from '../../src/main/db/repo'
-import { PRESETS } from '../../src/shared/presets'
+import { PRESETS, splitArgs } from '../../src/shared/presets'
 
 let bin: string
 let db: Db
@@ -81,4 +81,19 @@ test('HTTP friends validate the manifest, keep the token in the keychain and the
   expect(saved.auth).toEqual({ type: 'bearer', secret: expect.stringMatching(/^http-/) })
   expect(stored[saved.auth.secret]).toBe('tok-123')
   expect(JSON.stringify(f)).not.toContain('tok-123') // the token is not in the database row
+})
+
+test('Antigravity cannot accidentally be registered or tested as an ACP agent', async () => {
+  await expect(addCustom(repo, { name: 'Agy', command: '/usr/local/bin/agy', args: [], kind: 'acp' })).rejects.toThrow(/Antigravity preset/)
+  expect(await testAcp('agy', [])).toMatchObject({ ok: false, error: expect.stringContaining('stream-json') })
+})
+
+test('splitArgs parses quoted CLI arguments and repo.friends.setArgs updates them', async () => {
+  expect(splitArgs('  --model haiku -c model="gpt-5.6-luna"  ')).toEqual(['--model', 'haiku', '-c', 'model="gpt-5.6-luna"'])
+  expect(splitArgs('"--model" \'gemini-3.8-flash-low\'')).toEqual(['--model', 'gemini-3.8-flash-low'])
+  fakeCli('claude', '2.1.289 (Claude Code)')
+  const claude = await addPreset(repo, 'claude')
+  expect(claude.args).toEqual([])
+  await repo.friends.setArgs(claude.id, ['--model', 'haiku'])
+  expect((await repo.friends.get(claude.id))!.args).toEqual(['--model', 'haiku'])
 })

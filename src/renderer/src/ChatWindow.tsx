@@ -57,11 +57,14 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
   const [autoQueue, setAutoQueue] = useState(false)
   const profile = useData((s) => s.profile)
   const allChats = useData((s) => s.chats)
+  const workspaces = useData((s) => s.workspaces)
   const [draft, setDraftState] = useState(() => drafts.get(chatId) ?? '')
   const setDraft = useCallback((v: string | ((d: string) => string)) => setDraftState((d) => { const n = typeof v === 'function' ? v(d) : v; drafts.set(chatId, n); return n }), [chatId])
   const [globalDangerous] = useSetting<boolean>('allowDangerous', false)
   const [modeNote, setModeNote] = useState<string | null>(null)
   const [editingLabels, setEditingLabels] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
   const [drawer, setDrawer] = useState(false)
   /** Pictures and files waiting to go out with the next message (dropped, pasted). */
   const [pending, setPending] = useState<{ id: string; name: string; path: string; preview?: string; size?: number }[]>([])
@@ -69,6 +72,7 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
   const [attachNote, setAttachNote] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<{ branch: string | null; dirty: number; isolated: boolean } | null>(null)
   const chatLabelIds = useData((s) => s.chatLabels[chatId] ?? NO_LABELS)
+  const workspace = useMemo(() => workspaces.find((w) => w.id === chat?.workspaceId) ?? null, [workspaces, chat?.workspaceId])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -223,8 +227,33 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
         {live?.message ? <span className={friend.letteringStyle === 'plain' ? '' : 'funky'}> — {live.message}</span> : null}
         <span className="grow" />
         {chatUsage && chatUsage.calls > 0 ? <span className="chat-usage" data-testid="chat-usage" title={`input ${fmtTokens(chatUsage.inputTokens)} · output ${fmtTokens(chatUsage.outputTokens)} · cached ${fmtTokens(chatUsage.cacheReadTokens + chatUsage.cacheWriteTokens)}${chatUsage.pricedCalls === 0 ? ` · this agent does not report cost` : ''}`}>{spendLine(chatUsage)}</span> : null}
+        {workspace ? <span className="branch" data-testid="workspace-chip" title={chat.worktreePath ?? workspace.path}>📁 {workspace.name}</span> : null}
         {chat.branch ? <span className="branch" data-testid="branch" title={`Works in its own worktree: ${chat.worktreePath}`}>⎇ {chat.branch}</span> : null}
         <LabelChips ids={chatLabelIds} />
+        {renaming ? (
+          <input
+            className="field"
+            style={{ width: 160, minHeight: 20, padding: '1px 6px' }}
+            aria-label="Chat title"
+            value={titleDraft}
+            autoFocus
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={() => {
+              const next = titleDraft.trim()
+              setRenaming(false)
+              if (next && next !== chat.title) void window.asi.api.chats.rename(chatId, next)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() }
+              else if (e.key === 'Escape') { e.preventDefault(); setRenaming(false) }
+            }}
+          />
+        ) : (
+          <button className="linkish" aria-label="Rename chat" onClick={() => { setTitleDraft(chat.title); setRenaming(true) }} title={`Rename chat (${chat.title})`}>✎ Rename</button>
+        )}
+        {friend.harness !== 'asi' && friend.harness !== 'echo' ? (
+          <button className="linkish" aria-label="Reset session" onClick={() => void window.asi.chat.reset(chatId)} title="Start a fresh agent session in this chat (/reset)">↺ Reset</button>
+        ) : null}
         <button className="linkish" onClick={() => setEditingLabels((v) => !v)} title="Label this chat (⌘L)">🏷 Label</button>
         <button className="linkish" onClick={() => void window.asi.chat.worktreeInfo(chatId).then(setDeleting)} title="Delete this chat">🗑 Delete</button>
       </div>
@@ -323,7 +352,7 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
           ref={composerRef}
           className="field"
           aria-label="Message"
-          placeholder={`Reply to ${friend.displayName}… (drop or paste a picture, ! runs a shell command, /open opens a URL or file)`}
+          placeholder={`Reply to ${friend.displayName}… (drop or paste a picture, ! runs a shell command, /open opens a URL or file, /reset starts fresh)`}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onPaste={(e) => {
@@ -334,6 +363,15 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault()
               send()
+            } else if (e.key === 'Escape' && (presence === 'busy' || presence === 'away') && !draft.trim()) {
+              e.preventDefault()
+              void window.asi.chat.interrupt(chatId)
+            } else if (e.key === 'ArrowUp' && !draft) {
+              const lastUser = [...messages].reverse().find((m) => m.role === 'user' && m.kind === 'text' && m.text)
+              if (lastUser?.text) {
+                e.preventDefault()
+                setDraft(lastUser.text)
+              }
             }
           }}
           autoFocus

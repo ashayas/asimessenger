@@ -19,23 +19,27 @@ export class HttpSession implements AgentSession {
 
   constructor(private o: HttpOptions) { this.session = o.resumeId ?? null }
   get resumeId(): string | undefined { return this.session ?? undefined }
+  get busy(): boolean { return this.ctl !== null }
+  get closed(): boolean { return this.hub.closed }
 
   private headers(): Record<string, string> {
     return { 'Content-Type': 'application/json', Accept: this.o.manifest.stream === 'sse' ? 'text/event-stream' : 'application/json', ...(this.o.manifest.headers ?? {}), ...(this.o.token ? { Authorization: `Bearer ${this.o.token}` } : {}) }
   }
 
   send(turn: UserTurn): void {
-    void this.run(turn).catch((e: unknown) => {
-      if (this.ctl?.signal.aborted) return
+    const ctl = (this.ctl = new AbortController())
+    void this.run(turn, ctl).catch((e: unknown) => {
+      if (ctl.signal.aborted) return
       this.hub.emit({ t: 'turn_end', reason: 'error', error: e instanceof Error ? e.message : String(e) })
+    }).finally(() => {
+      if (this.ctl === ctl) this.ctl = null
     })
   }
 
-  private async run(turn: UserTurn): Promise<void> {
+  private async run(turn: UserTurn, ctl: AbortController): Promise<void> {
     const m = this.o.manifest
     const text = turn.quote ? `Quoting ${turn.quote.name}:\n${turn.quote.text.split('\n').map((l) => `> ${l}`).join('\n')}\n\n${turn.text}` : turn.text
     const id = `http-${++this.turn}`
-    const ctl = (this.ctl = new AbortController())
     this.hub.emit({ t: 'status', phase: 'thinking' })
     const res = await (this.o.fetchImpl ?? fetch)(new URL(m.send.path, m.baseUrl).toString(), { method: m.send.method ?? 'POST', headers: this.headers(), body: JSON.stringify(fillTemplate(m.send.body, { text, session: this.session })), signal: ctl.signal })
     if (!res.ok) {
@@ -82,6 +86,7 @@ export class HttpSession implements AgentSession {
   async interrupt(): Promise<void> {
     const c = this.ctl
     if (!c) return
+    this.ctl = null
     c.abort()
     const m = this.o.manifest
     if (m.cancel) void (this.o.fetchImpl ?? fetch)(new URL(m.cancel.path.replace('{{session}}', this.session ?? ''), m.baseUrl).toString(), { method: m.cancel.method ?? 'POST', headers: this.headers() }).catch(() => {})
@@ -90,5 +95,5 @@ export class HttpSession implements AgentSession {
 
   respond(): void {}
   setMode(): void {}
-  async dispose(): Promise<void> { this.ctl?.abort(); this.hub.closed = true }
+  async dispose(): Promise<void> { this.ctl?.abort(); this.ctl = null; this.hub.closed = true }
 }

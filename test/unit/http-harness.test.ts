@@ -60,6 +60,9 @@ test('streams SSE text, remembers the conversation id for the next message, send
   const c2 = collect(s)
   s.send({ text: 'again' })
   await c2.turnEnd()
+  expect(s.busy).toBe(false)
+  await s.interrupt()
+  expect(c2.events.filter((e) => e.t === 'turn_end')).toHaveLength(1)
   expect(seen[1]!.body).toMatchObject({ message: 'again', conversation_id: 'conv-1' })
 })
 

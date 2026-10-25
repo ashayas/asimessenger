@@ -38,6 +38,25 @@ test('every event kind renders and the permission/question round trips work', as
     await expect(chat.locator('[data-running]')).toBeVisible()
     await chat.getByRole('button', { name: 'Nudge' }).click()
     await expect.poll(() => h.win.evaluate(async (id) => (await window.asi.api.chats.get(id))!.statusText, chatId)).toContain('stopped')
+
+    // Single-player controls: workspace chip, inline chat rename, Escape interrupt, ArrowUp recall, and Reset session
+    await expect(chat.getByTestId('workspace-chip')).toContainText('w')
+    await chat.getByRole('button', { name: 'Rename chat' }).click()
+    await chat.getByLabel('Chat title').fill('refresh race fix')
+    await chat.getByLabel('Chat title').press('Enter')
+    await expect.poll(() => h.win.evaluate(async (id) => (await window.asi.api.chats.get(id))!.title, chatId)).toBe('refresh race fix')
+
+    await say('/script long')
+    await expect.poll(() => h.win.evaluate(async (id) => (await window.asi.api.chats.get(id))!.status, chatId)).toBe('busy')
+    await chat.getByLabel('Message').press('Escape')
+    await expect.poll(() => h.win.evaluate(async (id) => (await window.asi.api.chats.get(id))!.status, chatId)).toBe('online')
+
+    await chat.getByLabel('Message').press('ArrowUp')
+    await expect(chat.getByLabel('Message')).toHaveValue('/script long')
+    await chat.getByLabel('Message').fill('')
+
+    await chat.getByRole('button', { name: 'Reset session' }).click()
+    await expect(chat.getByText(/Session reset/)).toBeVisible()
     await chat.screenshot({ path: 'test-results/events.png' })
   } finally {
     await h.cleanup()

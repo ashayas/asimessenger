@@ -61,7 +61,7 @@ describe.skipIf(!live)('ASI MCP bridge with real agents', async () => {
   })
 
   test.skipIf(!which('codex', env))('codex calls ask_user and relays the answer', async () => {
-    const c = await run(codexFactory, { harness: 'codex' })
+    const c = await run(codexFactory, { harness: 'codex', args: ['-c', 'model="gpt-5.6-luna"', '-c', 'model_reasoning_effort="low"'] })
     expect(asked[0]?.q).toContain('secret fruit')
     expect(text(c.events)).toContain('Tangerine')
   })

@@ -110,3 +110,23 @@ test('agents that switch live (Claude, Codex, Pi) are never restarted for a mode
   expect(disposed).toBe(0)
   expect(m.isLive('c')).toBe(true)
 })
+
+test('revoking a session during startup disposes it before a prompt can reach the process', async () => {
+  let ready!: () => void
+  const gate = new Promise<void>((r) => { ready = r })
+  let disposed = false, sent = false
+  const m = new HarnessManager({ onEvent: () => {} })
+  m.register('echo', async () => {
+    await gate
+    return { subscribe: () => () => {}, send: () => { sent = true }, interrupt: async () => {}, respond() {}, setMode() {}, dispose: async () => { disposed = true } }
+  })
+  const sending = m.send({ id: 'c', mode: 'dangerous' } as never, { harness: 'echo' } as never, '/tmp', { text: 'work' })
+  const rejected = expect(sending).rejects.toThrow(/cancelled/)
+  await Promise.resolve() // enter the factory
+  const stopping = m.dispose('c')
+  ready()
+  await Promise.all([rejected, stopping])
+  expect(sent).toBe(false)
+  expect(disposed).toBe(true)
+  expect(m.isLive('c')).toBe(false)
+})

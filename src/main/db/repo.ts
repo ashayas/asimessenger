@@ -111,6 +111,9 @@ export function createRepo(db: Db) {
       async rename(id: string, displayName: string): Promise<void> {
         await run('UPDATE friends SET display_name = ? WHERE id = ?', [displayName, id])
       },
+      async setArgs(id: string, args: string[]): Promise<void> {
+        await run('UPDATE friends SET args_json = ? WHERE id = ?', [JSON.stringify(args), id])
+      },
       async setLettering(id: string, style: 'funky' | 'plain'): Promise<void> {
         await run('UPDATE friends SET lettering_style = ? WHERE id = ?', [style, id])
       },

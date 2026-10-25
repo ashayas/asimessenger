@@ -9,7 +9,7 @@ export const OPENCODE: AcpPreset = {
   args: ['acp'],
   env: (mode) => ({
     OPENCODE_CONFIG_CONTENT: JSON.stringify({
-      permission: mode === 'dangerous' ? { edit: 'allow', bash: 'allow', webfetch: 'allow' } : mode === 'plan' ? { edit: 'deny', bash: 'ask' } : { edit: 'ask', bash: 'ask', webfetch: 'ask' }
+      permission: mode === 'dangerous' ? { '*': 'allow' } : mode === 'plan' ? { edit: 'deny', bash: 'ask' } : mode === 'auto-edit' ? { edit: 'allow', bash: 'ask', webfetch: 'ask' } : { edit: 'ask', bash: 'ask', webfetch: 'ask' }
     })
   })
 }

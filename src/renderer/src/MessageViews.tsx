@@ -94,7 +94,7 @@ function PermissionCard({ chatId, p }: { chatId: string; p: Perm }) {
         <div className="decided">{DECISION_LABEL[p.decision] ?? p.decision}{p.reason ? ` — ${p.reason}` : ''}</div>
       ) : denying ? (
         <div className="deny-reason">
-          <input className="field" aria-label="Reason for denying" autoFocus placeholder="Tell the agent why (optional)" value={reason} onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') answer('deny', reason.trim() || undefined) }} />
+          <input className="field" aria-label="Reason for denying" autoFocus placeholder="Tell the agent why (optional)" value={reason} onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') answer('deny', reason.trim() || undefined); else if (e.key === 'Escape') setDenying(false) }} />
           <Btn kind="danger" onClick={() => answer('deny', reason.trim() || undefined)}>Deny</Btn>
           <Btn onClick={() => setDenying(false)}>Back</Btn>
         </div>

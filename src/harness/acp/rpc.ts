@@ -32,18 +32,26 @@ export class RpcPeer {
     child.stderr.setEncoding('utf8')
     child.stderr.on('data', (d: string) => { this.stderrTail = (this.stderrTail + d).slice(-2000) })
     child.on('error', (err) => this.shutdown(`failed to start: ${err.message}`))
-    child.on('exit', (code, sig) => this.shutdown(`process exited (${sig ?? code})${this.stderrTail ? `: ${this.stderrTail.trim().split('\n').pop()}` : ''}`))
+    child.stdin.on('error', (err) => this.shutdown(`stdin failed: ${err.message}`))
+    child.on('close', (code, sig) => this.shutdown(`process exited (${sig ?? code})${this.stderrTail ? `: ${this.stderrTail.trim().split('\n').pop()}` : ''}`))
   }
 
   onRequest(h: (method: string, params: unknown) => Promise<unknown> | unknown): void { this.requestHandler = h }
   onNotification(h: (method: string, params: unknown) => void): void { this.notificationHandler = h }
   onClose(h: (reason: string) => void): void { this.closeHandler = h }
 
-  request<T = unknown>(method: string, params?: unknown): Promise<T> {
+  request<T = unknown>(method: string, params?: unknown, timeoutMs = 0): Promise<T> {
     if (this.closed) return Promise.reject(new Error('connection closed'))
     const id = this.nextId++
     return new Promise<T>((resolve, reject) => {
-      this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject })
+      const timer = timeoutMs > 0 ? setTimeout(() => {
+        this.pending.delete(id)
+        reject(new Error(`${method} timed out after ${timeoutMs}ms`))
+      }, timeoutMs) : undefined
+      this.pending.set(id, {
+        resolve: (v) => { clearTimeout(timer); resolve(v as T) },
+        reject: (e) => { clearTimeout(timer); reject(e) }
+      })
       this.write({ id, method, params })
     })
   }
@@ -53,14 +61,15 @@ export class RpcPeer {
   }
 
   kill(): void {
-    this.closed = true
+    this.shutdown('connection closed')
     this.child.kill('SIGTERM')
-    setTimeout(() => { if (this.child.exitCode === null) this.child.kill('SIGKILL') }, 1500).unref()
+    setTimeout(() => { if (this.child.exitCode === null && this.child.signalCode === null) this.child.kill('SIGKILL') }, 1500).unref()
   }
 
   private write(msg: Json): void {
+    if (this.closed) return
     const out = this.opts.jsonrpcField === false ? msg : { jsonrpc: '2.0', ...msg }
-    this.child.stdin.write(JSON.stringify(out) + '\n')
+    try { this.child.stdin.write(JSON.stringify(out) + '\n') } catch (err) { this.shutdown(`write failed: ${String(err)}`) }
   }
 
   private onData(chunk: string): void {
@@ -72,7 +81,8 @@ export class RpcPeer {
       if (!line) continue
       let msg: Json
       try { msg = JSON.parse(line) as Json } catch { continue } // agents may log non-JSON to stdout
-      void this.dispatch(msg)
+      if (!msg || typeof msg !== 'object' || Array.isArray(msg)) continue
+      void this.dispatch(msg).catch((err) => this.shutdown(`invalid agent message: ${String(err)}`))
     }
   }
 
@@ -81,7 +91,8 @@ export class RpcPeer {
     const id = msg['id'] as number | string | undefined
     if (method && id !== undefined) {
       try {
-        const result = (await this.requestHandler?.(method, msg['params'])) ?? null
+        if (!this.requestHandler) { this.write({ id, error: { code: -32601, message: `unsupported method ${method}` } }); return }
+        const result = (await this.requestHandler(method, msg['params'])) ?? null
         this.write({ id, result })
       } catch (err) {
         this.write({ id, error: { code: -32603, message: err instanceof Error ? err.message : String(err) } })

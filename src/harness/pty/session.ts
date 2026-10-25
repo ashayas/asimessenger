@@ -56,6 +56,8 @@ export class PtySession implements AgentSession {
 
   get buffer(): string { return this.scrollback }
   get isExited(): boolean { return this.exited }
+  get busy(): boolean { return this.active }
+  get closed(): boolean { return this.hub.closed || this.exited }
 
   write(data: string): void { if (!this.exited) this.term.write(data) }
   resize(cols: number, rows: number): void { if (!this.exited && cols > 0 && rows > 0) this.term.resize(cols, rows) }

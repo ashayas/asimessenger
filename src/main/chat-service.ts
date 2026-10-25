@@ -118,9 +118,10 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       if (!clean) return null
       const chat = await repo.chats.get(chatId)
       if (!chat) throw new Error(`unknown chat ${chatId}`)
-      // "!cmd" runs a shell command here; "/open <url|path>" opens it. Neither goes to the agent.
+      // "!cmd" runs a shell command here; "/open <url|path>" opens it; "/reset" starts a fresh agent session.
       if (clean.startsWith('!') && clean.length > 1 && !opts.silentUser) return this.runShell(chatId, clean.slice(1).trim())
       if (/^\/open\s+\S/.test(clean) && !opts.silentUser) return this.openTarget(chatId, clean.replace(/^\/open\s+/, '').trim())
+      if (clean === '/reset' && !opts.silentUser) return this.reset(chatId)
       const friend = await repo.friends.get(chat.friendId)
       if (!friend) throw new Error(`unknown friend ${chat.friendId}`)
       const ws = await repo.workspaces.get(chat.workspaceId)
@@ -466,6 +467,26 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       cancelAsks(chatId, NO_ANSWER)
       shells.get(chatId)?.kill('SIGINT')
       await manager.interrupt(chatId)
+    },
+
+    /** Start a fresh agent session in this chat without losing the transcript history. */
+    async reset(chatId: string): Promise<Message | null> {
+      const chat = await repo.chats.get(chatId)
+      if (!chat) return null
+      cancelAsks(chatId, NO_ANSWER)
+      shells.get(chatId)?.kill('SIGINT')
+      await manager.dispose(chatId)
+      await repo.chats.setSession(chatId, null)
+      await repo.chats.setStatus(chatId, 'online', null)
+      const msg = await repo.messages.append({
+        chatId,
+        role: 'system',
+        kind: 'system',
+        body: { text: 'Session reset — the next message starts a fresh agent session.' },
+        text: 'Session reset — the next message starts a fresh agent session.'
+      })
+      notify('chats'); notify('messages')
+      return msg
     },
 
     /** ask_user from the MCP bridge: shows a question card and resolves with the answer. */

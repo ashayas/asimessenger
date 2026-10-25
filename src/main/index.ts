@@ -224,6 +224,7 @@ app.whenReady().then(async () => {
   })
   ipcMain.handle('workspace:is-repo', async (_e, workspaceId: string) => { const ws = await repo.workspaces.get(workspaceId); return ws ? worktrees.isRepo(ws.path) : false })
   ipcMain.handle('chat:interrupt', (_e, chatId: string) => chat.interrupt(chatId))
+  ipcMain.handle('chat:reset', (_e, chatId: string) => chat.reset(chatId))
   ipcMain.handle('chat:respond', (_e, chatId: string, reqId: string, answer: string, reason?: string) => chat.respond(chatId, reqId, answer, reason))
   ipcMain.handle('window:open-chat', (_e, chatId: string) => { showChat(chatId) })
   setChatRouter((chatId) => void (async () => {

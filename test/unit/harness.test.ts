@@ -188,3 +188,44 @@ test('"/open" routes URLs to the browser and paths to the OS', async () => {
   await svc.send(chatId, '/open javascript:alert(1)')
   expect(opened).toEqual(['url:http://localhost:5173', 'url:https://example.com/docs', `path:${process.cwd()}/README.md`]) // javascript:/file: style targets are refused
 })
+
+test('a Dangerous default cannot bypass the global switch when sending the first message', async () => {
+  const ws = (await repo.workspaces.list())[0]!
+  const f = await repo.friends.create({ harness: 'fake', displayName: 'Default bypass', defaultMode: 'dangerous', dangerousAllowed: true })
+  const chat = await repo.chats.create({ workspaceId: ws.id, friendId: f.id })
+  await service.send(chat.id, 'work')
+  expect(manager.isLive(chat.id)).toBe(false)
+  expect((await repo.messages.list(chat.id)).some((m) => m.kind === 'error' && /turned off/.test(m.text ?? ''))).toBe(true)
+})
+
+test('reset and /reset dispose the live session, clear harnessSessionId, and keep transcript history', async () => {
+  await service.send(chatId, 'hello fake')
+  await waitFor(async () => (await repo.chats.get(chatId))!.status === 'online' && (await repo.messages.list(chatId)).length === 2)
+  await repo.chats.setSession(chatId, 'sess-123')
+  expect(manager.isLive(chatId)).toBe(true)
+
+  await service.send(chatId, '/reset')
+  expect(manager.isLive(chatId)).toBe(false)
+  expect((await repo.chats.get(chatId))!.harnessSessionId).toBeNull()
+  expect((await repo.chats.get(chatId))!.status).toBe('online')
+  const msgs = await repo.messages.list(chatId)
+  expect(msgs).toHaveLength(3)
+  expect(msgs[2]!.text).toContain('Session reset')
+})
+
+test('updating friend.args restarts an idle session on the next turn', async () => {
+  const seenArgs: string[][] = []
+  manager.register('fake', async (opts) => {
+    seenArgs.push(opts.friend.args)
+    return (agent = new FakeAgent())
+  })
+  await service.send(chatId, 'turn one')
+  await waitFor(async () => (await repo.chats.get(chatId))!.status === 'online' && (await repo.messages.list(chatId)).length === 2)
+  expect(seenArgs).toEqual([[]])
+
+  const chat = (await repo.chats.get(chatId))!
+  await repo.friends.setArgs(chat.friendId, ['--model', 'haiku'])
+  await service.send(chatId, 'turn two')
+  await waitFor(async () => (await repo.messages.list(chatId)).length === 4)
+  expect(seenArgs).toEqual([[], ['--model', 'haiku']])
+})

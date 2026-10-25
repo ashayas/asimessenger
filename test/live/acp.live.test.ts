@@ -60,4 +60,35 @@ describe.skipIf(!live)('opencode (ACP)', async () => {
     const end = (await c.until((e) => e.t === 'turn_end', 30_000)) as Extract<AgentEvent, { t: 'turn_end' }>
     expect(end.reason).toBe('interrupted')
   })
+  run('Auto-edit writes without approval but shell still asks', async () => {
+    session = await acpFactory(OPENCODE)({ friend: friendFor() as never, chatId: 'c', cwd: ws.dir, mode: 'auto-edit' })
+    const edits = collect(session)
+    session.send({ text: 'Create auto-edit.txt containing AUTO using only your file write tool. Do not use shell.' })
+    await edits.until(e => e.t === 'turn_end', 120_000)
+    expect(edits.events.filter(e => e.t === 'permission')).toHaveLength(0)
+    expect(existsSync(join(ws.dir, 'auto-edit.txt'))).toBe(true)
+    const shell = collect(session)
+    session.send({ text: 'Use your shell tool to run exactly: printf ACP_SHELL_CHECK' })
+    const permission = await shell.until(e => e.t === 'permission', 120_000)
+    if (permission.t !== 'permission') throw new Error('missing permission')
+    session.respond(permission.reqId, 'deny')
+    await shell.until(e => e.t === 'turn_end', 120_000)
+  })
+
+  run('reset resumes the conversation without duplicating history', async () => {
+    const context = { friend: friendFor() as never, chatId: 'c', cwd: ws.dir, mode: 'ask' as const }
+    session = await acpFactory(OPENCODE)(context)
+    const first = collect(session)
+    session.send({ text: 'Remember this secret token: ACP_RESET_CEDAR. Reply OK without using tools.' })
+    await first.until(e => e.t === 'turn_end', 120_000)
+    const resumeId = session.resumeId
+    await session.dispose()
+    session = await acpFactory(OPENCODE)({ ...context, resumeId })
+    const resumed = collect(session)
+    session.send({ text: 'What was the secret token I asked you to remember? Reply with only the token.' })
+    await resumed.until(e => e.t === 'turn_end', 120_000)
+    expect(session.resumeId).toBe(resumeId)
+    expect(text(resumed.events)).toContain('ACP_RESET_CEDAR')
+  })
+
 })

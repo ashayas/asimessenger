@@ -105,9 +105,10 @@ describe('PiSession (mock pi --mode rpc)', () => {
     expect(await c.turnEnd()).toMatchObject({ reason: 'error', error: 'no model configured' })
   })
 
-  test('a missing binary fails the turn instead of crashing', async () => {
+  test('a missing binary fails the turn instead of crashing and marks the session closed', async () => {
     const { s, c } = make('ask', { command: '/nonexistent/pi', prefixArgs: [] })
     s.send({ text: 'hi' })
     expect(await c.turnEnd()).toMatchObject({ reason: 'error' })
+    expect(s.closed).toBe(true)
   })
 })

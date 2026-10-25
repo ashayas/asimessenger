@@ -38,8 +38,8 @@ test('raw listeners and the scrollback see the same bytes', async () => {
 
 test('interrupt sends Ctrl-C: a long sleep stops and the shell is usable again', async () => {
   const c = collect(start({ idleMs: 4000 }))
-  s!.send({ text: 'sleep 30' })
-  await new Promise((r) => setTimeout(r, 300))
+  s!.send({ text: 'echo started && sleep 30' })
+  await c.until((e) => e.t === 'text' && e.delta.includes('started'))
   const t0 = Date.now()
   await s!.interrupt()
   expect(await c.turnEnd()).toMatchObject({ reason: 'interrupted' })
@@ -50,12 +50,14 @@ test('interrupt sends Ctrl-C: a long sleep stops and the shell is usable again',
   expect(text(c2.events)).toContain('still-alive')
 })
 
-test('a process that exits ends the turn with an error', async () => {
+test('a process that exits ends the turn with an error and marks the session closed', async () => {
   const c = collect(start())
+  expect(s!.closed).toBe(false)
   s!.send({ text: 'exit 3' })
   const end = (await c.until((e) => e.t === 'turn_end' && e.reason === 'error')) as Extract<AgentEvent, { t: 'turn_end' }>
   expect(end.error).toContain('code 3')
   expect(s!.isExited).toBe(true)
+  expect(s!.closed).toBe(true)
 })
 
 test('resize is accepted', () => {

@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { avatarFor } from '@shared/harness-meta'
+import { splitArgs } from '@shared/presets'
 import { Avatar, Btn } from './ui/kit'
 import { play } from './sounds'
 import { useData } from './store'
 import { useSetting } from './hooks'
 
-/** Options: windows, sounds, status lettering, your data. */
+/** Options: windows, sounds, status lettering, agent CLI arguments, your data. */
 export function GeneralSettings() {
   const friends = useData((s) => s.friends)
+  const cliFriends = friends.filter((f) => f.harness !== 'asi' && f.harness !== 'echo')
   const [windows] = useSetting<'windows' | 'tabs'>('chatWindows', 'windows')
   const [soundsOn] = useSetting<boolean>('soundsOn', true)
   const [volume] = useSetting<number>('soundVolume', 0.7)
@@ -49,6 +51,38 @@ export function GeneralSettings() {
           })}
         </div>
       </section>
+
+      {cliFriends.length > 0 ? (
+        <section data-testid="friend-args-settings">
+          <h3>Agent CLI arguments</h3>
+          <p className="hint">Extra CLI flags passed when launching each agent (for example <code>--model haiku</code>, <code>-c model=&quot;gpt-5.6-luna&quot;</code>, or <code>--provider openrouter --model …</code>). Changes take effect on the next turn.</p>
+          <div className="friend-opts">
+            {cliFriends.map((f) => {
+              const a = avatarFor(f)
+              return (
+                <div key={f.id} className="friend-opt" data-friend-args={f.displayName}>
+                  <Avatar label={a.label} gradient={a.gradient} presence="online" size="sm" />
+                  <span style={{ minWidth: 96, fontWeight: 600 }}>{f.displayName}</span>
+                  <input
+                    key={f.args.join(' ')}
+                    className="field mono grow"
+                    aria-label={`Arguments for ${f.displayName}`}
+                    placeholder="e.g. --model haiku"
+                    defaultValue={f.args.join(' ')}
+                    onBlur={(e) => void window.asi.api.friends.setArgs(f.id, splitArgs(e.currentTarget.value))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur()
+                      }
+                    }}
+                  />
+                  <Btn aria-label={`Remove ${f.displayName}`} title={`Remove ${f.displayName}`} onClick={() => void window.asi.api.friends.remove(f.id)}>Remove</Btn>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <section data-testid="data-settings">
         <h3>Your data</h3>

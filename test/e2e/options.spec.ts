@@ -19,9 +19,12 @@ test('Options: sounds off silences Nudge, plain lettering changes the status lin
     await h.win.keyboard.press('Meta+,')
     const opts = await optsP
 
-    // lettering: funky -> plain
+    // lettering: funky -> plain, and CLI arguments for the agent
     await opts.getByLabel('Lettering for Fake').selectOption('plain')
     await expect.poll(() => h.win.evaluate(async (id) => (await window.asi.api.friends.get(id))!.letteringStyle, friendId)).toBe('plain')
+    await opts.getByLabel('Arguments for Fake').fill('--model haiku')
+    await opts.getByLabel('Arguments for Fake').press('Enter')
+    await expect.poll(() => h.win.evaluate(async (id) => (await window.asi.api.friends.get(id))!.args, friendId)).toEqual(['--model', 'haiku'])
 
     // sounds off: the nudge sound is not played
     const chatP = h.app.waitForEvent('window')

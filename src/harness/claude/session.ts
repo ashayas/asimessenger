@@ -55,9 +55,13 @@ export class ClaudeSession implements AgentSession {
   private pending = new Map<string, { toolUseId: string; input: Obj; suggestions: unknown; question?: { prompt: string } }>()
   private interrupting = false
   private active = false
+  private dead = false
   /** Claude reports a running cost for the whole session; we publish what each turn added. */
   private lastTotalCost = 0
   private reqN = 0
+
+  get busy(): boolean { return this.active }
+  get closed(): boolean { return this.hub.closed || this.dead || this.child.exitCode !== null || this.child.killed }
 
   constructor(private o: ClaudeOptions) {
     this.resumeId = o.resumeId || randomUUID()
@@ -77,8 +81,9 @@ export class ClaudeSession implements AgentSession {
     this.child.stdout.on('data', (d: string) => this.onData(d))
     this.child.stderr.setEncoding('utf8')
     this.child.stderr.on('data', (d: string) => { this.stderrTail = (this.stderrTail + d).slice(-1500) })
-    this.child.on('error', (err) => this.fail(`failed to start claude: ${err.message}`))
+    this.child.on('error', (err) => { this.dead = true; this.fail(`failed to start claude: ${err.message}`) })
     this.child.on('exit', (code, sig) => {
+      this.dead = true
       if (this.hub.closed) return
       const tail = this.stderrTail.trim().split('\n').pop()
       this.fail(`claude exited (${sig ?? code})${tail ? `: ${tail}` : ''}`)
@@ -267,7 +272,8 @@ export class ClaudeSession implements AgentSession {
     this.hub.emit({ t: 'usage', inputTokens: Number(usage['input_tokens'] ?? 0), outputTokens: Number(usage['output_tokens'] ?? 0), cacheReadTokens: Number(usage['cache_read_input_tokens'] ?? 0), cacheWriteTokens: Number(usage['cache_creation_input_tokens'] ?? 0), costUsd, model })
     this.streamed.clear()
     if (this.interrupting) return void this.hub.emit({ t: 'turn_end', reason: 'interrupted' })
-    if (m['is_error']) this.hub.emit({ t: 'turn_end', reason: 'error', error: String(m['result'] ?? m['subtype'] ?? 'error').split('\n')[0] })
+    const errMsg = m['result'] ?? (Array.isArray(m['errors']) ? (m['errors'] as unknown[])[0] : undefined) ?? m['subtype'] ?? 'error'
+    if (m['is_error']) this.hub.emit({ t: 'turn_end', reason: 'error', error: String(errMsg).split('\n')[0] })
     else this.hub.emit({ t: 'turn_end', reason: 'done' })
   }
 }

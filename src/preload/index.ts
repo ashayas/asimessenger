@@ -25,6 +25,7 @@ const chat = {
   toastOpenChat: (chatId: string): Promise<void> => ipcRenderer.invoke('toast:open-chat', chatId),
   toastDismiss: (): Promise<void> => ipcRenderer.invoke('toast:dismiss'),
   interrupt: (chatId: string): Promise<void> => ipcRenderer.invoke('chat:interrupt', chatId),
+  reset: (chatId: string): Promise<unknown> => ipcRenderer.invoke('chat:reset', chatId),
   queue: (chatId: string, text: string, quote?: { name: string; text: string }): Promise<{ queued: boolean }> => ipcRenderer.invoke('chat:queue', chatId, text, quote),
   queued: (chatId: string): Promise<unknown> => ipcRenderer.invoke('chat:queued', chatId),
   takeQueued: (chatId: string): Promise<string | null> => ipcRenderer.invoke('chat:queue-take', chatId),

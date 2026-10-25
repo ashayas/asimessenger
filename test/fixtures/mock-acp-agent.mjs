@@ -11,7 +11,8 @@ let loadedSessions = new Set()
 
 rl.on('line', async (line) => {
   const m = JSON.parse(line)
-  if (m.method === 'initialize') return out({ id: m.id, result: { protocolVersion: 1, agentCapabilities: { loadSession: true, promptCapabilities: { image: !process.argv.includes('--no-images') } }, authMethods: [] } })
+  if (m.method === 'initialize' && process.argv.includes('--no-init')) return
+  if (m.method === 'initialize') return out({ id: m.id, result: { protocolVersion: process.argv.includes('--bad-version') ? 2 : 1, agentCapabilities: { loadSession: true, promptCapabilities: { image: !process.argv.includes('--no-images') } }, authMethods: [] } })
   if (m.method === 'session/new') return out({ id: m.id, result: { sessionId: 'mock-session-1' } })
   if (m.method === 'session/load') {
     loadedSessions.add(m.params.sessionId)
@@ -19,14 +20,16 @@ rl.on('line', async (line) => {
     return out({ id: m.id, result: null })
   }
   if (m.method === 'session/set_mode') return out({ id: m.id, result: null })
-  if (m.method === 'session/cancel') { cancelled = true; return }
+  if (m.method === 'session/cancel') { if (!process.argv.includes('--ignore-cancel')) cancelled = true; return }
   if (m.id != null && !m.method) { waiting.get(m.id)?.(m.result); return }
   if (m.method === 'session/prompt') {
     cancelled = false
+    if (m.params.prompt.some(b => b.text === 'crash')) process.exit(1)
     const sid = m.params.sessionId
     const imgs = m.params.prompt.filter((b) => b.type === 'image' && b.mimeType === 'image/png' && b.data).length
     const text = m.params.prompt.map((b) => b.text).join('') + (imgs ? ` [img:${imgs}]` : '')
     const end = (stopReason = 'end_turn') => out({ id: m.id, result: { stopReason, usage: { inputTokens: 5, outputTokens: 2 } } })
+    if (text.includes('wrong-session')) upd('someone-else', { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'LEAK' } })
     if (text.includes('retitle')) upd(sid, { sessionUpdate: 'session_info_update', title: 'Fix the flaky session test' })
     if (text.includes('slow')) {
       upd(sid, { sessionUpdate: 'tool_call', toolCallId: 'c1', title: 'sleep', kind: 'execute', status: 'in_progress', rawInput: { command: 'sleep 30' } })

@@ -62,7 +62,11 @@ export class PiSession implements AgentSession {
   private modeFile: string
   private active = false
   private interrupting = false
+  private dead = false
   private lastError = ''
+
+  get busy(): boolean { return this.active }
+  get closed(): boolean { return this.hub.closed || this.dead || this.child.exitCode !== null || this.child.killed }
 
   constructor(private o: PiOptions) {
     this.resumeId = o.sessionFile
@@ -77,8 +81,10 @@ export class PiSession implements AgentSession {
     this.child.stdout.on('data', (d: string) => this.onData(d))
     this.child.stderr.setEncoding('utf8')
     this.child.stderr.on('data', (d: string) => { this.stderrTail = (this.stderrTail + d).slice(-1500) })
-    this.child.on('error', (err) => this.fail(`failed to start pi: ${err.message}`))
+    this.child.on('error', (err) => { this.dead = true; this.fail(`failed to start pi: ${err.message}`) })
     this.child.on('exit', (code, sig) => {
+      this.dead = true
+      this.pending.clear()
       if (this.hub.closed) return
       const tail = this.stderrTail.trim().split('\n').pop()
       this.fail(`pi exited (${sig ?? code})${tail ? `: ${tail}` : ''}`)

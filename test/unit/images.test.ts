@@ -74,8 +74,8 @@ describe('adapters pass pictures natively', () => {
     expect(text(c.events)).toContain('[img:1]')
     await s.dispose()
     s = await acpFactory({ command: process.execPath, args: [mock, '--no-images'] })({ friend: friendFor() as never, chatId: 'c', cwd: process.cwd(), mode: 'ask' })
-    const c2 = collect(s); s.send(turn()); await c2.turnEnd()
-    expect(text(c2.events)).not.toContain('[img:')
+    expect(() => s!.send(turn())).toThrow(/does not support image attachments/)
+    expect(s.busy).toBe(false)
   })
 })
 

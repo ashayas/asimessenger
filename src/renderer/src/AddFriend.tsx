@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { DetectedPreset } from '@shared/presets'
+import { splitArgs, type DetectedPreset } from '@shared/presets'
 import { avatarFor } from '@shared/harness-meta'
 import { Avatar, Btn, WindowFrame } from './ui/kit'
 import { useData } from './store'
@@ -20,7 +20,7 @@ export function AddFriend() {
 
   const added = (id: string) => friends.some((f) => f.avatar === id)
   const parse = () => {
-    const parts = cmdline.trim().match(/"[^"]*"|'[^']*'|\S+/g)?.map((p) => p.replace(/^["']|["']$/g, '')) ?? []
+    const parts = splitArgs(cmdline)
     return { command: parts[0] ?? '', args: parts.slice(1) }
   }
 

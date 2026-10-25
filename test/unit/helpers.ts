@@ -8,6 +8,8 @@ export function collect(session: AgentSession) {
     for (;;) {
       const hit = events.find(pred)
       if (hit) return hit
+      const last = events.at(-1)
+      if (last?.t === 'turn_end' && last.reason === 'error') throw new Error(`agent failed before the expected event: ${last.error}`)
       if (Date.now() - t > ms) throw new Error(`timed out; saw: ${JSON.stringify(events.map((e) => e.t))}`)
       await new Promise((r) => setTimeout(r, 15))
     }

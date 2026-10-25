@@ -1,3 +1,4 @@
+import { basename } from 'node:path'
 import { execFile, spawn } from 'node:child_process'
 import { loginEnv, which } from '../harness/env'
 import { RpcPeer } from '../harness/acp/rpc'
@@ -72,6 +73,7 @@ export async function addCustom(repo: Repo, c: CustomFriendInput, secrets?: { se
     return repo.friends.create({ harness: 'http', displayName: name, avatar: 'http', transport: 'http', command: null, args: [JSON.stringify(m)] })
   }
   if (!c.command.trim()) throw new Error('enter the command to run')
+  if (c.kind === 'acp' && basename(c.command.trim()) === 'agy') throw new Error('Antigravity uses stream-json, not ACP. Add it using the Antigravity preset above.')
   return repo.friends.create({
     harness: c.kind, displayName: name, avatar: null, transport: c.kind === 'acp' ? 'generic' : null,
     command: c.command.trim(), args: c.args
@@ -80,6 +82,7 @@ export async function addCustom(repo: Repo, c: CustomFriendInput, secrets?: { se
 
 /** Starts the command as an ACP agent and reads its handshake. */
 export async function testAcp(command: string, args: string[]): Promise<{ ok: true; agent: string } | { ok: false; error: string }> {
+  if (basename(command.trim()) === 'agy') return { ok: false, error: 'Antigravity uses stream-json, not ACP. Add it using the Antigravity preset above.' }
   const env = await loginEnv()
   const exe = which(command, env)
   if (!exe) return { ok: false, error: `"${command}" was not found on your PATH` }

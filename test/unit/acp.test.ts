@@ -2,6 +2,8 @@ import { resolve } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { acpFactory } from '../../src/harness/acp/factory'
 import type { AgentSession } from '../../src/shared/events'
+import { HarnessManager } from '../../src/harness/manager'
+import { OPENCODE } from '../../src/harness/acp/presets'
 import { collect, friendFor } from './helpers'
 
 const MOCK = resolve('test/fixtures/mock-acp-agent.mjs')
@@ -92,4 +94,72 @@ test('quotes are prepended to the prompt', async () => {
 test('missing command and dangerous gate are reported clearly', async () => {
   await expect(factory({ friend: friendFor({ command: 'definitely-not-a-real-cli' }) as never, chatId: 'c', cwd: '/tmp', mode: 'ask' })).rejects.toThrow(/not found on your PATH/)
   await expect(factory({ friend: friendFor({ dangerousAllowed: false }) as never, chatId: 'c', cwd: '/tmp', mode: 'dangerous' })).rejects.toThrow(/dangerous mode/)
+})
+
+
+test('rejects incompatible versions and bounds initialization', async () => {
+  await expect(start({ args: [MOCK, '--bad-version'] })).rejects.toThrow(/protocol version 2/)
+  const timed = acpFactory({ command: process.execPath, args: [MOCK, '--no-init'], startupTimeoutMs: 100 })
+  await expect(timed({ friend: friendFor() as never, chatId: 'c', cwd: process.cwd(), mode: 'ask' })).rejects.toThrow(/initialize timed out/)
+})
+
+test('ignores updates for other sessions', async () => {
+  const s = await start()
+  const c = collect(s)
+  s.send({ text: 'wrong-session' })
+  await c.turnEnd()
+  expect(c.events.filter(e => e.t === 'text').map(e => e.delta).join('')).not.toContain('LEAK')
+})
+
+test('disconnect emits one terminal event and clears busy state', async () => {
+  const s = await start()
+  const c = collect(s)
+  s.send({ text: 'crash' })
+  expect(await c.turnEnd()).toMatchObject({ reason: 'error' })
+  expect(c.events.filter(e => e.t === 'turn_end')).toHaveLength(1)
+  expect(s.busy).toBe(false)
+  expect(s.closed).toBe(true)
+})
+
+test('interrupt closes an unresponsive agent and the manager reconnects on retry', async () => {
+  const events: import('../../src/shared/events').AgentEvent[] = []
+  const manager = new HarnessManager({ onEvent: (_, e) => events.push(e) })
+  manager.register('acp', acpFactory({ command: process.execPath, args: [MOCK, '--ignore-cancel'] }))
+  const friend = friendFor({ harness: 'acp' })
+  const chat = { id: 'c', mode: 'ask', harnessSessionId: null } as import('../../src/shared/models').Chat
+  try {
+    const s = await manager.session(chat, friend, process.cwd(), 'ask')
+    const c = collect(s)
+    s.send({ text: 'slow job' })
+    await c.until(e => e.t === 'tool')
+    expect(() => s.send({ text: 'overlapping' })).toThrow(/already running/)
+    await manager.interrupt('c')
+    expect(await c.turnEnd()).toMatchObject({ reason: 'interrupted' })
+    expect(s.busy).toBe(false)
+    const next = await manager.session(chat, friend, process.cwd(), 'ask')
+    expect(next).not.toBe(s)
+    const resumed = collect(next)
+    next.send({ text: 'after reset' })
+    expect(await resumed.turnEnd()).toMatchObject({ reason: 'done' })
+  } finally { await manager.disposeAll() }
+}, 10_000)
+
+test('interrupt cancels pending permission and remains usable', async () => {
+  const s = await start()
+  const c = collect(s)
+  s.send({ text: 'permission please' })
+  await c.until(e => e.t === 'permission')
+  await s.interrupt()
+  expect(await c.turnEnd()).toMatchObject({ reason: 'interrupted' })
+  const next = collect(s)
+  s.send({ text: 'hello again' })
+  expect(await next.turnEnd()).toMatchObject({ reason: 'done' })
+})
+
+test('OpenCode policies distinguish auto-edit, ask, plan and full bypass', () => {
+  const policy = (mode: import('../../src/shared/models').Mode) => JSON.parse(OPENCODE.env!(mode).OPENCODE_CONFIG_CONTENT!).permission
+  expect(policy('auto-edit')).toMatchObject({ edit: 'allow', bash: 'ask' })
+  expect(policy('ask')).toMatchObject({ edit: 'ask', bash: 'ask' })
+  expect(policy('plan')).toMatchObject({ edit: 'deny' })
+  expect(policy('dangerous')).toEqual({ '*': 'allow' })
 })

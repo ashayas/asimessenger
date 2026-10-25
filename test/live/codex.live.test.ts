@@ -15,7 +15,7 @@ afterAll(() => ws?.cleanup())
 afterEach(async () => { await session?.dispose(); session = null })
 
 const text = (events: AgentEvent[]) => events.filter((e) => e.t === 'text').map((e) => (e as { delta: string }).delta).join('')
-const friend = () => friendFor({ harness: 'codex' }) as never
+const friend = () => friendFor({ harness: 'codex', args: ['-c', 'model="gpt-5.6-luna"', '-c', 'model_reasoning_effort="low"'] }) as never
 const T = 150_000
 
 describe.skipIf(!live)('codex (app-server)', async () => {
@@ -34,9 +34,14 @@ describe.skipIf(!live)('codex (app-server)', async () => {
   run('Ask mode: Deny leaves no file', async () => {
     session = await codexFactory({ friend: friend(), chatId: 'c', cwd: ws.dir, mode: 'ask' })
     const c = collect(session)
-    session.send({ text: 'Create a file named hello.txt containing the word hi.' })
+    session.send({ text: 'Create a file named hello.txt containing the word hi. If denied, do not retry.' })
     const req = (await c.until((e) => e.t === 'permission', T)) as Extract<AgentEvent, { t: 'permission' }>
+    ;(req as { seen?: boolean }).seen = true
     session.respond(req.reqId, 'deny')
+    for (let i = 0; i < 120 && !c.events.some((e) => e.t === 'turn_end'); i++) {
+      for (const e of c.events) if (e.t === 'permission' && !(e as { seen?: boolean }).seen) { (e as { seen?: boolean }).seen = true; session.respond(e.reqId, 'deny') }
+      await new Promise((r) => setTimeout(r, 250))
+    }
     await c.until((e) => e.t === 'turn_end', T)
     expect(existsSync(join(ws.dir, 'hello.txt'))).toBe(false)
   })
@@ -46,7 +51,12 @@ describe.skipIf(!live)('codex (app-server)', async () => {
     const c = collect(session)
     session.send({ text: 'Create a file named allowed.txt containing the word yes.' })
     const req = (await c.until((e) => e.t === 'permission', T)) as Extract<AgentEvent, { t: 'permission' }>
+    ;(req as { seen?: boolean }).seen = true
     session.respond(req.reqId, 'allow-once')
+    for (let i = 0; i < 120 && !c.events.some((e) => e.t === 'turn_end'); i++) {
+      for (const e of c.events) if (e.t === 'permission' && !(e as { seen?: boolean }).seen) { (e as { seen?: boolean }).seen = true; session.respond(e.reqId, 'allow-once') }
+      await new Promise((r) => setTimeout(r, 250))
+    }
     await c.until((e) => e.t === 'turn_end', T)
     expect(existsSync(join(ws.dir, 'allowed.txt'))).toBe(true)
   })

@@ -10,17 +10,22 @@ let cached: Promise<NodeJS.ProcessEnv> | null = null
  */
 export function loginEnv(): Promise<NodeJS.ProcessEnv> {
   // tests pin PATH so detection is deterministic
-  if (process.env['ASI_TEST_PATH']) return Promise.resolve({ ...process.env, PATH: process.env['ASI_TEST_PATH'] })
+  if (process.env['ASI_TEST_PATH']) {
+    const env: NodeJS.ProcessEnv = { ...process.env, PATH: process.env['ASI_TEST_PATH'] }
+    delete env['ELECTRON_RUN_AS_NODE']
+    return Promise.resolve(env)
+  }
   if (cached) return cached
   cached = new Promise((resolve) => {
     const shell = process.env['SHELL'] || '/bin/zsh'
     const marker = '__ASI_ENV__'
     execFile(shell, ['-ilc', `printf '${marker}'; env -0`], { timeout: 5000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => {
-      if (err || !stdout.includes(marker)) return resolve({ ...process.env })
       const env: NodeJS.ProcessEnv = { ...process.env }
+      delete env['ELECTRON_RUN_AS_NODE']
+      if (err || !stdout.includes(marker)) return resolve(env)
       for (const entry of stdout.split(marker).pop()!.split('\0')) {
         const i = entry.indexOf('=')
-        if (i > 0) env[entry.slice(0, i)] = entry.slice(i + 1)
+        if (i > 0 && entry.slice(0, i) !== 'ELECTRON_RUN_AS_NODE') env[entry.slice(0, i)] = entry.slice(i + 1)
       }
       resolve(env)
     })

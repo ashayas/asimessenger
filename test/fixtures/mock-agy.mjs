@@ -10,11 +10,13 @@ const flag = (n) => argv.includes(n)
 const val = (n) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : null)
 const convo = val('--conversation') ?? `conv-${process.pid}`
 const dangerous = flag('--dangerously-skip-permissions')
+const autoEdit = val('--mode') === 'accept-edits'
 const settingsPath = process.env.MOCK_AGY_SETTINGS
 const out = (o) => process.stdout.write(JSON.stringify(o) + '\n')
 const allowed = () => { try { return JSON.parse(readFileSync(settingsPath, 'utf8')).permissions?.allow ?? [] } catch { return [] } }
 const realish = (p) => { const abs = resolve(p); try { return realpathSync(abs) } catch { try { return resolve(realpathSync(dirname(abs)), abs.split('/').pop()) } catch { return abs } } }
 
+const startupRules = allowed()
 let step = 0
 let turnN = 0
 /** what a real model would redo when told "permission was granted, retry" */
@@ -31,11 +33,11 @@ const text = (t) => su({ step_index: step++, state: 'DONE', step_type: 'agent_re
 async function tool(name, params, rule) {
   const i = step++
   su({ step_index: i, state: 'ACTIVE', step_type: 'tool', tool_name: name, tool_info: { name, parameters: params } })
-  if (dangerous || allowed().includes(rule)) {
-    su({ step_index: i, state: 'DONE', step_type: 'tool', tool_name: name, duration_seconds: 0.01, tool_info: { name, parameters: params } })
+  if (dangerous || (autoEdit && name === 'write_to_file') || startupRules.includes(rule)) {
+    su({ step_index: i, state: 'DONE', step_type: 'tool', tool_name: name, duration_seconds: 0.01, tool_info: { name, parameters: params, output: 'mock tool output' } })
     return true
   }
-  su({ step_index: i, state: 'ERROR', step_type: 'tool', tool_name: name, tool_info: { name, parameters: params, error: { type: 'TOOL_ERROR', message: `permission check failed for ${rule.split('(')[0]}: user denied permission for ${rule}\nDo not attempt to circumvent this denial` } } })
+  su({ step_index: i, state: 'DONE', step_type: 'tool', tool_name: name, tool_info: { name, parameters: params, ...(process.env.MOCK_AGY_DENIAL_ERROR ? { error: { message: 'permission check failed for unsandboxed command: user denied permission to run command:' } } : {}) } })
   return false
 }
 
@@ -48,8 +50,13 @@ rl.on('line', async (line) => {
   const denied = []
   su({ step_index: step++, state: 'DONE', step_type: 'user_input' })
   const cancelled = new Promise((res) => { running = () => res('cancel') })
-  const usage = { input_tokens: 100, output_tokens: 20, thinking_tokens: 5, cache_read_tokens: 40, total_tokens: 165 }
+  const usage = { input_tokens: 100 * turnN, output_tokens: 20 * turnN, thinking_tokens: 5 * turnN, cache_read_tokens: 40 * turnN, total_tokens: 120 * turnN }
+  su({ step_index: step++, state: 'DONE', step_type: 'agent_response', usage: { input_tokens: 100, output_tokens: 20, thinking_tokens: 5, cache_read_tokens: 40 } })
   const finish = (status = 'SUCCESS', extra = {}) => { running = null; out({ event: 'result', result: { conversation_id: convo, status, response: '', num_turns: 1, usage, ...extra } }) }
+  if (content === 'cancelled-result') return finish('CANCELED')
+  if (content === 'result-only') return finish('SUCCESS', { response: 'fallback reply' })
+  if (content === 'whitespace') { for (const delta of ['hello', ' ', 'world', '\n']) su({ step_index: step, state: 'ACTIVE', step_type: 'agent_response', text_delta: delta }); step++; return finish() }
+  if (content === 'exit-idle') { text('bye'); finish(); setTimeout(() => process.exit(0), 10); return }
   if (content.includes('flags')) { text(`args=${argv.join(' ')}`); return finish() }
   if (content.includes('slow')) {
     su({ step_index: step++, state: 'ACTIVE', step_type: 'tool', tool_name: 'run_command', tool_info: { name: 'run_command', parameters: { CommandLine: 'sleep 30' } } })
@@ -67,6 +74,6 @@ rl.on('line', async (line) => {
   }
   lastActions = failed
   if (statePath) { mkdirSync(dirname(statePath), { recursive: true }); writeFileSync(statePath, JSON.stringify(failed)) }
-  text(denied.length ? 'blocked' : `done ${turnN}`)
+  if (!denied.length) text(`done ${turnN}`)
   finish('SUCCESS', denied.length ? { denied_actions: denied } : {})
 })

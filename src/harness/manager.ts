@@ -14,10 +14,11 @@ export interface ManagerHooks {
 /** Owns one live AgentSession per chat; sessions start lazily on the first message. */
 export class HarnessManager {
   private factories = new Map<HarnessKind, HarnessFactory>()
-  private sessions = new Map<string, { session: AgentSession; unsub: () => void; mode: Mode }>()
+  private sessions = new Map<string, { session: AgentSession; unsub: () => void; mode: Mode; argsKey: string }>()
   /** Chats whose agent must start over in a new mode once its current turn ends. */
   private restartAfterTurn = new Set<string>()
-  private starting = new Map<string, Promise<AgentSession>>()
+  private starting = new Map<string, { promise: Promise<AgentSession>; cancelled: boolean; mode: Mode }>()
+  private stopping = new Map<string, Promise<void>>()
 
   constructor(private hooks: ManagerHooks) {}
 
@@ -39,27 +40,33 @@ export class HarnessManager {
   }
 
   async session(chat: Chat, friend: Friend, cwd: string, mode: Mode = friend.defaultMode): Promise<AgentSession> {
+    await this.stopping.get(chat.id)
+    const argsKey = JSON.stringify(friend.args ?? [])
     const live = this.sessions.get(chat.id)
-    if (live) return live.session
+    if (live && !live.session.closed && (live.argsKey === argsKey || live.session.busy)) return live.session
+    if (live) await this.dispose(chat.id)
     const pending = this.starting.get(chat.id)
-    if (pending) return pending
+    if (pending) return pending.promise
     const factory = this.factories.get(friend.harness)
     if (!factory) throw new Error(`no harness registered for "${friend.harness}"`)
+    const start = { promise: null as unknown as Promise<AgentSession>, cancelled: false, mode }
     const p = (async () => {
       const session = await factory({ friend, chatId: chat.id, cwd, mode, resumeId: chat.harnessSessionId, mcp: this.hooks.mcpFor?.(chat.id) })
+      if (start.cancelled) { await session.dispose(); throw new Error('session startup was cancelled') }
       const unsub = session.subscribe((e) => {
         this.hooks.onEvent(chat.id, e)
         if (e.t === 'turn_end' && this.restartAfterTurn.delete(chat.id)) void this.dispose(chat.id) // the next message starts a fresh session in the new mode
       })
-      this.sessions.set(chat.id, { session, unsub, mode })
+      this.sessions.set(chat.id, { session, unsub, mode, argsKey })
       if (session.resumeId && session.resumeId !== chat.harnessSessionId) this.hooks.onResumeId?.(chat.id, session.resumeId)
       return session
     })()
-    this.starting.set(chat.id, p)
+    start.promise = p
+    this.starting.set(chat.id, start)
     try {
       return await p
     } finally {
-      this.starting.delete(chat.id)
+      if (this.starting.get(chat.id) === start) this.starting.delete(chat.id)
     }
   }
 
@@ -78,25 +85,41 @@ export class HarnessManager {
 
   setMode(chatId: string, mode: Mode): void {
     const s = this.sessions.get(chatId)
-    if (!s) return
+    if (!s) {
+      const pending = this.starting.get(chatId)
+      if (pending && pending.mode !== mode) void this.dispose(chatId)
+      return
+    }
     s.session.setMode(mode)
     // some agents only read their permission policy at launch: a new mode means a new process, never a silent no-op
     if (s.session.restartOnModeChange && s.mode !== mode) {
       if (s.session.busy) this.restartAfterTurn.add(chatId)
       else void this.dispose(chatId)
+    } else {
+      this.restartAfterTurn.delete(chatId)
+      s.mode = mode
     }
   }
 
-  async dispose(chatId: string): Promise<void> {
+  dispose(chatId: string): Promise<void> {
+    const stopping = this.stopping.get(chatId)
+    if (stopping) return stopping
+    const pending = this.starting.get(chatId)
+    if (pending) pending.cancelled = true
     const s = this.sessions.get(chatId)
-    if (!s) return
     this.sessions.delete(chatId)
     this.restartAfterTurn.delete(chatId)
-    s.unsub()
-    await s.session.dispose()
+    s?.unsub()
+    const stopped = (async () => {
+      if (pending) await pending.promise.catch(() => {})
+      await s?.session.dispose()
+    })()
+    this.stopping.set(chatId, stopped)
+    void stopped.finally(() => { if (this.stopping.get(chatId) === stopped) this.stopping.delete(chatId) }).catch(() => {})
+    return stopped
   }
 
   async disposeAll(): Promise<void> {
-    await Promise.all([...this.sessions.keys()].map((id) => this.dispose(id)))
+    await Promise.all([...new Set([...this.sessions.keys(), ...this.starting.keys(), ...this.stopping.keys()])].map((id) => this.dispose(id)))
   }
 }

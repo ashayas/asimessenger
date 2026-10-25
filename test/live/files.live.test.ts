@@ -41,5 +41,5 @@ async function total(factory: HarnessFactory, over: Record<string, unknown>) {
 describe.skipIf(!live)('agents open an attached file from its path', async () => {
   const env = await loginEnv()
   test.skipIf(!which('claude', env))('claude reads the csv', async () => { expect(await total(claudeFactory, { harness: 'claude', args: ['--model', 'haiku'] })).toContain('12160') }, 240_000)
-  test.skipIf(!which('codex', env))('codex reads the csv', async () => { expect(await total(codexFactory, { harness: 'codex' })).toContain('12160') }, 240_000)
+  test.skipIf(!which('codex', env))('codex reads the csv', async () => { expect(await total(codexFactory, { harness: 'codex', args: ['-c', 'model="gpt-5.6-luna"', '-c', 'model_reasoning_effort="low"'] })).toContain('12160') }, 240_000)
 })

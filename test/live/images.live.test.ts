@@ -51,7 +51,7 @@ describe.skipIf(!live)('pictures reach real agents', async () => {
   const env = await loginEnv()
   test.skipIf(!which('claude', env))('claude', async () => { expect(await ask(claudeFactory, { harness: 'claude', args: ['--model', 'haiku'] })).toContain('red') }, 180_000)
   test.skipIf(!which('pi', env))('pi', async () => { expect(await ask(piFactory, { harness: 'pi', args: ['--provider', 'openrouter', '--model', 'anthropic/claude-haiku-4.5'] })).toContain('red') }, 180_000)
-  test.skipIf(!which('codex', env))('codex', async () => { expect(await ask(codexFactory, { harness: 'codex' })).toContain('red') }, 180_000)
+  test.skipIf(!which('codex', env))('codex', async () => { expect(await ask(codexFactory, { harness: 'codex', args: ['-c', 'model="gpt-5.6-luna"', '-c', 'model_reasoning_effort="low"'] })).toContain('red') }, 180_000)
   // OpenCode's default model may be text-only; then the honest answer is that it cannot see images
   test.skipIf(!which('opencode', env))('opencode', async () => { expect(await ask(acpFactory(OPENCODE), {})).toMatch(/red|image input|can't read images/) }, 180_000)
 })

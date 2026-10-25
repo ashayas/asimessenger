@@ -33,13 +33,45 @@ const settingsJson = () => JSON.parse(readFileSync(settings, 'utf8')) as { permi
 const waitFor = async (pred: () => boolean, ms = 8000) => { const t = Date.now(); while (!pred()) { if (Date.now() - t > ms) throw new Error('timed out'); await new Promise((r) => setTimeout(r, 15)) } }
 
 describe('Antigravity (agy) over stream-json', () => {
-  test('streams the reply, reports usage (thinking counts as output), and the conversation id is the resume id', async () => {
+  test('missing executable fails promptly instead of waiting for the init timeout', async () => {
+    await expect(make('ask', { command: join(dir, 'missing') })).rejects.toThrow(/failed to start agy/)
+  }, 2000)
+
+  test('whitespace deltas and result-only replies survive normalization', async () => {
+    const { s, c } = await make()
+    s.send({ text: 'whitespace' }); await waitFor(() => turnEnds(c.events).length === 1)
+    expect(text(c.events)).toBe('hello world\n')
+    s.send({ text: 'result-only' }); await waitFor(() => turnEnds(c.events).length === 2)
+    expect(text(c.events)).toBe('hello world\nfallback reply')
+  })
+
+  test('an idle process exit is recovered on the next message', async () => {
+    const { s, c } = await make()
+    const id = s.resumeId
+    s.send({ text: 'exit-idle' }); await c.turnEnd()
+    await new Promise((r) => setTimeout(r, 100))
+    s.send({ text: 'hello' }); await waitFor(() => turnEnds(c.events).length === 2)
+    expect(turnEnds(c.events).at(-1)).toMatchObject({ reason: 'done' })
+    expect(s.resumeId).toBe(id)
+    expect(text(c.events)).toBe('byedone 1')
+  })
+
+  test('a resumed conversation reports per-step spend instead of cumulative history', async () => {
+    const first = await make()
+    first.s.send({ text: 'hello' }); await first.c.turnEnd()
+    await first.s.dispose()
+    const resumed = await make('ask', { resumeId: first.s.resumeId })
+    resumed.s.send({ text: 'after reset' }); await resumed.c.turnEnd()
+    expect(resumed.c.events.find(e => e.t === 'usage')).toMatchObject({ inputTokens: 100, outputTokens: 20 })
+  })
+
+  test('streams the reply, reports usage without counting thinking twice, and the conversation id is the resume id', async () => {
     const { s, c } = await make()
     expect(s.resumeId).toMatch(/^conv-/)
     s.send({ text: 'hello' })
     await c.turnEnd()
     expect(text(c.events)).toBe('done 1')
-    expect(c.events.find((e) => e.t === 'usage')).toMatchObject({ inputTokens: 100, outputTokens: 25, cacheReadTokens: 40 })
+    expect(c.events.find((e) => e.t === 'usage')).toMatchObject({ inputTokens: 100, outputTokens: 20, cacheReadTokens: 40 })
     expect(turnEnds(c.events)[0]).toMatchObject({ reason: 'done' })
   })
 
@@ -48,6 +80,10 @@ describe('Antigravity (agy) over stream-json', () => {
     s.send({ text: 'one' }); await waitFor(() => turnEnds(c.events).length === 1)
     s.send({ text: 'two' }); await waitFor(() => turnEnds(c.events).length === 2)
     expect(text(c.events)).toBe('done 1done 2')
+    expect(c.events.filter((e) => e.t === 'usage')).toEqual([
+      { t: 'usage', inputTokens: 100, outputTokens: 20, cacheReadTokens: 40 },
+      { t: 'usage', inputTokens: 100, outputTokens: 20, cacheReadTokens: 40 }
+    ])
   })
 
   test('resuming passes --conversation', async () => {
@@ -58,7 +94,7 @@ describe('Antigravity (agy) over stream-json', () => {
   })
 
   test('mode becomes launch flags: Dangerous skips permissions (only when the friend allows it), Plan plans, Ask adds none', async () => {
-    for (const [mode, expected] of [['dangerous', '--dangerously-skip-permissions'], ['plan', '--mode plan']] as const) {
+    for (const [mode, expected] of [['dangerous', '--dangerously-skip-permissions'], ['plan', '--mode plan'], ['auto-edit', '--mode accept-edits']] as const) {
       const { s, c } = await make(mode)
       s.send({ text: 'flags' }); await c.turnEnd()
       expect(text(c.events)).toContain(expected)
@@ -78,14 +114,29 @@ describe('Antigravity (agy) over stream-json', () => {
     expect(['write_to_file', 'run_command', 'view_file', 'grep_search', 'browser_get_dom', 'call_mcp_tool'].map(toolKind)).toEqual(['edit', 'exec', 'read', 'search', 'web', 'mcp'])
     const { s, c } = await make('dangerous')
     s.send({ text: `write ${join(dir, 'a.txt')} and run \`echo ok\`` }); await c.turnEnd()
-    const tools = c.events.filter((e) => e.t === 'tool' && e.done) as Extract<AgentEvent, { t: 'tool' }>[]
+    const tools = c.events.filter((e) => e.t === 'tool' && e.done && e.exit === 0) as Extract<AgentEvent, { t: 'tool' }>[]
     expect(tools.map((t) => [t.kind, t.command ?? t.files?.[0]?.path])).toEqual([['edit', join(dir, 'a.txt')], ['exec', 'echo ok']])
+    expect(tools[0]).toMatchObject({ output: 'mock tool output', durationMs: 10 })
     expect(perms(c.events)).toHaveLength(0)
+  })
+
+  test('agent-reported cancellation is an interruption, not an error', async () => {
+    const { s, c } = await make()
+    s.send({ text: 'cancelled-result' }); await c.turnEnd()
+    expect(turnEnds(c.events)[0]).toMatchObject({ reason: 'interrupted' })
   })
 })
 
 describe('Ask mode: headless agy cannot prompt, so denied actions become cards you can approve', () => {
   const target = () => join(dir, 'a.txt')
+
+  test('result denial plus an unscoped tool error still yields the exact command approval', async () => {
+    const { s, c } = await make('ask', { env: { ...process.env, MOCK_AGY_SETTINGS: settings, MOCK_AGY_DENIAL_ERROR: '1' } })
+    s.send({ text: 'run `python3 -c "print(271828)"`' })
+    await waitFor(() => perms(c.events).length === 1)
+    expect(perms(c.events)[0]).toMatchObject({ tool: 'exec', summary: 'python3 -c "print(271828)"' })
+    expect(c.events.filter(e => e.t === 'tool').at(-1)).toMatchObject({ output: 'Not allowed yet: command(python3 -c "print(271828)")' })
+  })
 
   test('a denied write ends the turn, then asks; Deny leaves everything as it was', async () => {
     const { s, c } = await make('ask')
@@ -93,7 +144,7 @@ describe('Ask mode: headless agy cannot prompt, so denied actions become cards y
     expect(turnEnds(c.events)).toHaveLength(1)
     expect(perms(c.events)[0]).toMatchObject({ tool: 'edit', summary: target() })
     expect(perms(c.events)[0]!.options.map((o) => o.id)).toEqual(['allow-once', 'allow-chat', 'deny'])
-    const denied = c.events.find((e) => e.t === 'tool' && e.exit === 1) as Extract<AgentEvent, { t: 'tool' }>
+    const denied = c.events.find((e) => e.t === 'tool' && e.output?.startsWith('Not allowed yet')) as Extract<AgentEvent, { t: 'tool' }>
     expect(denied.output).toContain('Not allowed yet')
     s.respond(perms(c.events)[0]!.reqId, 'deny')
     await new Promise((r) => setTimeout(r, 200))
@@ -113,6 +164,8 @@ describe('Ask mode: headless agy cannot prompt, so denied actions become cards y
     expect(c.events.filter((e) => e.t === 'tool' && e.done && e.exit === 0)).toHaveLength(1) // the retry went through
     expect(s.resumeId).toBe(convo) // same conversation, new process
     expect(perms(c.events)).toHaveLength(1)
+    s.send({ text: `write ${target()}` })
+    await waitFor(() => perms(c.events).length === 2) // a cached allow-once grant cannot authorize the next turn
     await waitFor(() => !(settingsJson().permissions?.allow ?? []).includes(rule)) // gone again once the turn is over
     expect(settingsJson()).toEqual({ keep: 1, permissions: { allow: ['command(git log)'] } }) // everything else untouched
   })
@@ -152,6 +205,33 @@ describe('Ask mode: headless agy cannot prompt, so denied actions become cards y
 })
 
 describe('allow-rules in agy’s settings', () => {
+  test('concurrent grants and releases do not overwrite each other', async () => {
+    const rules = Array.from({ length: 10 }, (_, i) => `command(echo ${i})`)
+    await Promise.all(rules.map((r) => addRule(settings, r)))
+    expect(settingsJson().permissions!.allow?.sort()).toEqual(rules.sort())
+    await Promise.all(rules.map((r) => removeRule(settings, r)))
+    expect(existsSync(settings)).toBe(false)
+  })
+
+  test('pre-existing user rules survive a grant and release', async () => {
+    mkdirSync(join(dir, 'cfg'), { recursive: true })
+    writeFileSync(settings, JSON.stringify({ permissions: { allow: ['command(mine)'] } }))
+    await addRule(settings, 'command(mine)')
+    await removeRule(settings, 'command(mine)')
+    expect(settingsJson().permissions!.allow).toEqual(['command(mine)'])
+  })
+
+  test('the same rule in different settings files has independent ownership', async () => {
+    const other = join(dir, 'other', 'settings.json')
+    await Promise.all([addRule(settings, 'command(same)'), addRule(other, 'command(same)')])
+    expect(JSON.parse(readFileSync(other, 'utf8')).permissions.allow).toEqual(['command(same)'])
+    await removeRule(settings, 'command(same)')
+    expect(existsSync(settings)).toBe(false)
+    expect(existsSync(other)).toBe(true)
+    await removeRule(other, 'command(same)')
+    expect(existsSync(other)).toBe(false)
+  })
+
   test('rules are counted: two holders of the same rule, and it goes only when both let go; unrelated settings survive', async () => {
     mkdirSync(join(dir, 'cfg'), { recursive: true })
     writeFileSync(settings, JSON.stringify({ model: 'x', permissions: { allow: ['command(head)'] } }))

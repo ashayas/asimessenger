@@ -27,19 +27,22 @@ export class AcpSession implements AgentSession {
   private perms = new Map<string, { resolve(v: unknown): void; options: Map<PermDecision, string>; cancelOption?: string }>()
   private prompting: Promise<void> | null = null
   private suppress = false
+  private cancelling = false
+  private modeReady: Promise<void> = Promise.resolve()
+  private modeError: unknown
+
 
   constructor(
     private peer: RpcPeer,
     readonly sessionId: string,
     private opts: AcpSessionOptions = {}
   ) {
-    peer.onNotification((m, p) => { if (m === 'session/update') this.onUpdate((p as Obj)['update'] as Obj) })
+    peer.onNotification((m, p) => { if (m === 'session/update' && (p as Obj)?.['sessionId'] === this.sessionId) this.onUpdate((p as Obj)['update'] as Obj) })
     peer.onRequest((m, p) => this.onAgentRequest(m, p as Obj))
-    peer.onClose((reason) => {
-      if (this.prompting) this.hub.emit({ t: 'turn_end', reason: 'error', error: reason })
-    })
+    peer.onClose(() => this.cancelPermissions())
   }
 
+  get closed(): boolean { return this.peer.closed }
   get resumeId(): string { return this.sessionId }
   get restartOnModeChange(): boolean { return !!this.opts.restartOnModeChange }
   get busy(): boolean { return this.prompting !== null }
@@ -48,32 +51,55 @@ export class AcpSession implements AgentSession {
   setSuppress(v: boolean): void { this.suppress = v }
 
   send(turn: UserTurn): void {
+    if (this.busy) throw new Error('ACP turn already running')
+    if (this.closed) throw new Error('ACP connection closed; retry to reconnect')
+    if (turn.images?.length && !this.opts.images) throw new Error('This ACP agent does not support image attachments')
+    this.cancelling = false
     const prompt: Obj[] = []
     if (turn.quote) prompt.push({ type: 'text', text: `Quoting ${turn.quote.name}:\n${turn.quote.text.split('\n').map((l) => `> ${l}`).join('\n')}\n\n` })
     prompt.push({ type: 'text', text: turn.text })
     if (this.opts.images) for (const i of loadImages(turn)) prompt.push({ type: 'image', data: i.data, mimeType: i.mimeType })
-    const n = ++this.turn
+    ++this.turn
+    this.tools.clear()
     this.hub.emit({ t: 'status', phase: 'thinking' })
-    this.prompting = this.peer
-      .request<Obj>('session/prompt', { sessionId: this.sessionId, prompt })
+    this.prompting = this.modeReady.then(() => {
+      if (this.modeError) throw this.modeError
+      if (this.cancelling) return { stopReason: 'cancelled' } as Obj
+      return this.peer.request<Obj>('session/prompt', { sessionId: this.sessionId, prompt })
+    })
       .then((r) => {
         const stop = String(r?.['stopReason'] ?? 'end_turn')
         const usage = r?.['usage'] as Obj | undefined
         if (usage) this.hub.emit({ t: 'usage', inputTokens: Number(usage['inputTokens'] ?? 0), outputTokens: Number(usage['outputTokens'] ?? 0), cacheReadTokens: Number(usage['cachedReadTokens'] ?? usage['cacheReadTokens'] ?? 0) || undefined, cacheWriteTokens: Number(usage['cachedWriteTokens'] ?? usage['cacheWriteTokens'] ?? 0) || undefined })
-        this.hub.emit({ t: 'turn_end', reason: stop === 'cancelled' ? 'interrupted' : stop === 'refusal' ? 'error' : 'done', ...(stop === 'refusal' ? { error: 'the agent refused' } : {}) })
+        this.finish({ t: 'turn_end', reason: this.cancelling || stop === 'cancelled' ? 'interrupted' : stop === 'refusal' ? 'error' : 'done', ...(stop === 'refusal' ? { error: 'the agent refused' } : {}) })
       })
       .catch((err: unknown) => {
         const msg = err instanceof RpcFailure ? err.rpc.message : err instanceof Error ? err.message : String(err)
-        this.hub.emit({ t: 'turn_end', reason: 'error', error: msg })
+        this.finish(this.cancelling ? { t: 'turn_end', reason: 'interrupted' } : { t: 'turn_end', reason: 'error', error: msg })
       })
-      .finally(() => { this.prompting = null; void n })
+
+  }
+
+  private cancelPermissions(): void {
+    for (const p of this.perms.values()) p.resolve({ outcome: { outcome: 'cancelled' } })
+    this.perms.clear()
+  }
+
+  private finish(event: Extract<AgentEvent, { t: 'turn_end' }>): void {
+    this.prompting = null
+    this.cancelPermissions()
+    this.tools.clear()
+    this.hub.emit(event)
   }
 
   async interrupt(): Promise<void> {
-    for (const [id, p] of this.perms) { p.resolve({ outcome: { outcome: 'cancelled' } }); this.perms.delete(id) }
-    if (!this.prompting) return
+    this.cancelling = true
+    this.cancelPermissions()
+    const pending = this.prompting
+    if (!pending) return
     this.peer.notify('session/cancel', { sessionId: this.sessionId })
-    await Promise.race([this.prompting, new Promise((r) => setTimeout(r, 4000))])
+    const timer = setTimeout(() => this.peer.kill(), 4000)
+    try { await pending } finally { clearTimeout(timer) }
   }
 
   respond(reqId: string, answer: PermDecision | string): void {
@@ -85,20 +111,32 @@ export class AcpSession implements AgentSession {
     this.hub.emit({ t: 'status', phase: 'thinking' })
   }
 
-  setMode(mode: Mode): void {
+  async configureMode(mode: Mode): Promise<void> {
     const modeId = this.opts.modeMap?.[mode]
-    if (modeId) void this.peer.request('session/set_mode', { sessionId: this.sessionId, modeId }).catch(() => {})
+    if (modeId) await this.peer.request('session/set_mode', { sessionId: this.sessionId, modeId }, 30_000)
+  }
+
+  setMode(mode: Mode): void {
+    this.modeReady = this.modeReady.then(() => this.configureMode(mode)).then(
+      () => { this.modeError = undefined },
+      (err: unknown) => { this.modeError = err }
+    )
   }
 
   async dispose(): Promise<void> {
     this.hub.closed = true
+    this.cancelPermissions()
     this.peer.kill()
+    await this.prompting
   }
 
   // ---- agent -> client ----
 
   private async onAgentRequest(method: string, p: Obj): Promise<unknown> {
-    if (method === 'session/request_permission') return this.onPermission(p)
+    if (method === 'session/request_permission') {
+      if (p?.['sessionId'] !== this.sessionId || this.cancelling || this.hub.closed) return { outcome: { outcome: 'cancelled' } }
+      return this.onPermission(p)
+    }
     throw new Error(`unsupported client method ${method}`)
   }
 
@@ -160,7 +198,7 @@ export class AcpSession implements AgentSession {
   private onTool(u: Obj, isUpdate: boolean): void {
     const id = String(u['toolCallId'])
     const prev = this.tools.get(id)
-    const raw = { ...((prev ? {} : {}) as Obj), ...((u['rawInput'] ?? {}) as Obj) }
+    const raw = (u['rawInput'] ?? {}) as Obj
     const status = String(u['status'] ?? (isUpdate ? 'in_progress' : 'pending'))
     const done = status === 'completed' || status === 'failed'
     const text = ((u['content'] as Obj[]) ?? [])

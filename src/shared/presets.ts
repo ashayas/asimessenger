@@ -28,3 +28,13 @@ export interface DetectedPreset {
   path: string | null
   version: string | null
 }
+
+/** Split a shell-style flag string into individual arguments, stripping matching outer quotes. */
+export function splitArgs(cmdline: string): string[] {
+  return (
+    cmdline
+      .trim()
+      .match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)
+      ?.map((p) => ((p.startsWith('"') && p.endsWith('"')) || (p.startsWith("'") && p.endsWith("'")) ? p.slice(1, -1) : p)) ?? []
+  )
+}

@@ -15,6 +15,7 @@ export interface Harness {
 export async function launchApp(opts: { seed?: boolean; toasts?: boolean; onboarding?: boolean; userData?: string; env?: Record<string, string> } = {}): Promise<Harness> {
   const userData = opts.userData ?? mkdtempSync(join(tmpdir(), 'asi-e2e-'))
   const env = { ...process.env, ASI_USER_DATA: userData, ...(opts.seed ? {} : { ASI_NO_SEED: '1' }), ...(opts.toasts ? {} : { ASI_NO_TOAST: '1' }), ASI_NO_AUTOCLOSE: '1', ...(opts.onboarding ? {} : { ASI_SKIP_ONBOARDING: '1' }), ...opts.env } as Record<string, string>
+  delete env['ELECTRON_RUN_AS_NODE']
   const h: Harness = {
     app: await electron.launch({ args: ['.'], env }),
     win: undefined as unknown as Page,

@@ -8,14 +8,35 @@ knows those events, so a new harness never needs UI work.
 |---|---|---|
 | `claude` | `claude -p` stream-json + `--permission-prompt-tool stdio` | Claude Code |
 | `codex` | `codex app-server` JSON-RPC | Codex |
+| `agy` | `agy -p= --input-format stream-json --output-format stream-json` | Antigravity CLI |
 | `pi` | `pi --mode rpc` (JSONL) + a bundled gate extension | Pi |
 | `acp` | Agent Client Protocol over stdio | OpenCode, Hermes, anything ACP |
 | `pty` | a real pseudo-terminal | any CLI with no protocol |
 | `http` | manifest-driven HTTP (SSE / NDJSON / JSON) | hosted agents |
 | `asi`, `echo`, `fake` | in-process | ASI, a smoke-test friend, tests |
 
-All structured harnesses also get **ASI's MCP tools** (`ask_user`, `send_attachment`, `open_url`, `open_drawing`,
+Claude, Codex, Pi, and compatible ACP harnesses also get **ASI's MCP tools** (`ask_user`, `send_attachment`, `open_url`, `open_drawing`,
 `set_status`) injected, so questions and attachments behave the same everywhere.
+
+## ACP
+
+ASI negotiates ACP version 1 and rejects incompatible versions. Initialize and session setup have 30-second deadlines; normal model turns remain unbounded until interrupted. Cancellation resolves outstanding permission requests as cancelled and waits for the prompt result. If the agent ignores cancellation for four seconds, ASI closes its process and resumes the saved session on the next message. Disconnects emit one terminal error, and updates from another session are ignored.
+
+OpenCode's preset injects launch-time permissions: Ask requests edits and commands, Auto-edit permits edits while asking for commands, Plan denies edits, and Dangerous permits all tools. A mode change restarts the adapter with the new policy. Generic ACP agents must supply their own permission policy or a configured mode map; ACP itself does not define ASI's four permission modes. HTTP MCP tools are injected only when the agent advertises support. Unsupported image input is rejected explicitly.
+
+Regression coverage includes stalled startup, incompatible versions, broken pipes, ignored cancellation, pending approvals, reconnect, and image capabilities. Real OpenCode tests exercise approvals, mode changes, MCP, and resume. See [ACP v1 prompt lifecycle](https://agentclientprotocol.com/protocol/v1/prompt-turn).
+
+## Antigravity
+
+Agy uses a persistent stream-json process. Auto-edit passes `--mode accept-edits`; Dangerous passes
+`--dangerously-skip-permissions` after the global and friend opt-ins. Mode changes restart the process while resuming the
+conversation. A live contract test in `test/live/agy.live.test.ts` checks replies, mode switching, file writes, and shell commands.
+
+Headless Ask mode reports denied actions instead of pausing for approval. The app shows these as cards; accepting one temporarily
+adds the exact rule to Agy's settings and restarts the conversation to retry it. Settings updates are serialized across chats and
+existing user rules are preserved. Allow-once rules are removed at turn end and the process is refreshed before the next prompt
+so cached grants cannot carry into that turn. These rules are in Agy's shared settings: they are not isolated from other Agy
+processes launched while a grant exists. Agy does not currently receive the app's MCP tools.
 
 ## Pi
 

@@ -12,6 +12,7 @@ interface ChatState {
   /** event id -> persisted message id (text, thinking, tool upserts) */
   byEventId: Map<string, string>
   textBuf: Map<string, string>
+  dirtyText: Set<string>
   flushTimer: ReturnType<typeof setTimeout> | null
   lettering: Lettering | null
 }
@@ -33,18 +34,20 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
   const queues = new Map<string, Promise<void>>()
   const state = (chatId: string): ChatState => {
     let s = states.get(chatId)
-    if (!s) states.set(chatId, (s = { byEventId: new Map(), textBuf: new Map(), flushTimer: null, lettering: null }))
+    if (!s) states.set(chatId, (s = { byEventId: new Map(), textBuf: new Map(), dirtyText: new Set(), flushTimer: null, lettering: null }))
     return s
   }
 
   async function flush(chatId: string): Promise<void> {
     const s = state(chatId)
     if (s.flushTimer) { clearTimeout(s.flushTimer); s.flushTimer = null }
-    for (const [eventId, text] of s.textBuf) {
+    if (!s.dirtyText.size) return
+    for (const eventId of s.dirtyText) {
+      const text = s.textBuf.get(eventId)!
       const mid = s.byEventId.get(eventId)
       if (mid) await repo.messages.update(mid, { text, body: { text } })
     }
-    s.textBuf.clear()
+    s.dirtyText.clear()
     notify('messages')
   }
 
@@ -73,7 +76,11 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
           notify('messages')
         } else {
           s.textBuf.set(key, text)
-          if (!s.flushTimer) s.flushTimer = setTimeout(() => void flush(chatId), 80)
+          s.dirtyText.add(key)
+          if (!s.flushTimer) s.flushTimer = setTimeout(() => {
+            s.flushTimer = null
+            void enqueue(chatId, () => flush(chatId))
+          }, 80)
         }
         return
       }
@@ -148,6 +155,7 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
       case 'turn_end': {
         await flush(chatId)
         s.byEventId.clear()
+        s.textBuf.clear()
         const style = await lettering(chatId)
         const text = e.reason === 'interrupted' ? statusLine({ phase: 'stopped' }, style) : e.reason === 'error' ? statusLine({ phase: 'error', detail: e.error ?? 'error' }, style) : statusLine({ phase: 'done' }, style)
         if (e.reason === 'error') await repo.messages.append({ chatId, role: 'system', kind: 'error', body: { error: e.error ?? 'error' }, text: e.error ?? 'error' })
@@ -164,13 +172,17 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
     }
   }
 
+  function enqueue(chatId: string, task: () => Promise<void>): Promise<void> {
+    const prev = queues.get(chatId) ?? Promise.resolve()
+    const next = prev.then(task).catch((err) => console.error('[ingest]', err))
+    queues.set(chatId, next)
+    return next
+  }
+
   return {
     /** Queue an event; resolves once it has been persisted. */
     ingest(chatId: string, e: AgentEvent): Promise<void> {
-      const prev = queues.get(chatId) ?? Promise.resolve()
-      const next = prev.then(() => handle(chatId, e)).catch((err) => console.error('[ingest]', err))
-      queues.set(chatId, next)
-      return next
+      return enqueue(chatId, () => handle(chatId, e))
     },
     async idle(chatId: string): Promise<void> {
       await queues.get(chatId)

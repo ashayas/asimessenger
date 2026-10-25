@@ -47,6 +47,7 @@ export class CodexSession implements AgentSession {
   private pending = new Map<string, { resolve(v: unknown): void; kind: 'command' | 'file' | 'question' | 'permissions'; params: Obj }>()
   private active = false
   private interrupting = false
+  private dead = false
   /** Codex reports cumulative per-thread counters; we publish what each update added. */
   private prevTotal: Obj | null = null
 
@@ -54,10 +55,16 @@ export class CodexSession implements AgentSession {
     this.mode = o.mode
     peer.onNotification((m, p) => this.onNotification(m, (p ?? {}) as Obj))
     peer.onRequest((m, p) => this.onServerRequest(m, (p ?? {}) as Obj))
-    peer.onClose((reason) => { if (this.active) { this.active = false; this.hub.emit({ t: 'turn_end', reason: 'error', error: reason }) } })
+    peer.onClose((reason) => {
+      this.dead = true
+      this.pending.clear()
+      if (this.active) { this.active = false; this.hub.emit({ t: 'turn_end', reason: 'error', error: reason }) }
+    })
   }
 
   get resumeId(): string { return this.threadId }
+  get busy(): boolean { return this.active }
+  get closed(): boolean { return this.hub.closed || this.dead }
 
   static async create(o: CodexOptions): Promise<CodexSession> {
     const mcpArgs = o.mcp

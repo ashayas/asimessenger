@@ -45,7 +45,7 @@ async function run(factory: HarnessFactory, over: Record<string, unknown>, start
 async function runViaManager(factory: HarnessFactory, over: Record<string, unknown>) {
   const events: AgentEvent[] = []
   const manager = new HarnessManager({ onEvent: (_id, e) => events.push(e) })
-  manager.register('x' as never, factory)
+  manager.register((over.harness ?? 'x') as never, factory)
   const friend = friendFor({ dangerousAllowed: true, harness: 'x', ...over }) as never
   const chat = { id: 'c', harnessSessionId: null as string | null, mode: 'ask' as Mode } as never
   const waitEnd = async (n: number) => { for (let i = 0; i < 150 && events.filter((e) => e.t === 'turn_end').length < n; i++) { for (const e of events) if (e.t === 'permission' && !(e as { seen?: boolean }).seen) { (e as { seen?: boolean }).seen = true; manager.respond('c', e.reqId, 'allow-once') } await new Promise((r) => setTimeout(r, 1000)) } }
@@ -64,7 +64,7 @@ async function runViaManager(factory: HarnessFactory, over: Record<string, unkno
 
 const AGENTS: { name: string; bin: string; make: () => HarnessFactory; over: Record<string, unknown> }[] = [
   { name: 'claude', bin: 'claude', make: () => claudeFactory, over: { harness: 'claude', args: ['--model', 'haiku'] } },
-  { name: 'codex', bin: 'codex', make: () => codexFactory, over: { harness: 'codex' } },
+  { name: 'codex', bin: 'codex', make: () => codexFactory, over: { harness: 'codex', args: ['-c', 'model="gpt-5.6-luna"', '-c', 'model_reasoning_effort="low"'] } },
   { name: 'opencode (ACP)', bin: 'opencode', make: () => acpFactory(OPENCODE), over: {} },
   { name: 'pi', bin: 'pi', make: () => piFactory, over: { harness: 'pi', args: ['--provider', 'openrouter', '--model', 'anthropic/claude-haiku-4.5'] } }
 ]

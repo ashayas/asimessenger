@@ -18,7 +18,14 @@ function onChanged(cb: (topic: string) => void): () => void {
 const pickFolder = (): Promise<string | null> => ipcRenderer.invoke('dialog:pick-folder')
 
 const chat = {
-  send: (chatId: string, text: string, quote?: { name: string; text: string }): Promise<unknown> => ipcRenderer.invoke('chat:send', chatId, text, quote),
+  send: (chatId: string, text: string, quote?: { name: string; text: string }, targetParticipantId?: string): Promise<unknown> => ipcRenderer.invoke('chat:send', chatId, text, quote, targetParticipantId),
+  invite: (chatId: string, friendId: string, role?: string, customName?: string): Promise<unknown> => ipcRenderer.invoke('chat:invite', chatId, friendId, role, customName),
+  removeParticipant: (chatId: string, participantId: string): Promise<void> => ipcRenderer.invoke('chat:remove-participant', chatId, participantId),
+  setGoal: (chatId: string, goal: string | null): Promise<string> => ipcRenderer.invoke('chat:set-goal', chatId, goal),
+  openBoard: (chatId: string): Promise<string> => ipcRenderer.invoke('chat:open-board', chatId),
+  boardPath: (chatId: string): Promise<string> => ipcRenderer.invoke('chat:board-path', chatId),
+  readBoard: (chatId: string, filter?: { grep?: string; agentId?: string; type?: string; limit?: number }): Promise<string> => ipcRenderer.invoke('chat:read-board', chatId, filter),
+  appendBoard: (chatId: string, participantId: string | undefined, entry: { type?: string; summary: string; detail?: string }): Promise<string> => ipcRenderer.invoke('chat:append-board', chatId, participantId, entry),
   setMode: (chatId: string, mode: string): Promise<void> => ipcRenderer.invoke('chat:set-mode', chatId, mode),
   nudge: (chatId: string): Promise<boolean> => ipcRenderer.invoke('chat:nudge', chatId),
   openNextUnread: (): Promise<string | null> => ipcRenderer.invoke('chat:open-next-unread'),

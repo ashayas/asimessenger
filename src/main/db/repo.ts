@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { Db } from './db'
 import { canReplaceTitle, type TitleSource } from '@shared/title'
 import type { UsageGroup, UsageTotals } from '@shared/usage'
-import type { Chat, Friend, HarnessKind, Label, Message, MessageRole, Mode, SearchHit, Workspace } from '@shared/models'
+import type { BoardEntry, BoardEntryType, Chat, ChatParticipant, Friend, HarnessKind, Label, Message, MessageRole, Mode, SearchHit, Workspace } from '@shared/models'
 import type { Presence } from '@shared/status'
 
 type Row = Record<string, unknown>
@@ -23,9 +23,33 @@ const toFriend = (r: Row): Friend => ({
 })
 const toChat = (r: Row): Chat => ({
   id: String(r['id']), workspaceId: String(r['workspace_id']), friendId: String(r['friend_id']),
-  title: String(r['title']), titleSource: ((r['title_source'] as string | null) ?? 'user') as TitleSource, worktreePath: (r['worktree_path'] as string | null) ?? null, branch: (r['branch'] as string | null) ?? null, harnessSessionId: (r['harness_session_id'] as string | null) ?? null,
+  title: String(r['title']), titleSource: ((r['title_source'] as string | null) ?? 'user') as TitleSource,
+  goal: (r['goal'] as string | null) ?? null,
+  worktreePath: (r['worktree_path'] as string | null) ?? null, branch: (r['branch'] as string | null) ?? null, harnessSessionId: (r['harness_session_id'] as string | null) ?? null,
   status: r['status'] as Presence, statusText: (r['status_text'] as string | null) ?? null, mode: (r['mode'] as Mode) ?? 'ask', unreadCount: Number(r['unread_count']),
   createdAt: Number(r['created_at']), lastActivityAt: Number(r['last_activity_at'])
+})
+const toParticipant = (r: Row): ChatParticipant => ({
+  id: String(r['id']),
+  chatId: String(r['chat_id']),
+  friendId: String(r['friend_id']),
+  agentId: String(r['agent_id']),
+  displayName: String(r['display_name']),
+  role: (r['role'] as string | null) ?? null,
+  harnessSessionId: (r['harness_session_id'] as string | null) ?? null,
+  status: (r['status'] as Presence) ?? 'online',
+  statusText: (r['status_text'] as string | null) ?? null,
+  createdAt: Number(r['created_at'])
+})
+const toBoardEntry = (r: Row): BoardEntry => ({
+  seq: Number(r['seq']),
+  chatId: String(r['chat_id']),
+  agentId: String(r['agent_id']),
+  agentName: String(r['agent_name']),
+  entryType: String(r['entry_type']) as BoardEntryType,
+  summary: String(r['summary']),
+  detail: (r['detail'] as string | null) ?? null,
+  createdAt: Number(r['created_at'])
 })
 const toMessage = (r: Row): Message => ({
   id: String(r['id']), chatId: String(r['chat_id']), role: r['role'] as MessageRole, kind: String(r['kind']),
@@ -204,6 +228,9 @@ export function createRepo(db: Db) {
       async setMode(id: string, mode: Mode): Promise<void> {
         await run('UPDATE chats SET mode = ? WHERE id = ?', [mode, id])
       },
+      async setGoal(id: string, goal: string | null): Promise<void> {
+        await run('UPDATE chats SET goal = ? WHERE id = ?', [goal, id])
+      },
       async setSession(id: string, sessionId: string | null): Promise<void> {
         await run('UPDATE chats SET harness_session_id = ? WHERE id = ?', [sessionId, id])
       },
@@ -216,6 +243,78 @@ export function createRepo(db: Db) {
       },
       async remove(id: string): Promise<void> {
         await run('DELETE FROM chats WHERE id = ?', [id])
+      }
+    },
+
+    participants: {
+      async list(chatId: string): Promise<ChatParticipant[]> {
+        return (await all('SELECT * FROM chat_participants WHERE chat_id = ? ORDER BY created_at, rowid', [chatId])).map(toParticipant)
+      },
+      async get(id: string): Promise<ChatParticipant | null> {
+        const r = (await all('SELECT * FROM chat_participants WHERE id = ?', [id]))[0]
+        return r ? toParticipant(r) : null
+      },
+      async add(p: { chatId: string; friendId: string; agentId: string; displayName: string; role?: string | null; harnessSessionId?: string | null }): Promise<ChatParticipant> {
+        const id = randomUUID()
+        const t = now()
+        await run(
+          'INSERT INTO chat_participants(id,chat_id,friend_id,agent_id,display_name,role,harness_session_id,status,status_text,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
+          [id, p.chatId, p.friendId, p.agentId, p.displayName, p.role ?? null, p.harnessSessionId ?? null, 'online', null, t]
+        )
+        return (await this.get(id))!
+      },
+      async setRole(id: string, role: string | null): Promise<void> {
+        await run('UPDATE chat_participants SET role = ? WHERE id = ?', [role, id])
+      },
+      async setSession(id: string, sessionId: string | null): Promise<void> {
+        await run('UPDATE chat_participants SET harness_session_id = ? WHERE id = ?', [sessionId, id])
+      },
+      async setStatus(id: string, status: Presence, statusText: string | null = null): Promise<void> {
+        await run('UPDATE chat_participants SET status = ?, status_text = ? WHERE id = ?', [status, statusText, id])
+      },
+      async remove(id: string): Promise<void> {
+        await run('DELETE FROM chat_participants WHERE id = ?', [id])
+      }
+    },
+
+    board: {
+      async list(chatId: string, opts: { limit?: number; agentId?: string; entryType?: string; grep?: string } = {}): Promise<BoardEntry[]> {
+        const where = ['chat_id = ?']
+        const args: (string | number)[] = [chatId]
+        if (opts.agentId) {
+          where.push('agent_id = ?')
+          args.push(opts.agentId)
+        }
+        if (opts.entryType) {
+          where.push('entry_type = ?')
+          args.push(opts.entryType)
+        }
+        const rows = await all(`SELECT * FROM board_entries WHERE ${where.join(' AND ')} ORDER BY seq ASC`, args)
+        let entries = rows.map(toBoardEntry)
+        if (opts.grep && opts.grep.trim()) {
+          const needle = opts.grep.trim().toLowerCase()
+          entries = entries.filter(
+            (e) =>
+              e.agentId.toLowerCase().includes(needle) ||
+              e.agentName.toLowerCase().includes(needle) ||
+              e.entryType.toLowerCase().includes(needle) ||
+              e.summary.toLowerCase().includes(needle) ||
+              (e.detail?.toLowerCase().includes(needle) ?? false)
+          )
+        }
+        return opts.limit ? entries.slice(-opts.limit) : entries
+      },
+      async append(e: { chatId: string; agentId: string; agentName: string; entryType: BoardEntryType; summary: string; detail?: string | null }): Promise<BoardEntry> {
+        const t = now()
+        const res = await run(
+          'INSERT INTO board_entries(chat_id,agent_id,agent_name,entry_type,summary,detail,created_at) VALUES (?,?,?,?,?,?,?)',
+          [e.chatId, e.agentId, e.agentName, e.entryType, e.summary, e.detail ?? null, t]
+        )
+        const seq = Number(res.lastInsertRowid)
+        const r = (await all('SELECT * FROM board_entries WHERE seq = ?', [seq]))[0]
+        return r
+          ? toBoardEntry(r)
+          : { seq, chatId: e.chatId, agentId: e.agentId, agentName: e.agentName, entryType: e.entryType, summary: e.summary, detail: e.detail ?? null, createdAt: t }
       }
     },
 

@@ -28,7 +28,7 @@ test('handshake and tool listing', async () => {
   const init = await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' } })
   expect(init.body.result).toMatchObject({ protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'asi-messenger' } })
   const list = await rpc('tools/list')
-  expect(list.body.result.tools.map((t: { name: string }) => t.name)).toEqual(['ask_user', 'send_attachment', 'open_url', 'open_drawing', 'set_status'])
+  expect(list.body.result.tools.map((t: { name: string }) => t.name)).toEqual(['ask_user', 'send_attachment', 'open_url', 'open_drawing', 'set_status', 'board_append', 'board_read'])
   expect((await rpc('nope')).body.error.code).toBe(-32601)
 })
 

@@ -1,6 +1,7 @@
 import { fileBadge, fmtBytes, imageMime, MAX_FILE_BYTES } from '@shared/attachments'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Chat, Friend, Message } from '@shared/models'
+import type { BoardEntry, Chat, ChatParticipant, Friend, Message } from '@shared/models'
+import { formatBoardEntry } from '@shared/board'
 import { avatarFor } from '@shared/harness-meta'
 import { isBuiltin, liveFor } from '@shared/grouping'
 import { useQueued } from './queue-hooks'
@@ -26,6 +27,8 @@ function useChat(chatId: string) {
   const [chat, setChat] = useState<Chat | null>(null)
   const [friend, setFriend] = useState<Friend | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [participants, setParticipants] = useState<ChatParticipant[]>([])
+  const [boardEntries, setBoardEntries] = useState<BoardEntry[]>([])
 
   const load = useCallback(async () => {
     const c = await window.asi.api.chats.get(chatId)
@@ -33,6 +36,8 @@ function useChat(chatId: string) {
     if (c) {
       setFriend(await window.asi.api.friends.get(c.friendId))
       setMessages(await window.asi.api.messages.list(chatId))
+      setParticipants(await window.asi.api.participants.list(chatId))
+      setBoardEntries(await window.asi.api.board.list(chatId))
     }
   }, [chatId])
 
@@ -40,7 +45,7 @@ function useChat(chatId: string) {
     void load()
     return window.asi.onChanged(() => void load())
   }, [load])
-  return { chat, friend, messages }
+  return { chat, friend, messages, participants, boardEntries }
 }
 
 /** Unsent text survives switching tabs (only the active tab is mounted). */
@@ -50,13 +55,14 @@ const drafts = new Map<string, string>()
 const clientLastNudge = new Map<string, number>()
 
 export function ChatWindow({ chatId, embedded = false }: { chatId: string; embedded?: boolean }) {
-  const { chat, friend, messages } = useChat(chatId)
+  const { chat, friend, messages, participants, boardEntries } = useChat(chatId)
   const chatUsage = useChatUsage(chatId)
   const queued = useQueued(chatId)
   /** While on, Enter holds your message until the agent finishes instead of sending it straight away. */
   const [autoQueue, setAutoQueue] = useState(false)
   const profile = useData((s) => s.profile)
   const allChats = useData((s) => s.chats)
+  const allFriends = useData((s) => s.friends)
   const workspaces = useData((s) => s.workspaces)
   const [draft, setDraftState] = useState(() => drafts.get(chatId) ?? '')
   const setDraft = useCallback((v: string | ((d: string) => string)) => setDraftState((d) => { const n = typeof v === 'function' ? v(d) : v; drafts.set(chatId, n); return n }), [chatId])
@@ -66,6 +72,15 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
   const [renaming, setRenaming] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [drawer, setDrawer] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteFriendId, setInviteFriendId] = useState('')
+  const [inviteRole, setInviteRole] = useState('')
+  const [goalDraft, setGoalDraft] = useState('')
+  const [goalDirty, setGoalDirty] = useState(false)
+  const [targetParticipantId, setTargetParticipantId] = useState<string>('')
+  const [showBoardLog, setShowBoardLog] = useState(false)
+  const [boardGrep, setBoardGrep] = useState('')
+  const [boardPath, setBoardPath] = useState<string | null>(null)
   /** Pictures and files waiting to go out with the next message (dropped, pasted). */
   const [pending, setPending] = useState<{ id: string; name: string; path: string; preview?: string; size?: number }[]>([])
   const [dropping, setDropping] = useState(false)
@@ -73,6 +88,20 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
   const [deleting, setDeleting] = useState<{ branch: string | null; dirty: number; isolated: boolean } | null>(null)
   const chatLabelIds = useData((s) => s.chatLabels[chatId] ?? NO_LABELS)
   const workspace = useMemo(() => workspaces.find((w) => w.id === chat?.workspaceId) ?? null, [workspaces, chat?.workspaceId])
+
+  useEffect(() => {
+    if (!goalDirty) setGoalDraft(chat?.goal ?? '')
+  }, [chat?.goal, goalDirty])
+
+  useEffect(() => {
+    if (!inviteFriendId && friend) setInviteFriendId(friend.id)
+  }, [inviteFriendId, friend])
+
+  useEffect(() => {
+    if (inviteOpen || participants.length > 0 || chat?.goal) {
+      void window.asi.chat.boardPath(chatId).then(setBoardPath).catch(() => {})
+    }
+  }, [inviteOpen, participants.length, chat?.goal, chatId])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -172,6 +201,12 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
     void window.asi.chat.nudge(chatId)
   }, [chatId])
 
+  const filteredBoardEntries = useMemo(() => {
+    const q = boardGrep.trim().toLowerCase()
+    if (!q) return boardEntries
+    return boardEntries.filter((e) => formatBoardEntry(e).toLowerCase().includes(q))
+  }, [boardEntries, boardGrep])
+
   const Frame = embedded ? EmbeddedFrame : WindowFrame
   if (!chat || !friend) return <Frame title="ASI Messenger"><div className="empty">Loading…</div></Frame>
 
@@ -184,6 +219,18 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
     setModeNote(null)
     if (!canUseMode(m, safety)) return setModeNote(lockedReason(safety))
     try { await window.asi.chat.setMode(chatId, m) } catch (err) { setModeNote(err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : String(err)) }
+  }
+
+  const handleInvite = async () => {
+    const fId = inviteFriendId || friend.id
+    await window.asi.chat.invite(chatId, fId, inviteRole.trim() || undefined)
+    setInviteRole('')
+  }
+
+  const handleSaveGoal = async () => {
+    const p = await window.asi.chat.setGoal(chatId, goalDraft.trim() || null)
+    setBoardPath(p)
+    setGoalDirty(false)
   }
 
   const send = () => {
@@ -200,21 +247,29 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
     const slash = /^\/queue\s+([\s\S]+)$/.exec(text)
     if (slash) return void window.asi.chat.queue(chatId, slash[1]!)
     if (autoQueue && (presence === 'busy' || presence === 'away')) return void window.asi.chat.queue(chatId, text)
-    void window.asi.chat.send(chatId, text)
+    void window.asi.chat.send(chatId, text, undefined, targetParticipantId || undefined)
   }
 
   // group consecutive messages by the same speaker under one "X says:"
-  const blocks: { role: Message['role']; items: Message[] }[] = []
+  const blocks: { role: Message['role']; speaker: string; items: Message[] }[] = []
   for (const m of messages) {
+    const sp =
+      m.role === 'user'
+        ? profile.name
+        : m.role === 'system'
+          ? 'ASI'
+          : ((m.body as { speaker?: { speakerName?: string } } | null)?.speaker?.speakerName ?? friend.displayName)
     const last = blocks[blocks.length - 1]
-    if (last && last.role === m.role) last.items.push(m)
-    else blocks.push({ role: m.role, items: [m] })
+    if (last && last.role === m.role && last.speaker === sp) last.items.push(m)
+    else blocks.push({ role: m.role, speaker: sp, items: [m] })
   }
+
+  const isMultiAgent = participants.length > 0 || !!(chat.goal && chat.goal.trim())
 
   return (
     <Frame title={`${chat.mode === 'dangerous' ? '⚠ DANGEROUS · ' : ''}${chat.title} · ${friend.displayName} · Conversation`} danger={chat.mode === 'dangerous'}>
       <div className="toolbar">
-        <ToolButton icon="👥" label="Invite" disabled />
+        <ToolButton icon="👥" label="Invite" onClick={() => setInviteOpen((v) => !v)} />
         <ToolButton icon="📎" label="Send Files" onClick={() => void window.asi.attachments.pickFiles().then(async (paths) => { if (paths.length) await window.asi.attachments.sendFiles(chatId, paths) })} />
         <ToolButton icon="✏️" label="Doodle" onClick={() => void window.asi.doodle.open(chat.workspaceId, { chatId })} />
         <ToolButton icon="🌐" label="Browser" onClick={() => void window.asi.browser.open('about:blank')} />
@@ -224,8 +279,23 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
       </div>
       <div className="to">
         <b>To:</b> {friend.displayName} <StatusDot presence={presence} />
+        {participants.length > 1 ? (
+          <span className="participant-summary" data-testid="participant-summary">
+            +{participants.length - 1} invited ({participants.map((p) => p.agentId).join(', ')})
+          </span>
+        ) : null}
         {live?.message ? <span className={friend.letteringStyle === 'plain' ? '' : 'funky'}> — {live.message}</span> : null}
         <span className="grow" />
+        {isMultiAgent ? (
+          <button
+            className="linkish"
+            data-testid="toggle-board-btn"
+            onClick={() => { setInviteOpen(true); setShowBoardLog((v) => !v) }}
+            title={boardPath ? `Shared session board: ${boardPath}` : 'Open shared session board'}
+          >
+            📋 Board ({boardEntries.length})
+          </button>
+        ) : null}
         {chatUsage && chatUsage.calls > 0 ? <span className="chat-usage" data-testid="chat-usage" title={`input ${fmtTokens(chatUsage.inputTokens)} · output ${fmtTokens(chatUsage.outputTokens)} · cached ${fmtTokens(chatUsage.cacheReadTokens + chatUsage.cacheWriteTokens)}${chatUsage.pricedCalls === 0 ? ` · this agent does not report cost` : ''}`}>{spendLine(chatUsage)}</span> : null}
         {workspace ? <span className="branch" data-testid="workspace-chip" title={chat.worktreePath ?? workspace.path}>📁 {workspace.name}</span> : null}
         {chat.branch ? <span className="branch" data-testid="branch" title={`Works in its own worktree: ${chat.worktreePath}`}>⎇ {chat.branch}</span> : null}
@@ -257,6 +327,110 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
         <button className="linkish" onClick={() => setEditingLabels((v) => !v)} title="Label this chat (⌘L)">🏷 Label</button>
         <button className="linkish" onClick={() => void window.asi.chat.worktreeInfo(chatId).then(setDeleting)} title="Delete this chat">🗑 Delete</button>
       </div>
+      {inviteOpen ? (
+        <div className="invite-panel" data-testid="invite-panel">
+          <div className="invite-row">
+            <label className="invite-lbl">Goal:</label>
+            <input
+              className="field grow"
+              aria-label="Session goal"
+              placeholder="Overall goal for all collaborating agents (placed at the top of the shared log file)…"
+              value={goalDraft}
+              onChange={(e) => { setGoalDraft(e.target.value); setGoalDirty(true) }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleSaveGoal() } }}
+            />
+            <Btn onClick={() => void handleSaveGoal()}>Save Goal</Btn>
+            <button className="linkish" onClick={() => setShowBoardLog((v) => !v)}>{showBoardLog ? 'Hide Log' : `View Log (${boardEntries.length})`}</button>
+            {boardPath ? (
+              <button className="linkish" onClick={() => void window.asi.chat.openBoard(chatId)} title={boardPath}>Open .log</button>
+            ) : null}
+            <button className="linkish" aria-label="Close invite panel" onClick={() => setInviteOpen(false)}>✕</button>
+          </div>
+          <div className="invite-row">
+            <label className="invite-lbl">Invite:</label>
+            <select
+              className="field"
+              aria-label="Invite friend"
+              value={inviteFriendId}
+              onChange={(e) => setInviteFriendId(e.target.value)}
+            >
+              {allFriends.map((f) => (
+                <option key={f.id} value={f.id}>{f.displayName} ({f.harness})</option>
+              ))}
+            </select>
+            <input
+              className="field grow"
+              aria-label="Agent role"
+              placeholder="Optional role / focus (e.g. backend, tests, security reviewer)…"
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleInvite() } }}
+            />
+            <Btn kind="primary" onClick={() => void handleInvite()}>+ Add Agent</Btn>
+          </div>
+          {participants.length > 0 ? (
+            <div className="invite-roster" data-testid="participant-roster">
+              {participants.map((p, idx) => (
+                <span key={p.id} className="participant-chip" data-testid="participant-chip" data-agent-id={p.agentId}>
+                  <StatusDot presence={p.status} />
+                  <b>{p.displayName}</b>
+                  <code className="agent-id-badge">{p.agentId}</code>
+                  {p.role ? <span className="participant-role">· {p.role}</span> : null}
+                  {idx > 0 ? (
+                    <button
+                      className="chip-rm"
+                      aria-label={`Remove ${p.displayName}`}
+                      title={`Remove ${p.displayName} (${p.agentId})`}
+                      onClick={() => void window.asi.chat.removeParticipant(chatId, p.id)}
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </span>
+              ))}
+              {participants.length > 1 ? (
+                <span className="target-picker">
+                  <label>Send to:</label>{' '}
+                  <select
+                    className="field"
+                    aria-label="Send target"
+                    value={targetParticipantId}
+                    onChange={(e) => setTargetParticipantId(e.target.value)}
+                  >
+                    <option value="">All agents ({participants.length})</option>
+                    {participants.map((p) => (
+                      <option key={p.id} value={p.id}>{p.displayName} (@{p.agentId})</option>
+                    ))}
+                  </select>
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          {showBoardLog ? (
+            <div className="board-log-box" data-testid="board-log-box">
+              <div className="board-log-bar">
+                <span className="board-path" title={boardPath ?? ''}>📄 {boardPath ?? `.boards/${chatId}.log`}</span>
+                <input
+                  className="field"
+                  style={{ width: 220, minHeight: 20, padding: '1px 6px' }}
+                  aria-label="Grep board"
+                  placeholder="grep filter (e.g. AGENT=claude-1)…"
+                  value={boardGrep}
+                  onChange={(e) => setBoardGrep(e.target.value)}
+                />
+              </div>
+              <pre className="board-log-pre" data-testid="board-log-pre">
+                {[
+                  `# GOAL: ${chat.goal?.trim() || '(none)'}`,
+                  ...participants.map((p) => `# AGENT_ROSTER: agent_id=${p.agentId} | name="${p.displayName}" | role="${p.role ?? 'general'}"`),
+                  '# [LOG]',
+                  ...(filteredBoardEntries.length > 0 ? filteredBoardEntries.map((e) => formatBoardEntry(e)) : ['# (no matching board entries yet)'])
+                ].join('\n')}
+              </pre>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {deleting ? (
         <div className="mode-note" role="alert" data-testid="delete-confirm">
           <span className="grow">
@@ -275,7 +449,7 @@ export function ChatWindow({ chatId, embedded = false }: { chatId: string; embed
           {blocks.length === 0 && <div className="empty">Say something to {friend.displayName}.</div>}
           {blocks.map((b, i) => (
             <div key={i} className="block" data-role={b.role}>
-              <div className="says"><b>{b.role === 'user' ? profile.name : b.role === 'agent' ? friend.displayName : 'ASI'}</b> says:</div>
+              <div className="says"><b>{b.speaker}</b> says:</div>
               {b.items.map((m) => (
                 <MessageView key={m.id} m={m} chatId={chatId} />
               ))}

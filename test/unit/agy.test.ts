@@ -273,7 +273,7 @@ describe('Gemini CLI is replaced by Antigravity for existing users', () => {
       const friend = (id: string, harness: string, transport: string | null, name: string) => db.execute({ sql: "INSERT INTO friends(id,harness,display_name,avatar,command,args_json,transport,default_mode,dangerous_allowed,lettering_style,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)", args: [id, harness, name, transport ?? harness, transport ?? harness, '["--experimental-acp"]', transport, 'ask', 0, 'funky', 1] })
       await friend('g', 'acp', 'gemini', 'Gemini CLI'); await friend('o', 'acp', 'opencode', 'OpenCode'); await friend('gx', 'acp', 'gemini', 'My Gemini')
       for (const [c, f] of [['cg', 'g'], ['co', 'o']] as const) await db.execute({ sql: "INSERT INTO chats(id,workspace_id,friend_id,title,harness_session_id,created_at,last_activity_at) VALUES (?,?,?,?,?,1,1)", args: [c, 'w', f, 't', 'old-session'] })
-      await db.executeMultiple(MIGRATIONS.at(-1)!)
+      await db.executeMultiple(MIGRATIONS[9]!)
       const rows = (await db.execute('SELECT id, harness, transport, command, args_json, avatar, display_name FROM friends ORDER BY id')).rows
       expect(rows.find((r) => r['id'] === 'g')).toMatchObject({ harness: 'agy', transport: null, command: 'agy', args_json: '[]', avatar: 'agy', display_name: 'Antigravity' })
       expect(rows.find((r) => r['id'] === 'gx')).toMatchObject({ harness: 'agy', display_name: 'My Gemini' }) // a name you chose is kept

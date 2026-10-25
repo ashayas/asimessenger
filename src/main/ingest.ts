@@ -5,13 +5,22 @@ import type { AgentEvent, Risk } from '@shared/events'
 import type { Presence } from '@shared/status'
 import { heuristicRisk } from '@shared/safety'
 import { statusLine, type Lettering } from '@shared/status-text'
+import type { ParticipantTarget } from '../harness/manager'
 
 const PHASE_PRESENCE: Record<string, Presence> = { idle: 'online', done: 'online', thinking: 'busy', tool: 'busy', waiting: 'away', error: 'busy' }
+
+export interface SpeakerTag {
+  participantId: string
+  agentId: string
+  speakerName: string
+  friendId?: string
+}
 
 interface ChatState {
   /** event id -> persisted message id (text, thinking, tool upserts) */
   byEventId: Map<string, string>
   textBuf: Map<string, string>
+  speakerByKey: Map<string, SpeakerTag | undefined>
   dirtyText: Set<string>
   flushTimer: ReturnType<typeof setTimeout> | null
   lettering: Lettering | null
@@ -29,13 +38,29 @@ export interface Attention {
   reqId?: string
 }
 
-export function createIngestor(repo: Repo, notify: (topic: string) => void, onAttention: (a: Attention) => void = () => {}, assessRisk?: (tool: string, summary: string) => Promise<Risk>, onTurnEnd: (chatId: string, reason: 'done' | 'interrupted' | 'error') => void = () => {}) {
+export function createIngestor(
+  repo: Repo,
+  notify: (topic: string) => void,
+  onAttention: (a: Attention) => void = () => {},
+  assessRisk?: (tool: string, summary: string) => Promise<Risk>,
+  onTurnEnd: (chatId: string, reason: 'done' | 'interrupted' | 'error', participant?: ParticipantTarget, turnText?: string) => void = () => {}
+) {
   const states = new Map<string, ChatState>()
   const queues = new Map<string, Promise<void>>()
   const state = (chatId: string): ChatState => {
     let s = states.get(chatId)
-    if (!s) states.set(chatId, (s = { byEventId: new Map(), textBuf: new Map(), dirtyText: new Set(), flushTimer: null, lettering: null }))
+    if (!s) states.set(chatId, (s = { byEventId: new Map(), textBuf: new Map(), speakerByKey: new Map(), dirtyText: new Set(), flushTimer: null, lettering: null }))
     return s
+  }
+
+  function speakerOf(p?: ParticipantTarget): SpeakerTag | undefined {
+    if (!p) return undefined
+    return {
+      participantId: p.id,
+      agentId: p.agentId,
+      speakerName: `${p.displayName} [${p.agentId}]`,
+      friendId: p.friendId
+    }
   }
 
   async function flush(chatId: string): Promise<void> {
@@ -45,7 +70,8 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
     for (const eventId of s.dirtyText) {
       const text = s.textBuf.get(eventId)!
       const mid = s.byEventId.get(eventId)
-      if (mid) await repo.messages.update(mid, { text, body: { text } })
+      const speaker = s.speakerByKey.get(eventId)
+      if (mid) await repo.messages.update(mid, { text, body: speaker ? { text, speaker } : { text } })
     }
     s.dirtyText.clear()
     notify('messages')
@@ -61,18 +87,27 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
     return s.lettering
   }
 
-  async function handle(chatId: string, e: AgentEvent): Promise<void> {
+  async function handle(chatId: string, e: AgentEvent, participant?: ParticipantTarget): Promise<void> {
     const s = state(chatId)
+    const pPrefix = participant ? `${participant.id}::` : ''
+    const speaker = speakerOf(participant)
     switch (e.t) {
       case 'text':
       case 'thinking': {
-        const key = `${e.t}:${e.id}`
+        const key = `${pPrefix}${e.t}:${e.id}`
         const prev = s.textBuf.get(key) ?? ''
         const text = prev + e.delta
         if (!s.byEventId.has(key)) {
-          const m = await repo.messages.append({ chatId, role: 'agent', kind: e.t, body: { text }, text })
+          const m = await repo.messages.append({
+            chatId,
+            role: 'agent',
+            kind: e.t,
+            body: speaker ? { text, speaker } : { text },
+            text
+          })
           s.byEventId.set(key, m.id)
           s.textBuf.set(key, text)
+          s.speakerByKey.set(key, speaker)
           notify('messages')
         } else {
           s.textBuf.set(key, text)
@@ -86,41 +121,46 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
       }
       case 'tool': {
         await flush(chatId)
-        const key = `tool:${e.id}`
+        const key = `${pPrefix}tool:${e.id}`
         const mid = s.byEventId.get(key)
         const text = [e.title, e.command].filter(Boolean).join(' ')
-        if (mid) await repo.messages.update(mid, { body: e, text })
-        else s.byEventId.set(key, (await repo.messages.append({ chatId, role: 'agent', kind: 'tool', body: e, text })).id)
+        const body = speaker ? { ...e, speaker } : e
+        if (mid) await repo.messages.update(mid, { body, text })
+        else s.byEventId.set(key, (await repo.messages.append({ chatId, role: 'agent', kind: 'tool', body, text })).id)
         notify('messages')
         return
       }
       case 'permission': {
         await flush(chatId)
         const risk = e.risk ?? (await (assessRisk?.(e.tool, e.summary) ?? Promise.resolve(heuristicRisk(e.tool, e.summary))).catch(() => heuristicRisk(e.tool, e.summary)))
-        await repo.messages.append({ chatId, role: 'agent', kind: 'permission', body: { ...e, risk, decision: null }, text: `${e.tool}: ${e.summary}` })
-        await repo.chats.setStatus(chatId, 'away', statusLine({ phase: 'waiting', detail: e.summary }, await lettering(chatId)))
-        notify('chats'); notify('messages')
+        await repo.messages.append({ chatId, role: 'agent', kind: 'permission', body: speaker ? { ...e, risk, decision: null, speaker } : { ...e, risk, decision: null }, text: `${e.tool}: ${e.summary}` })
+        const line = statusLine({ phase: 'waiting', detail: e.summary }, await lettering(chatId))
+        if (participant) await repo.participants.setStatus(participant.id, 'away', line)
+        await repo.chats.setStatus(chatId, 'away', line)
+        notify('chats'); notify('participants'); notify('messages')
         onAttention({ chatId, kind: 'permission', text: e.summary, risk, reqId: e.reqId })
         return
       }
       case 'question': {
         await flush(chatId)
-        await repo.messages.append({ chatId, role: 'agent', kind: 'question', body: { ...e, answer: null }, text: e.prompt })
-        await repo.chats.setStatus(chatId, 'away', statusLine({ phase: 'waiting', detail: 'question' }, await lettering(chatId)))
-        notify('chats'); notify('messages')
+        await repo.messages.append({ chatId, role: 'agent', kind: 'question', body: speaker ? { ...e, answer: null, speaker } : { ...e, answer: null }, text: e.prompt })
+        const line = statusLine({ phase: 'waiting', detail: 'question' }, await lettering(chatId))
+        if (participant) await repo.participants.setStatus(participant.id, 'away', line)
+        await repo.chats.setStatus(chatId, 'away', line)
+        notify('chats'); notify('participants'); notify('messages')
         onAttention({ chatId, kind: 'question', text: e.prompt, reqId: e.reqId })
         return
       }
       case 'attachment': {
         await flush(chatId)
-        const m = await repo.messages.append({ chatId, role: 'agent', kind: 'attachment', body: e, text: e.name })
+        const m = await repo.messages.append({ chatId, role: 'agent', kind: 'attachment', body: speaker ? { ...e, speaker } : e, text: e.name })
         await repo.attachments.add({ messageId: m.id, kind: e.kind, name: e.name, path: e.path ?? null, body: e.body ?? null })
         notify('messages')
         return
       }
       case 'links': {
         await flush(chatId)
-        await repo.messages.append({ chatId, role: 'agent', kind: 'links', body: e, text: e.items.map((i) => i.label).join(', ') })
+        await repo.messages.append({ chatId, role: 'agent', kind: 'links', body: speaker ? { ...e, speaker } : e, text: e.items.map((i) => i.label).join(', ') })
         notify('messages')
         return
       }
@@ -130,7 +170,13 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
         return
       }
       case 'status': {
-        await repo.chats.setStatus(chatId, PHASE_PRESENCE[e.phase] ?? 'online', statusLine({ phase: e.phase, detail: e.detail, kind: e.kind }, await lettering(chatId)))
+        const presence = PHASE_PRESENCE[e.phase] ?? 'online'
+        const line = statusLine({ phase: e.phase, detail: e.detail, kind: e.kind }, await lettering(chatId))
+        if (participant) {
+          await repo.participants.setStatus(participant.id, presence, line)
+          notify('participants')
+        }
+        await repo.chats.setStatus(chatId, presence, line)
         notify('chats')
         return
       }
@@ -141,9 +187,10 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
       case 'usage': {
         // spend is recorded with the names of the chat, agent and workspace as they are now, so totals outlive any of them
         const chat = await repo.chats.get(chatId)
-        const friend = chat ? await repo.friends.get(chat.friendId) : null
+        const fId = participant?.friendId ?? chat?.friendId
+        const friend = fId ? await repo.friends.get(fId) : null
         const ws = chat ? await repo.workspaces.get(chat.workspaceId) : null
-        await repo.usage.record({ chatId, chatTitle: chat?.title, friendId: friend?.id, friendName: friend?.displayName, workspaceId: ws?.id, workspaceName: ws?.name, harness: friend?.harness, model: e.model, inputTokens: e.inputTokens, outputTokens: e.outputTokens, cacheReadTokens: e.cacheReadTokens, cacheWriteTokens: e.cacheWriteTokens, costUsd: e.costUsd })
+        await repo.usage.record({ chatId, chatTitle: chat?.title, friendId: friend?.id, friendName: participant ? `${participant.displayName} [${participant.agentId}]` : friend?.displayName, workspaceId: ws?.id, workspaceName: ws?.name, harness: friend?.harness, model: e.model, inputTokens: e.inputTokens, outputTokens: e.outputTokens, cacheReadTokens: e.cacheReadTokens, cacheWriteTokens: e.cacheWriteTokens, costUsd: e.costUsd })
         notify('usage')
         return
       }
@@ -154,19 +201,47 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
       }
       case 'turn_end': {
         await flush(chatId)
-        s.byEventId.clear()
-        s.textBuf.clear()
+        let turnText = ''
+        for (const [k, val] of s.textBuf) {
+          if (!pPrefix ? !k.includes('::') : k.startsWith(pPrefix)) {
+            if (k.startsWith(`${pPrefix}text:`)) turnText = val
+            s.textBuf.delete(k)
+            s.byEventId.delete(k)
+            s.speakerByKey.delete(k)
+          }
+        }
+        for (const k of [...s.byEventId.keys()]) {
+          if (!pPrefix ? !k.includes('::') : k.startsWith(pPrefix)) {
+            s.byEventId.delete(k)
+            s.speakerByKey.delete(k)
+          }
+        }
         const style = await lettering(chatId)
         const text = e.reason === 'interrupted' ? statusLine({ phase: 'stopped' }, style) : e.reason === 'error' ? statusLine({ phase: 'error', detail: e.error ?? 'error' }, style) : statusLine({ phase: 'done' }, style)
-        if (e.reason === 'error') await repo.messages.append({ chatId, role: 'system', kind: 'error', body: { error: e.error ?? 'error' }, text: e.error ?? 'error' })
-        await repo.chats.setStatus(chatId, 'online', text)
+        if (e.reason === 'error') {
+          const errLabel = participant ? `[${participant.agentId}] ${e.error ?? 'error'}` : (e.error ?? 'error')
+          await repo.messages.append({ chatId, role: 'system', kind: 'error', body: { error: errLabel }, text: errLabel })
+        }
+        if (participant) {
+          await repo.participants.setStatus(participant.id, 'online', text)
+          notify('participants')
+          const allP = await repo.participants.list(chatId)
+          const stillBusy = allP.find((p) => p.id !== participant.id && (p.status === 'busy' || p.status === 'away'))
+          if (stillBusy) {
+            await repo.chats.setStatus(chatId, stillBusy.status, stillBusy.statusText)
+          } else {
+            await repo.chats.setStatus(chatId, 'online', text)
+          }
+        } else {
+          await repo.chats.setStatus(chatId, 'online', text)
+        }
         notify('chats'); notify('messages')
         if (e.reason === 'error') onAttention({ chatId, kind: 'error', text: e.error ?? 'error' })
         else if (e.reason === 'done') {
-          const last = (await repo.messages.list(chatId)).filter((m) => m.role === 'agent' && m.kind === 'text').at(-1)
-          if (last?.text) onAttention({ chatId, kind: 'message', text: last.text })
+          const last = turnText || (await repo.messages.list(chatId)).filter((m) => m.role === 'agent' && m.kind === 'text').at(-1)?.text || ''
+          if (last) onAttention({ chatId, kind: 'message', text: last })
         }
-        onTurnEnd(chatId, e.reason)
+        onTurnEnd(chatId, e.reason, participant, turnText)
         return
       }
     }
@@ -181,8 +256,8 @@ export function createIngestor(repo: Repo, notify: (topic: string) => void, onAt
 
   return {
     /** Queue an event; resolves once it has been persisted. */
-    ingest(chatId: string, e: AgentEvent): Promise<void> {
-      return enqueue(chatId, () => handle(chatId, e))
+    ingest(chatId: string, e: AgentEvent, participant?: ParticipantTarget): Promise<void> {
+      return enqueue(chatId, () => handle(chatId, e, participant))
     },
     async idle(chatId: string): Promise<void> {
       await queues.get(chatId)

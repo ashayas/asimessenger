@@ -73,9 +73,9 @@ app.whenReady().then(async () => {
   ipcMain.handle('asi:brain-disconnect', async () => { await brain.disconnect(); broadcastChanged('settings') })
   const attention = createAttentionHandler(repo)
   const titler = createTitler(repo, () => brain.titleModel())
-  const ingestor = createIngestor(repo, broadcastChanged, (a) => void attention(a), async (tool, summary) => (await assessRisk(await brain.decider(), tool, summary)).risk, (chatId, reason) => {
+  const ingestor = createIngestor(repo, broadcastChanged, (a) => void attention(a), async (tool, summary) => (await assessRisk(await brain.decider(), tool, summary)).risk, (chatId, reason, participant, turnText) => {
     if (reason === 'done') void titler.maybeRetitle(chatId).then((changed) => { if (changed) broadcastChanged('chats') })
-    void chatRef.current?.onTurnEnd(chatId, reason)
+    void chatRef.current?.onTurnEnd(chatId, reason, participant, turnText)
   })
   let badgeTimer: ReturnType<typeof setTimeout> | null = null
   onChanged((topic) => {
@@ -99,29 +99,47 @@ app.whenReady().then(async () => {
   const chatRef: { current: ReturnType<typeof createChatService> | null } = { current: null }
   const bridge = createMcpBridge({
     chatExists: async (id) => !!(await repo.chats.get(id)),
-    askUser: (id, q, choices) => chatRef.current!.askUser(id, q, choices),
-    sendAttachment: async (id, a) => {
+    askUser: (id, q, choices, participantId) => chatRef.current!.askUser(id, q, choices, participantId),
+    sendAttachment: async (id, a, participantId) => {
       // a file the agent points at must be inside the workspace; the card then opens it with the default app
       const file = a.kind === 'file' && a.path ? await chatRef.current!.resolveAgentFile(id, a.path) : null
-      await ingestor.ingest(id, { t: 'attachment', id: `mcp-${Date.now()}`, kind: a.kind, name: a.name, path: file?.path ?? a.path, body: a.content, bytes: file?.bytes })
+      const p = participantId ? await repo.participants.get(participantId) : null
+      const pTarget = p ? { id: p.id, agentId: p.agentId, displayName: p.displayName, friendId: p.friendId, harnessSessionId: p.harnessSessionId } : undefined
+      await ingestor.ingest(id, { t: 'attachment', id: `mcp-${Date.now()}`, kind: a.kind, name: a.name, path: file?.path ?? a.path, body: a.content, bytes: file?.bytes }, pTarget)
     },
     openUrl: async (id, url) => { await ingestor.ingest(id, { t: 'open_url', url }); browser.open(url) },
     openDrawing: async (id, name) => { const c = await repo.chats.get(id); if (c) openDoodleWindow(c.workspaceId, { chatId: id, name }) },
-    setStatus: async (id, text) => { await repo.chats.setStatus(id, 'busy', text); broadcastChanged('chats') }
+    setStatus: async (id, text, participantId) => {
+      if (participantId) {
+        await repo.participants.setStatus(participantId, 'busy', text)
+        broadcastChanged('participants')
+      }
+      await repo.chats.setStatus(id, 'busy', text)
+      broadcastChanged('chats')
+    },
+    appendBoard: (id, participantId, entry) => chatRef.current!.appendBoard(id, participantId, entry),
+    readBoard: (id, filter) => chatRef.current!.readBoard(id, filter)
   })
   await bridge.start()
   app.on('will-quit', () => void bridge.stop())
   const manager = new HarnessManager({
-    mcpFor: (chatId) => bridge.endpointFor(chatId),
-    onEvent: (chatId, e) => void ingestor.ingest(chatId, e),
-    onResumeId: (chatId, id) => void repo.chats.setSession(chatId, id)
+    mcpFor: (chatId, participantId) => bridge.endpointFor(chatId, participantId),
+    onEvent: (chatId, e, participant) => void ingestor.ingest(chatId, e, participant),
+    onResumeId: (chatId, id, participant) => void (participant ? repo.participants.setSession(participant.id, id) : repo.chats.setSession(chatId, id))
   })
   registerHarnesses(manager, { http: httpFactory(secrets), asi: async () => new AsiAgent({ repo, decider: () => brain.decider(), discover: () => discoverSessions({ home: process.env['ASI_DISCOVERY_HOME'] ?? homedir() }), search: (q) => searchAll(repo, q) }) })
   app.on('will-quit', () => void manager.disposeAll())
   const worktrees = createWorktrees({ dir: join(app.getPath('userData'), 'worktrees'), env: await loginEnv() })
   const chat = createChatService({ repo, manager, ingestor, notify: broadcastChanged, worktrees, opener: { url: (u) => browser.open(u), path: (p) => void shell.openPath(p), reveal: (p) => shell.showItemInFolder(p) } })
   chatRef.current = chat
-  ipcMain.handle('chat:send', (_e, chatId: string, text: string, quote?: { name: string; text: string }) => chat.send(chatId, text, quote))
+  ipcMain.handle('chat:send', (_e, chatId: string, text: string, quote?: { name: string; text: string }, targetParticipantId?: string) => chat.send(chatId, text, quote, { targetParticipantId }))
+  ipcMain.handle('chat:invite', (_e, chatId: string, friendId: string, role?: string, customName?: string) => chat.inviteParticipant(chatId, friendId, role, customName))
+  ipcMain.handle('chat:remove-participant', (_e, chatId: string, participantId: string) => chat.removeParticipant(chatId, participantId))
+  ipcMain.handle('chat:set-goal', (_e, chatId: string, goal: string | null) => chat.setGoal(chatId, goal))
+  ipcMain.handle('chat:open-board', (_e, chatId: string) => chat.openBoard(chatId))
+  ipcMain.handle('chat:board-path', (_e, chatId: string) => chat.getBoardPath(chatId))
+  ipcMain.handle('chat:read-board', (_e, chatId: string, filter?: { grep?: string; agentId?: string; type?: string; limit?: number }) => chat.readBoard(chatId, filter))
+  ipcMain.handle('chat:append-board', (_e, chatId: string, participantId: string | undefined, entry: { type?: string; summary: string; detail?: string }) => chat.appendBoard(chatId, participantId, entry))
   ipcMain.handle('safety:set-global-dangerous', (_e, on: boolean) => chat.setGlobalDangerous(on))
   ipcMain.handle('safety:set-friend-dangerous', (_e, id: string, on: boolean) => chat.setFriendDangerous(id, on))
   ipcMain.handle('data:export', async () => {

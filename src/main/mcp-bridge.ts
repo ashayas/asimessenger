@@ -9,11 +9,20 @@ type Obj = Record<string, unknown>
 
 export interface BridgeActions {
   chatExists(chatId: string): Promise<boolean>
-  askUser(chatId: string, question: string, choices?: string[]): Promise<string>
-  sendAttachment(chatId: string, a: { name: string; kind: AttachmentKind; content?: string; path?: string }): Promise<void>
+  askUser(chatId: string, question: string, choices?: string[], participantId?: string): Promise<string>
+  sendAttachment(chatId: string, a: { name: string; kind: AttachmentKind; content?: string; path?: string }, participantId?: string): Promise<void>
   openUrl(chatId: string, url: string): Promise<void>
   openDrawing(chatId: string, name?: string): Promise<void>
-  setStatus(chatId: string, text: string): Promise<void>
+  setStatus(chatId: string, text: string, participantId?: string): Promise<void>
+  appendBoard?(
+    chatId: string,
+    participantId: string | undefined,
+    entry: { type?: string; summary: string; detail?: string }
+  ): Promise<string>
+  readBoard?(
+    chatId: string,
+    filter: { grep?: string; agentId?: string; type?: string; limit?: number }
+  ): Promise<string>
 }
 
 const TOOLS = [
@@ -41,6 +50,32 @@ const TOOLS = [
     name: 'set_status',
     description: 'Set a short status line (shown under your name in the contact list) describing what you are doing.',
     inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] }
+  },
+  {
+    name: 'board_append',
+    description: 'Append an entry with your agent_id to the shared multi-agent session board log file so other collaborating agents can see your claims, status updates, findings, questions, or completed work.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['CLAIM', 'STATUS', 'FINDING', 'QUESTION', 'DONE'], description: 'Category of board entry' },
+        summary: { type: 'string', description: 'Concise single-line summary (searchable via grep)' },
+        detail: { type: 'string', description: 'Optional multi-line details, file paths, or notes' }
+      },
+      required: ['summary']
+    }
+  },
+  {
+    name: 'board_read',
+    description: 'Read or search the shared multi-agent session board log file (overall goal, participating agent roster, and grep-filtered log entries).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        grep: { type: 'string', description: 'Optional substring filter (e.g. AGENT=claude-2 or FINDING)' },
+        agent_id: { type: 'string', description: 'Optional filter for a specific agent_id' },
+        type: { type: 'string', description: 'Optional filter by entry type (GOAL, CLAIM, STATUS, FINDING, QUESTION, TURN, DONE)' },
+        limit: { type: 'number', description: 'Maximum number of entries to return' }
+      }
+    }
   }
 ]
 
@@ -57,20 +92,20 @@ export function isHttpUrl(s: string): boolean {
   }
 }
 
-/** Streamable-HTTP MCP server on 127.0.0.1, scoped per chat by URL and a per-launch bearer token. */
+/** Streamable-HTTP MCP server on 127.0.0.1, scoped per chat (and optional participant) by URL and a per-launch bearer token. */
 export function createMcpBridge(actions: BridgeActions) {
   const token = randomBytes(24).toString('hex')
   let server: Server | null = null
   let port = 0
 
-  async function callTool(chatId: string, name: string, args: Obj): Promise<unknown> {
+  async function callTool(chatId: string, participantId: string | undefined, name: string, args: Obj): Promise<unknown> {
     try {
       switch (name) {
         case 'ask_user': {
           const q = String(args['question'] ?? '').trim()
           if (!q) return fail('question is required')
           const choices = Array.isArray(args['choices']) ? (args['choices'] as unknown[]).map(String).slice(0, 8) : undefined
-          return ok(await actions.askUser(chatId, q, choices))
+          return ok(await actions.askUser(chatId, q, choices, participantId))
         }
         case 'send_attachment': {
           const n = String(args['name'] ?? '').trim()
@@ -78,7 +113,7 @@ export function createMcpBridge(actions: BridgeActions) {
           const kind = (KINDS.has(String(args['kind'])) ? args['kind'] : args['path'] && !args['content'] ? kindForFile(String(args['path'])) : n.endsWith('.md') ? 'markdown' : 'code') as AttachmentKind
           if (!args['content'] && !args['path']) return fail('provide content or path')
           if (kind === 'file' && !args['path']) return fail('a file attachment needs a path inside the workspace')
-          await actions.sendAttachment(chatId, { name: n, kind, content: args['content'] ? String(args['content']) : undefined, path: args['path'] ? String(args['path']) : undefined })
+          await actions.sendAttachment(chatId, { name: n, kind, content: args['content'] ? String(args['content']) : undefined, path: args['path'] ? String(args['path']) : undefined }, participantId)
           return ok('Sent to the human as an attachment.')
         }
         case 'open_url': {
@@ -93,8 +128,27 @@ export function createMcpBridge(actions: BridgeActions) {
         case 'set_status': {
           const text = String(args['text'] ?? '').trim().slice(0, 80)
           if (!text) return fail('text is required')
-          await actions.setStatus(chatId, text)
+          await actions.setStatus(chatId, text, participantId)
           return ok('Status updated.')
+        }
+        case 'board_append': {
+          if (!actions.appendBoard) return fail('board_append is not enabled')
+          const summary = String(args['summary'] ?? '').trim()
+          if (!summary) return fail('summary is required')
+          const type = args['type'] ? String(args['type']).trim().toUpperCase() : 'STATUS'
+          const detail = args['detail'] ? String(args['detail']) : undefined
+          return ok(await actions.appendBoard(chatId, participantId, { type, summary, detail }))
+        }
+        case 'board_read': {
+          if (!actions.readBoard) return fail('board_read is not enabled')
+          return ok(
+            await actions.readBoard(chatId, {
+              grep: args['grep'] ? String(args['grep']) : undefined,
+              agentId: args['agent_id'] ? String(args['agent_id']) : undefined,
+              type: args['type'] ? String(args['type']).toUpperCase() : undefined,
+              limit: typeof args['limit'] === 'number' ? args['limit'] : undefined
+            })
+          )
         }
         default:
           return fail(`unknown tool ${name}`)
@@ -104,7 +158,7 @@ export function createMcpBridge(actions: BridgeActions) {
     }
   }
 
-  async function handleRpc(chatId: string, msg: Obj): Promise<Obj | null> {
+  async function handleRpc(chatId: string, participantId: string | undefined, msg: Obj): Promise<Obj | null> {
     const id = msg['id']
     const method = String(msg['method'] ?? '')
     if (id === undefined) return null // notification
@@ -112,14 +166,14 @@ export function createMcpBridge(actions: BridgeActions) {
     const error = (code: number, message: string): Obj => ({ jsonrpc: '2.0', id, error: { code, message } })
     switch (method) {
       case 'initialize':
-        return reply({ protocolVersion: String((msg['params'] as Obj | undefined)?.['protocolVersion'] ?? '2025-03-26'), capabilities: { tools: {} }, serverInfo: { name: 'asi-messenger', version: '0.1.0' }, instructions: 'Tools for talking to the human in ASI Messenger.' })
+        return reply({ protocolVersion: String((msg['params'] as Obj | undefined)?.['protocolVersion'] ?? '2025-03-26'), capabilities: { tools: {} }, serverInfo: { name: 'asi-messenger', version: '0.1.0' }, instructions: 'Tools for talking to the human and collaborating via the shared session board in ASI Messenger.' })
       case 'ping':
         return reply({})
       case 'tools/list':
         return reply({ tools: TOOLS })
       case 'tools/call': {
         const p = (msg['params'] ?? {}) as Obj
-        return reply(await callTool(chatId, String(p['name']), (p['arguments'] ?? {}) as Obj))
+        return reply(await callTool(chatId, participantId, String(p['name']), (p['arguments'] ?? {}) as Obj))
       }
       default:
         return error(-32601, `method not found: ${method}`)
@@ -135,9 +189,10 @@ export function createMcpBridge(actions: BridgeActions) {
     const host = (req.headers.host ?? '').split(':')[0]
     if (host !== '127.0.0.1' && host !== 'localhost') return send(403, { error: 'forbidden host' })
     if (req.headers.authorization !== `Bearer ${token}`) return send(401, { error: 'unauthorized' })
-    const m = /^\/mcp\/([\w-]+)$/.exec(req.url ?? '')
+    const m = /^\/mcp\/([\w-]+)(?:\/([\w-]+))?$/.exec(req.url ?? '')
     if (!m) return send(404, { error: 'not found' })
     const chatId = m[1]!
+    const participantId = m[2]
     if (req.method === 'DELETE') return send(200, {})
     if (req.method !== 'POST') return send(405, { error: 'method not allowed' })
     if (!(await actions.chatExists(chatId))) return send(404, { error: 'unknown chat' })
@@ -151,7 +206,7 @@ export function createMcpBridge(actions: BridgeActions) {
     let body: unknown
     try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch { return send(400, { error: 'invalid json' }) }
     const batch = Array.isArray(body)
-    const replies = (await Promise.all((batch ? (body as Obj[]) : [body as Obj]).map((m) => handleRpc(chatId, m)))).filter((r): r is Obj => r !== null)
+    const replies = (await Promise.all((batch ? (body as Obj[]) : [body as Obj]).map((m) => handleRpc(chatId, participantId, m)))).filter((r): r is Obj => r !== null)
     if (replies.length === 0) return send(202)
     send(200, batch ? replies : replies[0])
   }
@@ -162,8 +217,9 @@ export function createMcpBridge(actions: BridgeActions) {
       await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', resolve))
       port = (server!.address() as AddressInfo).port
     },
-    endpointFor(chatId: string): McpEndpoint {
-      return { url: `http://127.0.0.1:${port}/mcp/${chatId}`, token }
+    endpointFor(chatId: string, participantId?: string): McpEndpoint {
+      const suffix = participantId ? `/${participantId}` : ''
+      return { url: `http://127.0.0.1:${port}/mcp/${chatId}${suffix}`, token }
     },
     async stop(): Promise<void> {
       await new Promise<void>((resolve) => (server ? server.close(() => resolve()) : resolve()))

@@ -145,5 +145,36 @@ export const MIGRATIONS: string[] = [
   UPDATE friends SET harness = 'agy', transport = NULL, command = 'agy', args_json = '[]', avatar = 'agy',
     display_name = CASE WHEN display_name IN ('Gemini CLI', 'Gemini') THEN 'Antigravity' ELSE display_name END
     WHERE harness = 'acp' AND transport = 'gemini';
+  `,
+  /* 11: Multi-agent threads (Invite flow) and append-only shared session board */
+  `
+  ALTER TABLE chats ADD COLUMN goal TEXT;
+
+  CREATE TABLE chat_participants (
+    id TEXT PRIMARY KEY,
+    chat_id TEXT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+    agent_id TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    role TEXT,
+    harness_session_id TEXT,
+    status TEXT NOT NULL DEFAULT 'online',
+    status_text TEXT,
+    created_at INTEGER NOT NULL,
+    UNIQUE(chat_id, agent_id)
+  );
+  CREATE INDEX chat_participants_chat ON chat_participants(chat_id, created_at);
+
+  CREATE TABLE board_entries (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id TEXT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    agent_id TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    entry_type TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    detail TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX board_entries_chat ON board_entries(chat_id, seq);
   `
 ]

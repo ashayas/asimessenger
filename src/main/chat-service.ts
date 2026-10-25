@@ -5,20 +5,29 @@ import { isAbsolute, resolve as resolvePath } from 'node:path'
 import { loginEnv } from '../harness/env'
 import { isAllowedNavigation, normalizeUrl } from '@shared/browser'
 import type { Repo } from './db/repo'
-import type { Message } from '@shared/models'
+import type { BoardEntryType, Chat, ChatParticipant, Friend, Message, Mode } from '@shared/models'
 import type { PermDecision, UserTurn } from '@shared/events'
-import type { Mode } from '@shared/models'
 import { canUseMode, lockedReason } from '@shared/safety'
 import { ruleTitle } from '@shared/title'
-import type { HarnessManager } from '../harness/manager'
+import type { HarnessManager, ParticipantTarget } from '../harness/manager'
 import { attachmentPrompt, filePrompt, imageMime, imagePrompt, kindForFile, MAX_FILE_BYTES, MAX_IMAGE_BYTES, MAX_PASTED_FILE_BYTES, safeFileName, safeImageName } from '@shared/attachments'
+import {
+  BOARD_ENTRY_TYPES,
+  buildCollaborationPrompt,
+  formatBoardEntry,
+  formatBoardFile,
+  nextAgentId,
+  nextParticipantDisplayName,
+  parseTargetMentions,
+  sanitizeSingleLine,
+  type BoardParticipantInfo
+} from '@shared/board'
 import { constants as fsConstants } from 'node:fs'
-import { copyFile, mkdir, realpath, stat, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
 import { basename, join, sep } from 'node:path'
 import { readPickedFile } from './attachments'
 import type { Ingestor } from './ingest'
 import type { Worktrees } from './worktrees'
-import type { Chat } from '@shared/models'
 
 
 const NUDGE_COOLDOWN_MS = 3000
@@ -55,6 +64,118 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
   const queued = new Map<string, QueuedPrompt>()
   const cancelAsks = (chatId: string, why: string) => {
     for (const [id, a] of asks) if (a.chatId === chatId) { asks.delete(id); a.resolve(why) }
+  }
+
+  /** `<workspace>/.boards/<chatId>.log`, created on demand. Collaborating agents read/grep and append to this shared file. */
+  async function boardFilePath(chatId: string): Promise<string> {
+    const chat = await repo.chats.get(chatId)
+    if (!chat) throw new Error(`unknown chat ${chatId}`)
+    const ws = await repo.workspaces.get(chat.workspaceId)
+    const dir = join(rootOf(chat, ws), '.boards')
+    await mkdir(dir, { recursive: true })
+    return join(dir, `${chat.id}.log`)
+  }
+
+  /** Harvest any raw lines appended directly to `.boards/<chatId>.log` on disk by a CLI agent before re-rendering canonical state. */
+  async function harvestDiskAppends(chatId: string, filePath: string, defaultAgent: { agentId: string; displayName: string }): Promise<void> {
+    if (!existsSync(filePath)) return
+    const raw = await readFile(filePath, 'utf8').catch(() => '')
+    const logIdx = raw.indexOf('\n# [LOG]')
+    if (logIdx < 0) return
+    const afterLog = raw.slice(logIdx + '\n# [LOG]'.length).split(/\r?\n/)
+    for (const line of afterLog) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      // Canonical rendered lines start with ISO timestamp + "| SEQ=" or "DETAIL:AGENT="
+      if (/^\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*\|\s*SEQ=\d+/.test(trimmed)) continue
+      if (/^DETAIL:AGENT=/.test(trimmed)) continue
+      const agentMatch = /\bAGENT=([a-zA-Z0-9_-]+)/i.exec(trimmed)
+      const typeMatch = /\bTYPE=(CLAIM|STATUS|FINDING|QUESTION|DONE|TURN|GOAL|USER|INVITE)\b/i.exec(trimmed)
+      const agentId = agentMatch?.[1]?.toLowerCase() ?? defaultAgent.agentId
+      const entryType = (typeMatch?.[1]?.toUpperCase() ?? 'FINDING') as BoardEntryType
+      const cleaned = trimmed
+        .replace(/\bAGENT=[a-zA-Z0-9_-]+\s*\|?\s*/i, '')
+        .replace(/\bTYPE=[a-zA-Z]+\s*\|?\s*/i, '')
+        .trim()
+      if (!cleaned) continue
+      const participants = await repo.participants.list(chatId)
+      const matchedP = participants.find((p) => p.agentId.toLowerCase() === agentId)
+      await repo.board.append({
+        chatId,
+        agentId: matchedP?.agentId ?? agentId,
+        agentName: matchedP?.displayName ?? defaultAgent.displayName,
+        entryType,
+        summary: sanitizeSingleLine(cleaned).slice(0, 240)
+      })
+    }
+  }
+
+  async function rosterFor(chat: Chat): Promise<BoardParticipantInfo[]> {
+    const participants = await repo.participants.list(chat.id)
+    const friends = new Map((await repo.friends.list()).map((f) => [f.id, f]))
+    if (participants.length === 0) {
+      const primary = friends.get(chat.friendId)
+      return [
+        {
+          agentId: nextAgentId(primary?.harness ?? 'agent', []),
+          displayName: primary?.displayName ?? 'Agent',
+          harness: primary?.harness ?? 'agent',
+          role: 'lead',
+          status: chat.status
+        }
+      ]
+    }
+    return participants.map((p) => {
+      const f = friends.get(p.friendId)
+      return {
+        agentId: p.agentId,
+        displayName: p.displayName,
+        harness: f?.harness ?? 'agent',
+        role: p.role,
+        status: p.status
+      }
+    })
+  }
+
+  async function syncBoardFile(chatId: string): Promise<string> {
+    const chat = await repo.chats.get(chatId)
+    if (!chat) throw new Error(`unknown chat ${chatId}`)
+    const filePath = await boardFilePath(chatId)
+    const roster = await rosterFor(chat)
+    const primary = roster[0] ?? { agentId: 'agent-1', displayName: 'Agent', role: null }
+    await harvestDiskAppends(chatId, filePath, primary)
+    const entries = await repo.board.list(chatId)
+    const content = formatBoardFile({
+      chatId: chat.id,
+      title: chat.title,
+      goal: chat.goal ?? null,
+      participants: roster,
+      entries
+    })
+    await writeFile(filePath, content, 'utf8')
+    return filePath
+  }
+
+  /** Ensures the chat's primary Friend is registered as the first participant before adding invited agents. */
+  async function ensurePrimaryParticipant(chatId: string): Promise<ChatParticipant[]> {
+    const existing = await repo.participants.list(chatId)
+    if (existing.length > 0) return existing
+    const chat = await repo.chats.get(chatId)
+    if (!chat) throw new Error(`unknown chat ${chatId}`)
+    const primaryFriend = await repo.friends.get(chat.friendId)
+    if (!primaryFriend) throw new Error(`unknown friend ${chat.friendId}`)
+    const agentId = nextAgentId(primaryFriend.harness, [])
+    const first = await repo.participants.add({
+      chatId: chat.id,
+      friendId: primaryFriend.id,
+      agentId,
+      displayName: primaryFriend.displayName,
+      role: 'Primary agent',
+      harnessSessionId: chat.harnessSessionId
+    })
+    // If there was a live session keyed under chat.id, dispose it so it resumes cleanly under the participant key
+    if (manager.isLive(chat.id)) await manager.dispose(chat.id)
+    return [first]
   }
 
   /** `<workspace>/.attachments`, created on demand. Pictures live in the workspace so the agent's own file tools can open them. */
@@ -113,15 +234,23 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
   }
 
   return {
-    async send(chatId: string, text: string, quote?: UserTurn['quote'], opts: { silentUser?: boolean; images?: UserTurn['images'] } = {}): Promise<Message | null> {
+    async send(chatId: string, text: string, quote?: UserTurn['quote'], opts: { silentUser?: boolean; images?: UserTurn['images']; targetParticipantId?: string } = {}): Promise<Message | null> {
       const clean = text.trim()
       if (!clean) return null
       const chat = await repo.chats.get(chatId)
       if (!chat) throw new Error(`unknown chat ${chatId}`)
-      // "!cmd" runs a shell command here; "/open <url|path>" opens it; "/reset" starts a fresh agent session.
+      // "!cmd" runs a shell command here; "/open <url|path>" opens it; "/reset" starts a fresh agent session; "/goal <text>" sets the shared session goal.
       if (clean.startsWith('!') && clean.length > 1 && !opts.silentUser) return this.runShell(chatId, clean.slice(1).trim())
       if (/^\/open\s+\S/.test(clean) && !opts.silentUser) return this.openTarget(chatId, clean.replace(/^\/open\s+/, '').trim())
       if (clean === '/reset' && !opts.silentUser) return this.reset(chatId)
+      if (/^\/goal(?:\s+|$)/i.test(clean) && !opts.silentUser) {
+        const goalText = clean.replace(/^\/goal\s*/i, '').trim()
+        const path = await this.setGoal(chatId, goalText || null)
+        const note = goalText ? `Updated session goal: "${goalText}" (Board: ${path})` : `Cleared session goal.`
+        const msg = await repo.messages.append({ chatId, role: 'system', kind: 'system', body: { text: note }, text: note })
+        notify('messages')
+        return msg
+      }
       const friend = await repo.friends.get(chat.friendId)
       if (!friend) throw new Error(`unknown friend ${chat.friendId}`)
       const ws = await repo.workspaces.get(chat.workspaceId)
@@ -129,9 +258,74 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       if (chat.titleSource === 'default') await repo.chats.setAutoTitle(chatId, opts.silentUser ? (await repo.messages.list(chatId)).find((m) => m.kind === 'attachment')?.text ?? ruleTitle(clean) : ruleTitle(clean), 'rule')
       notify('messages')
       try {
-        const permissionState = { globalDangerous: await repo.settings.get('allowDangerous', false), friendDangerous: friend.dangerousAllowed }
-        if (!canUseMode(chat.mode, permissionState)) throw new Error(lockedReason(permissionState) ?? 'that mode is not allowed')
-        await manager.send(chat, friend, rootOf(chat, ws), { text: clean, quote, images: opts.images })
+        const globalDangerous = await repo.settings.get('allowDangerous', false)
+        const existingParticipants = await repo.participants.list(chatId)
+        const isCollaborative = existingParticipants.length > 0 || !!(chat.goal && chat.goal.trim())
+
+        if (!isCollaborative) {
+          const permissionState = { globalDangerous, friendDangerous: friend.dangerousAllowed }
+          if (!canUseMode(chat.mode, permissionState)) throw new Error(lockedReason(permissionState) ?? 'that mode is not allowed')
+          await manager.send(chat, friend, rootOf(chat, ws), { text: clean, quote, images: opts.images })
+          return shown
+        }
+
+        // Multi-agent / Shared Session Board flow
+        const participants = existingParticipants.length > 0 ? existingParticipants : await ensurePrimaryParticipant(chatId)
+        await repo.board.append({
+          chatId,
+          agentId: 'user',
+          agentName: 'User',
+          entryType: 'USER',
+          summary: sanitizeSingleLine(clean).slice(0, 200),
+          detail: clean.length > 200 ? clean : null
+        })
+        const boardPath = await syncBoardFile(chatId)
+        notify('board')
+
+        let targets: ChatParticipant[] = participants
+        if (opts.targetParticipantId) {
+          const found = participants.find((p) => p.id === opts.targetParticipantId || p.agentId === opts.targetParticipantId)
+          if (found) targets = [found]
+        } else {
+          const mentionedIds = parseTargetMentions(clean, participants)
+          if (mentionedIds.length > 0) {
+            targets = participants.filter((p) => mentionedIds.includes(p.id))
+          }
+        }
+
+        const roster = await rosterFor(chat)
+        const recentEntries = await repo.board.list(chatId, { limit: 15 })
+        const cwd = rootOf(chat, ws)
+
+        await Promise.all(
+          targets.map(async (p) => {
+            const pFriend: Friend = (await repo.friends.get(p.friendId)) ?? friend
+            const permissionState = { globalDangerous, friendDangerous: pFriend.dangerousAllowed }
+            if (!canUseMode(chat.mode, permissionState)) throw new Error(lockedReason(permissionState) ?? 'that mode is not allowed')
+            const wrappedPrompt = buildCollaborationPrompt({
+              boardPath,
+              self: {
+                agentId: p.agentId,
+                displayName: p.displayName,
+                harness: pFriend.harness,
+                role: p.role,
+                status: p.status
+              },
+              goal: chat.goal ?? null,
+              participants: roster,
+              recentEntries,
+              userText: clean
+            })
+            const pTarget: ParticipantTarget = {
+              id: p.id,
+              agentId: p.agentId,
+              displayName: p.displayName,
+              friendId: p.friendId,
+              harnessSessionId: p.harnessSessionId
+            }
+            await manager.send(chat, pFriend, cwd, { text: wrappedPrompt, quote, images: opts.images }, pTarget)
+          })
+        )
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         await repo.messages.append({ chatId, role: 'system', kind: 'error', body: { error: message }, text: message })
@@ -448,10 +642,29 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       await this.send(chatId, q.text, q.quote)
     },
 
-    /** The ingestor calls this when a turn ends: success sends the held prompt, anything else holds it for you. */
-    async onTurnEnd(chatId: string, reason: 'done' | 'interrupted' | 'error'): Promise<void> {
+    /** The ingestor calls this when a turn ends: records turn output to the shared board if active, and sends any held prompt. */
+    async onTurnEnd(chatId: string, reason: 'done' | 'interrupted' | 'error', participant?: ParticipantTarget, turnText?: string): Promise<void> {
+      if (participant && reason === 'done' && turnText && turnText.trim()) {
+        await repo.board.append({
+          chatId,
+          agentId: participant.agentId,
+          agentName: participant.displayName,
+          entryType: 'TURN',
+          summary: sanitizeSingleLine(turnText).slice(0, 200),
+          detail: turnText.trim()
+        })
+        await syncBoardFile(chatId).catch(() => {})
+        notify('board')
+      } else if (participant) {
+        await syncBoardFile(chatId).catch(() => {})
+      }
       const q = queued.get(chatId)
       if (!q) return
+      // In multi-agent threads, wait until all participants finish before dispatching a queued prompt
+      if (participant) {
+        const allP = await repo.participants.list(chatId)
+        if (allP.some((p) => p.status === 'busy' || p.status === 'away')) return
+      }
       if (reason === 'done') {
         queued.delete(chatId)
         notify('queue')
@@ -460,6 +673,157 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
         q.held = true
         notify('queue')
       }
+    },
+
+    /** Invite a Friend (same or different harness/model) into this thread and initialize/sync the shared session board. */
+    async inviteParticipant(chatId: string, friendId: string, role?: string, customName?: string): Promise<ChatParticipant> {
+      const chat = await repo.chats.get(chatId)
+      if (!chat) throw new Error(`unknown chat ${chatId}`)
+      const friend = await repo.friends.get(friendId)
+      if (!friend) throw new Error(`unknown friend ${friendId}`)
+      await ensurePrimaryParticipant(chatId)
+      const current = await repo.participants.list(chatId)
+      const agentId = nextAgentId(friend.harness, current.map((p) => p.agentId))
+      const sameFriendCount = current.filter((p) => p.friendId === friendId).length
+      const displayName = customName?.trim() || nextParticipantDisplayName(friend.displayName, sameFriendCount)
+      const cleanRole = role?.trim() || null
+      const added = await repo.participants.add({
+        chatId,
+        friendId,
+        agentId,
+        displayName,
+        role: cleanRole
+      })
+      await repo.board.append({
+        chatId,
+        agentId,
+        agentName: displayName,
+        entryType: 'INVITE',
+        summary: `Invited ${displayName} (${friend.harness})${cleanRole ? ` — role: ${cleanRole}` : ''}`
+      })
+      const boardPath = await syncBoardFile(chatId)
+      const sysText = `Invited ${displayName} [${agentId}]${cleanRole ? ` (${cleanRole})` : ''} to collaborate. Shared board: ${boardPath}`
+      await repo.messages.append({
+        chatId,
+        role: 'system',
+        kind: 'system',
+        body: { text: sysText },
+        text: sysText
+      })
+      notify('participants')
+      notify('board')
+      notify('messages')
+      return added
+    },
+
+    /** Remove a participant from a multi-agent thread and stop its session. */
+    async removeParticipant(chatId: string, participantId: string): Promise<void> {
+      await manager.dispose(chatId, participantId)
+      await repo.participants.remove(participantId)
+      await syncBoardFile(chatId).catch(() => {})
+      notify('participants')
+      notify('board')
+    },
+
+    /** Set or update the overall goal at the top of the shared session board file. */
+    async setGoal(chatId: string, goal: string | null): Promise<string> {
+      const chat = await repo.chats.get(chatId)
+      if (!chat) throw new Error(`unknown chat ${chatId}`)
+      const clean = goal?.trim() || null
+      await repo.chats.setGoal(chatId, clean)
+      if (clean) await ensurePrimaryParticipant(chatId)
+      await repo.board.append({
+        chatId,
+        agentId: 'user',
+        agentName: 'User',
+        entryType: 'GOAL',
+        summary: clean ? sanitizeSingleLine(clean).slice(0, 200) : 'Cleared overall goal',
+        detail: clean && clean.includes('\n') ? clean : null
+      })
+      const path = await syncBoardFile(chatId)
+      notify('chats')
+      notify('participants')
+      notify('board')
+      return path
+    },
+
+    /** Append an entry to the shared session board (used by MCP board_append and UI). */
+    async appendBoard(
+      chatId: string,
+      participantId: string | undefined,
+      entry: { type?: string; summary: string; detail?: string }
+    ): Promise<string> {
+      const chat = await repo.chats.get(chatId)
+      if (!chat) throw new Error(`unknown chat ${chatId}`)
+      let agentId = 'user'
+      let agentName = 'User'
+      if (participantId) {
+        const p = await repo.participants.get(participantId)
+        if (p) {
+          agentId = p.agentId
+          agentName = p.displayName
+        }
+      } else {
+        const list = await repo.participants.list(chatId)
+        if (list[0]) {
+          agentId = list[0].agentId
+          agentName = list[0].displayName
+        } else {
+          const f = await repo.friends.get(chat.friendId)
+          agentId = nextAgentId(f?.harness ?? 'agent', [])
+          agentName = f?.displayName ?? 'Agent'
+        }
+      }
+      const rawType = (entry.type ?? 'STATUS').toUpperCase() as BoardEntryType
+      const entryType: BoardEntryType = BOARD_ENTRY_TYPES.includes(rawType) ? rawType : 'STATUS'
+      const created = await repo.board.append({
+        chatId,
+        agentId,
+        agentName,
+        entryType,
+        summary: sanitizeSingleLine(entry.summary),
+        detail: entry.detail?.trim() || null
+      })
+      const path = await syncBoardFile(chatId)
+      notify('board')
+      return `${formatBoardEntry(created)}\n(Synced to ${path})`
+    },
+
+    /** Read or grep the shared session board (used by MCP board_read and UI). */
+    async readBoard(
+      chatId: string,
+      filter: { grep?: string; agentId?: string; type?: string; limit?: number } = {}
+    ): Promise<string> {
+      const chat = await repo.chats.get(chatId)
+      if (!chat) throw new Error(`unknown chat ${chatId}`)
+      const path = await syncBoardFile(chatId)
+      const roster = await rosterFor(chat)
+      const entries = await repo.board.list(chatId, {
+        grep: filter.grep,
+        agentId: filter.agentId,
+        entryType: filter.type,
+        limit: filter.limit ?? 50
+      })
+      const formatted = formatBoardFile({
+        chatId: chat.id,
+        title: chat.title,
+        goal: chat.goal ?? null,
+        participants: roster,
+        entries
+      })
+      return `# BOARD_PATH: ${path}\n${formatted}`
+    },
+
+    /** Ensure the shared `.boards/<chatId>.log` file exists on disk, open it, and return its path. */
+    async openBoard(chatId: string): Promise<string> {
+      const path = await syncBoardFile(chatId)
+      opener.path(path)
+      return path
+    },
+
+    /** Return the path to `.boards/<chatId>.log`, syncing it on disk. */
+    async getBoardPath(chatId: string): Promise<string> {
+      return syncBoardFile(chatId)
     },
 
     /** Plain stop. */
@@ -478,6 +842,10 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       await manager.dispose(chatId)
       await repo.chats.setSession(chatId, null)
       await repo.chats.setStatus(chatId, 'online', null)
+      for (const p of await repo.participants.list(chatId)) {
+        await repo.participants.setSession(p.id, null)
+        await repo.participants.setStatus(p.id, 'online', null)
+      }
       const msg = await repo.messages.append({
         chatId,
         role: 'system',
@@ -485,15 +853,20 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
         body: { text: 'Session reset — the next message starts a fresh agent session.' },
         text: 'Session reset — the next message starts a fresh agent session.'
       })
-      notify('chats'); notify('messages')
+      notify('chats'); notify('participants'); notify('messages')
       return msg
     },
 
     /** ask_user from the MCP bridge: shows a question card and resolves with the answer. */
-    async askUser(chatId: string, prompt: string, choices?: string[]): Promise<string> {
+    async askUser(chatId: string, prompt: string, choices?: string[], participantId?: string): Promise<string> {
       const reqId = `ask-${randomUUID()}`
       const answered = new Promise<string>((resolve) => asks.set(reqId, { chatId, resolve }))
-      await ingestor.ingest(chatId, { t: 'question', reqId, prompt, choices })
+      let pTarget: ParticipantTarget | undefined
+      if (participantId) {
+        const p = await repo.participants.get(participantId)
+        if (p) pTarget = { id: p.id, agentId: p.agentId, displayName: p.displayName, friendId: p.friendId, harnessSessionId: p.harnessSessionId }
+      }
+      await ingestor.ingest(chatId, { t: 'question', reqId, prompt, choices }, pTarget)
       return answered
     },
 
@@ -517,14 +890,21 @@ export function createChatService(deps: { repo: Repo; manager: HarnessManager; i
       const ask = asks.get(reqId)
       const msgs = await repo.messages.list(chatId)
       const card = msgs.find((m) => (m.kind === 'permission' || m.kind === 'question') && (m.body as { reqId?: string }).reqId === reqId)
+      let participantId: string | undefined
       if (card) {
         const body = card.body as Record<string, unknown>
+        const speaker = body['speaker'] as { participantId?: string } | undefined
+        participantId = speaker?.participantId
         await repo.messages.update(card.id, { body: card.kind === 'permission' ? { ...body, decision: answer, reason: reason ?? null } : { ...body, answer } })
+      }
+      if (participantId) {
+        await repo.participants.setStatus(participantId, 'busy', null)
+        notify('participants')
       }
       await repo.chats.setStatus(chatId, 'busy', null)
       notify('messages'); notify('chats')
       if (ask) { asks.delete(reqId); ask.resolve(String(answer)); return }
-      manager.respond(chatId, reqId, answer, reason)
+      manager.respond(chatId, reqId, answer, reason, participantId)
     }
   }
 }

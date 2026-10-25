@@ -35,6 +35,8 @@ export interface Chat {
   friendId: string
   title: string
   titleSource: TitleSource
+  /** Shared overall goal for multi-agent collaboration on this thread. */
+  goal?: string | null
   /** Set for an isolated chat: the git worktree folder the agent works in, and its branch. */
   worktreePath: string | null
   branch: string | null
@@ -45,6 +47,32 @@ export interface Chat {
   unreadCount: number
   createdAt: number
   lastActivityAt: number
+}
+
+export interface ChatParticipant {
+  id: string
+  chatId: string
+  friendId: string
+  agentId: string
+  displayName: string
+  role: string | null
+  harnessSessionId: string | null
+  status: Presence
+  statusText: string | null
+  createdAt: number
+}
+
+export type BoardEntryType = 'GOAL' | 'USER' | 'INVITE' | 'CLAIM' | 'STATUS' | 'FINDING' | 'QUESTION' | 'TURN' | 'DONE'
+
+export interface BoardEntry {
+  seq: number
+  chatId: string
+  agentId: string
+  agentName: string
+  entryType: BoardEntryType
+  summary: string
+  detail: string | null
+  createdAt: number
 }
 
 export type MessageRole = 'user' | 'agent' | 'system'
